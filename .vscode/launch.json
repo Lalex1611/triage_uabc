@@ -1,0 +1,24 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "sistema_triage [desde repo triage_final]",
+      "request": "launch",
+      "type": "dart",
+      "cwd": "${workspaceFolder}/SYSTEMTRIAGE/sistema_triage",
+      "program": "lib/main.dart",
+      "toolArgs": [
+        "--dart-define-from-file=${workspaceFolder}/SYSTEMTRIAGE/sistema_triage/supabase.define.json"
+      ]
+    },
+    {
+      "name": "sistema_triage [carpeta sistema_triage = raíz]",
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/main.dart",
+      "toolArgs": [
+        "--dart-define-from-file=${workspaceFolder}/supabase.define.json"
+      ]
+    }
+  ]
+}
