@@ -106,10 +106,10 @@ class PatientDemographicsMapper {
     if (detail.status == 'trasladando' &&
         assignedHospital?.latitude != null &&
         assignedHospital?.longitude != null) {
-      return '${assignedHospital!.latitude!.toStringAsFixed(5)}, ${assignedHospital!.longitude!.toStringAsFixed(5)}';
+      return '${assignedHospital!.latitude!.toStringAsFixed(5)}, ${assignedHospital.longitude!.toStringAsFixed(5)}';
     }
     if (incident?.latitude != null && incident?.longitude != null) {
-      return '${incident!.latitude!.toStringAsFixed(5)}, ${incident!.longitude.toStringAsFixed(5)}';
+      return '${incident!.latitude!.toStringAsFixed(5)}, ${incident.longitude?.toStringAsFixed(5)}';
     }
     return '—';
   }
