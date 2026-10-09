@@ -524,13 +524,8 @@ class PatientDetailsController extends ChangeNotifier {
 
   List<PopupMenuEntry<PatientStatus>>? statusMenuEntries(String sqlStatus) {
     switch (sqlStatus) {
-      case 'registrado':
       case 'en_espera':
         return const [
-          PopupMenuItem(
-            value: PatientStatus.registrado,
-            child: Text('Registrado'),
-          ),
           PopupMenuItem(
             value: PatientStatus.enEspera,
             child: Text('En espera'),
@@ -572,7 +567,7 @@ class PatientDetailsController extends ChangeNotifier {
         await load();
         return;
       }
-      if (s == PatientStatus.registrado) {
+      if (s == PatientStatus.enEspera) {
         return;
       }
       if (s == PatientStatus.trasladando) {

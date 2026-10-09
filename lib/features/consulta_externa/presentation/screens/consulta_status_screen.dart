@@ -128,18 +128,16 @@ class ConsultaStatusScreen extends StatelessWidget {
 
   Widget _buildProgressBar(ConsultaStatus status) {
     final steps = [
-      'Registrado',
       'En espera',
       'Trasladando',
       'Recibido',
       'Alta médica',
     ];
     int currentIndex = 0;
-    if (status == ConsultaStatus.registrado) currentIndex = 0;
-    if (status == ConsultaStatus.enEspera) currentIndex = 1;
-    if (status == ConsultaStatus.trasladando) currentIndex = 2;
-    if (status == ConsultaStatus.recibido) currentIndex = 3;
-    if (status == ConsultaStatus.alta) currentIndex = 4;
+    if (status == ConsultaStatus.enEspera) currentIndex = 0;
+    if (status == ConsultaStatus.trasladando) currentIndex = 1;
+    if (status == ConsultaStatus.recibido) currentIndex = 2;
+    if (status == ConsultaStatus.alta) currentIndex = 3;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -282,7 +280,6 @@ class ConsultaStatusScreen extends StatelessWidget {
                 const SizedBox(height: 12),
 
                 if (!result.hasHospitalAssignment ||
-                    status == ConsultaStatus.registrado ||
                     status == ConsultaStatus.enEspera)
                   _buildUnassignedHospital()
                 else

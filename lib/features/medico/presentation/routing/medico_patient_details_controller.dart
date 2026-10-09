@@ -432,10 +432,9 @@ class MedicoPatientDetailsController extends ChangeNotifier {
   }
 
   MedicoPatientStatus medicoLifecycleUi() {
-    final raw = detail?.status ?? 'registrado';
+    final raw = detail?.status ?? 'en_espera';
     switch (raw) {
       case 'trasladando':
-      case 'registrado':
         return MedicoPatientStatus.enCamino;
       case 'en_espera':
         return MedicoPatientStatus.enEspera;

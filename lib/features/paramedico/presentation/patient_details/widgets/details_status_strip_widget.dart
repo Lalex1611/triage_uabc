@@ -104,7 +104,6 @@ class DetailsStatusStripWidget extends StatelessWidget {
             return custom;
           }
           return [
-            _buildPopupItem(PatientStatus.registrado, 'Registrado'),
             _buildPopupItem(PatientStatus.enEspera, 'En espera'),
             _buildPopupItem(PatientStatus.trasladando, 'Trasladando'),
           ];
@@ -175,8 +174,6 @@ class DetailsStatusStripWidget extends StatelessWidget {
     switch (status) {
       case PatientStatus.enEspera:
         return 'En espera';
-      case PatientStatus.registrado:
-        return 'Registrado';
       case PatientStatus.trasladando:
         return 'Trasladando';
       case PatientStatus.alta:

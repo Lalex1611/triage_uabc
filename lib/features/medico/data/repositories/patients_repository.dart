@@ -1,4 +1,3 @@
-import 'dart:math';
 
 import 'package:sistema_triage/core/config/supabase_env.dart';
 import 'package:sistema_triage/core/geo/geo_location_parser.dart';
@@ -142,7 +141,7 @@ class PatientsRepository {
       newTriageColor:
           _parseMedicoTriageColor(newColorRaw) ?? MedicoTriageCategory.amarillo,
       oldStatus: row['old_status'] as String?,
-      newStatus: row['new_status'] as String? ?? 'registrado',
+      newStatus: row['new_status'] as String? ?? 'en_espera',
       actorRole: row['actor_role'] as String?,
       changedFields: [for (final f in changedFieldsRaw) f.toString()],
       changedAt: dt,
@@ -192,68 +191,20 @@ class PatientsRepository {
       insertRow['vital_signs'] = vitalSigns;
     }
 
-    final inserted = await _c
-        .from('patients')
-        .insert(insertRow)
-        .select('id')
-        .single();
+final inserted = await _c
+    .from('patients')
+    .insert(insertRow)
+    .select('id')
+    .single();
 
-    final patientId = inserted['id'] as String;
+final patientId = inserted['id'] as String;
 
-    final code = await _insertUniqueConsultationCode(
-      patientId: patientId,
-      createdBy: uidAuth,
-    );
+final code = await _c.rpc(
+  'create_consultation_code',
+  params: {'p_patient_id': patientId},
+) as String;
 
-    return (patientId: patientId, consultationCode: code);
-  }
-
-  Future<String> _insertUniqueConsultationCode({
-    required String patientId,
-    required String createdBy,
-  }) async {
-    final rnd = Random.secure();
-    for (var attempt = 0; attempt < 12; attempt++) {
-      final code = _randomConsultationCode(rnd);
-      if (await _consultationCodeExists(code)) continue;
-      try {
-        await _c.from('consultation_codes').insert({
-          'patient_id': patientId,
-          'code': code,
-          'created_by': createdBy,
-        });
-        return code;
-      } on PostgrestException catch (e) {
-        if (!_isConsultationCodeCollision(e)) rethrow;
-        continue;
-      }
-    }
-    throw Exception('No pudimos generar un código de consulta único');
-  }
-
-  String _randomConsultationCode(Random rnd) {
-    const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-    final buf = StringBuffer();
-    for (var i = 0; i < 6; i++) {
-      buf.write(alphabet[rnd.nextInt(alphabet.length)]);
-    }
-    return buf.toString();
-  }
-
-  Future<bool> _consultationCodeExists(String code) async {
-    final rows = await _c
-        .from('consultation_codes')
-        .select('id')
-        .eq('code', code)
-        .limit(1);
-    return (rows as List<dynamic>).isNotEmpty;
-  }
-
-  bool _isConsultationCodeCollision(PostgrestException error) {
-    final message = error.message.toLowerCase();
-    return error.code == '23505' ||
-        message.contains('duplicate key') ||
-        message.contains('unique');
+return (patientId: patientId, consultationCode: code);
   }
 
   Future<List<MedicoPatientCardData>> fetchRejectedTransfers({
@@ -311,7 +262,7 @@ class PatientsRepository {
   MedicoPatientCardData _mapRow(Map<String, dynamic> row, {int? number}) {
     final id = row['id'] as String;
     final triageRaw = row['triage_color'] as String? ?? 'amarillo';
-    final statusRaw = row['status'] as String? ?? 'registrado';
+    final statusRaw = row['status'] as String? ?? 'en_espera';
     final createdAt = row['created_at'] as String?;
     final location = row['location'];
     final folio = row['regulation_folio'] as String?;
@@ -362,8 +313,6 @@ class PatientsRepository {
 
   static PatientStatus _lifecycleFromDb(String raw) {
     switch (raw) {
-      case 'registrado':
-        return PatientStatus.registrado;
       case 'en_espera':
         return PatientStatus.enEspera;
       case 'trasladando':
@@ -373,7 +322,7 @@ class PatientsRepository {
       case 'alta_medica':
         return PatientStatus.alta;
       default:
-        return PatientStatus.registrado;
+        return PatientStatus.enEspera;
     }
   }
 
