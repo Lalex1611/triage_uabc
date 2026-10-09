@@ -282,3 +282,37 @@ grant execute on function public.create_consultation_code(uuid, int) to authenti
 grant execute on function public.get_patient_status_by_code(text) to anon, authenticated;
 
 notify pgrst, 'reload schema';
+
+create or replace function public.paramedico_set_ambulance_unit(p_code text)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_code text := upper(trim(p_code));
+  v_unit uuid;
+begin
+  if public.app_current_role() is distinct from 'paramedico'::public.user_role then
+    raise exception 'forbidden';
+  end if;
+  if v_code is null or v_code = '' then
+    raise exception 'Escribe el código de tu unidad';
+  end if;
+
+  insert into public.ambulancias_unidades (numero_economico)
+  values (v_code)
+  on conflict (numero_economico)
+    do update set is_deleted = false, is_active = true
+  returning id into v_unit;
+
+  perform set_config('app.internal_rpc', 'on', true);
+  update public.profiles set ambulance_unit_id = v_unit where id = auth.uid();
+  perform set_config('app.internal_rpc', 'off', true);
+
+  return v_unit;
+end;
+$$;
+
+revoke all on function public.paramedico_set_ambulance_unit(text) from public;
+grant execute on function public.paramedico_set_ambulance_unit(text) to authenticated;

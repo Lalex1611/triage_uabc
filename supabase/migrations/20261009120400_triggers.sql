@@ -43,7 +43,9 @@ returns trigger
 language plpgsql
 as $$
 begin
-  if auth.uid() is null or public.app_current_role() = 'admin' then
+  if auth.uid() is null
+     or current_setting('app.internal_rpc', true) = 'on'
+     or public.app_current_role() = 'admin' then
     return new;
   end if;
 

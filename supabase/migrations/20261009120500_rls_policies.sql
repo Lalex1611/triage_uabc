@@ -207,3 +207,6 @@ create policy medico_rejected_transfers_select on public.medico_rejected_transfe
       and hospital_id = public.app_current_hospital_id()
     )
   );
+
+create policy profiles_select_staff on public.profiles for select to authenticated
+  using (public.app_current_role() in ('paramedico', 'medico'));
