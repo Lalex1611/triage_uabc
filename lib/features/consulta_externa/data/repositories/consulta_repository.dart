@@ -92,8 +92,6 @@ class ConsultaRepository {
 
   ConsultaStatus _parseLifecycle(String? raw) {
     switch (raw) {
-      case 'registrado':
-        return ConsultaStatus.registrado;
       case 'en_espera':
         return ConsultaStatus.enEspera;
       case 'trasladando':
@@ -103,7 +101,7 @@ class ConsultaRepository {
       case 'alta_medica':
         return ConsultaStatus.alta;
       default:
-        return ConsultaStatus.registrado;
+        return ConsultaStatus.enEspera;
     }
   }
 }

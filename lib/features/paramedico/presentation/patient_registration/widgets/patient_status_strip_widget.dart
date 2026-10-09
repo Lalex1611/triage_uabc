@@ -117,7 +117,6 @@ class PatientStatusStripWidget extends StatelessWidget {
         color: const Color(0xFFF5F5F5),
         onSelected: data.onStatusChanged,
         itemBuilder: (context) => [
-          _buildPopupItem(PatientStatus.registrado, 'Registrado'),
           _buildPopupItem(PatientStatus.enEspera, 'En espera'),
           _buildPopupItem(PatientStatus.trasladando, 'Trasladando'),
         ],
@@ -191,8 +190,6 @@ class PatientStatusStripWidget extends StatelessWidget {
     switch (status) {
       case PatientStatus.enEspera:
         return 'En espera';
-      case PatientStatus.registrado:
-        return 'Registrado';
       case PatientStatus.trasladando:
         return 'Trasladando';
       case PatientStatus.alta:

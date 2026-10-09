@@ -245,7 +245,7 @@ class ParamedicoPatientRow {
       id: id,
       displayName: display,
       triageColor: j['triage_color'] as String? ?? 'amarillo',
-      status: j['status'] as String? ?? 'registrado',
+      status: j['status'] as String? ?? 'en_espera',
       createdAt: (j['created_at'] as String?) != null
           ? DateTime.tryParse(j['created_at'] as String)
           : null,
@@ -307,7 +307,7 @@ class ParamedicoPatientDetail {
       id: id,
       displayName: display,
       triageColor: j['triage_color'] as String? ?? 'amarillo',
-      status: j['status'] as String? ?? 'registrado',
+      status: j['status'] as String? ?? 'en_espera',
       createdAt: (j['created_at'] as String?) != null
           ? DateTime.tryParse(j['created_at'] as String)
           : null,
@@ -398,6 +398,14 @@ class ParamedicoIncidentsRepository {
     if (row == null) return null;
     return ParamedicoIncidentSummary.fromJson(Map<String, dynamic>.from(row));
   }
+
+  Future<String> _createConsultationCode(String patientId) async {
+  final code = await _c.rpc(
+    'create_consultation_code',
+    params: {'p_patient_id': patientId},
+  );
+  return code as String;
+}
 
   /// Pacientes activos del incidente (para numeración al registrar uno nuevo)
   Future<int> countPatientsForIncident(String incidentId) async {
@@ -727,7 +735,7 @@ class ParamedicoIncidentsRepository {
           'sync_client_id': uid,
           'incident_id': incidentId,
           'triage_color': triageColor,
-          'status': 'registrado',
+          'status': 'en_espera',
           'created_by': uidAuth,
         })
         .select('id')
@@ -735,11 +743,7 @@ class ParamedicoIncidentsRepository {
 
     final patientId = inserted['id'] as String;
 
-    final code = await _insertUniqueConsultationCode(
-      patientId: patientId,
-      createdBy: uidAuth,
-    );
-    return code;
+    return _createConsultationCode(patientId);
   }
 
   /// Registro completo (display_name + demographics + ubicación del paciente + código de consulta)
@@ -763,7 +767,7 @@ class ParamedicoIncidentsRepository {
       'sync_client_id': uid,
       'incident_id': incidentId,
       'triage_color': triageColor,
-      'status': 'registrado',
+      'status': 'en_espera',
       'created_by': uidAuth,
       'display_name': displayName.trim().isEmpty ? null : displayName.trim(),
       'demographics': demo,
@@ -781,10 +785,7 @@ class ParamedicoIncidentsRepository {
       locationLng: locationLng,
     );
 
-    return _insertUniqueConsultationCode(
-      patientId: patientId,
-      createdBy: uidAuth,
-    );
+    return _createConsultationCode(patientId);
   }
 
   Future<void> updatePatientRecord({
@@ -862,10 +863,6 @@ class ParamedicoIncidentsRepository {
       );
     }
 
-    if (newStatus == 'trasladando' && cur.status == 'registrado') {
-      await updatePatientRecord(patientId: patientId, status: 'en_espera');
-    }
-
     await updatePatientRecord(
       patientId: patientId,
       status: newStatus,
@@ -908,16 +905,19 @@ class ParamedicoIncidentsRepository {
   /// Código activo (no revocado) más reciente del paciente, si existe
   Future<String?> getActiveConsultationCode(String patientId) async {
     final rows = await _c
-        .from('consultation_codes')
-        .select('code, revoked_at, created_at')
-        .eq('patient_id', patientId)
-        .order('created_at', ascending: false);
+      .from('consultation_codes')
+      .select('code, revoked_at, expires_at, created_at')
+      .eq('patient_id', patientId)
+      .order('created_at', ascending: false);
     final list = rows as List<dynamic>;
+    final now = DateTime.now().toUtc();
     for (final raw in list) {
-      final m = raw as Map<String, dynamic>;
-      if (m['revoked_at'] != null) continue;
-      final code = m['code'] as String?;
-      if (code != null && code.trim().isNotEmpty) return code.trim();
+        final m = raw as Map<String, dynamic>;
+        if (m['revoked_at'] != null) continue;
+        final exp = DateTime.tryParse(m['expires_at'] as String? ?? '');
+        if (exp != null && exp.isBefore(now)) continue;
+        final code = m['code'] as String?;
+        if (code != null && code.trim().isNotEmpty) return code.trim();
     }
     return null;
   }
@@ -926,9 +926,7 @@ class ParamedicoIncidentsRepository {
   Future<String> ensureConsultationCode(String patientId) async {
     final existing = await getActiveConsultationCode(patientId);
     if (existing != null) return existing;
-    final uid = _c.auth.currentUser?.id;
-    if (uid == null) throw Exception('Sesión inválida.');
-    return _insertUniqueConsultationCode(patientId: patientId, createdBy: uid);
+    return _createConsultationCode(patientId);
   }
 
   Future<List<HospitalRow>> listActiveHospitals() async {
@@ -991,54 +989,12 @@ class ParamedicoIncidentsRepository {
     return code == null || code.isEmpty ? null : code;
   }
 
-  Future<String> setCurrentAmbulanceUnitCode(String rawCode) async {
-    final uid = _c.auth.currentUser?.id;
-    if (uid == null) throw Exception('Sesión inválida.');
-    final code = rawCode.trim().toUpperCase();
-    if (code.isEmpty) throw Exception('Escribe el código de tu unidad.');
-
-    final unitId = await _ensureAmbulanceUnit(code);
-    await _c
-        .from('profiles')
-        .update({'ambulance_unit_id': unitId})
-        .eq('id', uid);
-    return code;
-  }
-
-  Future<String> _ensureAmbulanceUnit(String code) async {
-    final existing = await _c
-        .from('ambulancias_unidades')
-        .select('id, is_deleted')
-        .eq('numero_economico', code)
-        .maybeSingle();
-    final existingId = existing?['id'];
-    if (existingId != null) {
-      if (existing?['is_deleted'] == true) {
-        await _c
-            .from('ambulancias_unidades')
-            .update({'is_deleted': false, 'is_active': true})
-            .eq('id', existingId);
-      }
-      return existingId.toString();
-    }
-
-    try {
-      final inserted = await _c
-          .from('ambulancias_unidades')
-          .insert({'numero_economico': code})
-          .select('id')
-          .single();
-      return inserted['id'].toString();
-    } on PostgrestException catch (e) {
-      if (!_isConsultationCodeCollision(e)) rethrow;
-      final row = await _c
-          .from('ambulancias_unidades')
-          .select('id')
-          .eq('numero_economico', code)
-          .single();
-      return row['id'].toString();
-    }
-  }
+Future<String> setCurrentAmbulanceUnitCode(String rawCode) async {
+  final code = rawCode.trim().toUpperCase();
+  if (code.isEmpty) throw Exception('Escribe el código de tu unidad.');
+  await _c.rpc('paramedico_set_ambulance_unit', params: {'p_code': code});
+  return code;
+}
 
   Future<List<ParamedicoPatientRow>> listRecentPatientsForCurrentUser({
     int limit = 40,
@@ -1058,54 +1014,6 @@ class ParamedicoIncidentsRepository {
     return list
         .map((e) => ParamedicoPatientRow.fromJson(e as Map<String, dynamic>))
         .toList();
-  }
-
-  Future<String> _insertUniqueConsultationCode({
-    required String patientId,
-    required String createdBy,
-  }) async {
-    final rnd = Random.secure();
-    for (var attempt = 0; attempt < 12; attempt++) {
-      final code = _randomConsultationCode(rnd);
-      if (await _consultationCodeExists(code)) continue;
-      try {
-        await _c.from('consultation_codes').insert({
-          'patient_id': patientId,
-          'code': code,
-          'created_by': createdBy,
-        });
-        return code;
-      } on PostgrestException catch (e) {
-        if (!_isConsultationCodeCollision(e)) rethrow;
-        continue;
-      }
-    }
-    throw Exception('No fue posible generar un código único.');
-  }
-
-  String _randomConsultationCode(Random rnd) {
-    const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-    final buf = StringBuffer();
-    for (var i = 0; i < 6; i++) {
-      buf.write(alphabet[rnd.nextInt(alphabet.length)]);
-    }
-    return buf.toString();
-  }
-
-  Future<bool> _consultationCodeExists(String code) async {
-    final rows = await _c
-        .from('consultation_codes')
-        .select('id')
-        .eq('code', code)
-        .limit(1);
-    return (rows as List<dynamic>).isNotEmpty;
-  }
-
-  bool _isConsultationCodeCollision(PostgrestException error) {
-    final message = error.message.toLowerCase();
-    return error.code == '23505' ||
-        message.contains('duplicate key') ||
-        message.contains('unique');
   }
 }
 

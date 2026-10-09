@@ -237,8 +237,6 @@ class _TriageHistoryCard extends StatelessWidget {
   static String _readableStatus(String? status) {
     if (status == null) return '';
     switch (status.toLowerCase()) {
-      case 'registrado':
-        return 'Registrado';
       case 'en_espera':
         return 'En espera';
       case 'trasladando':

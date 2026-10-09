@@ -3,7 +3,6 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:sistema_triage/core/constants/app_icons.dart';
 
 enum ConsultaStatus {
-  registrado,
   enEspera,
   trasladando,
   recibido,
@@ -11,8 +10,6 @@ enum ConsultaStatus {
 
   String get title {
     switch (this) {
-      case ConsultaStatus.registrado:
-        return 'Paciente Registrado';
       case ConsultaStatus.enEspera:
         return 'Siendo atendido en escena';
       case ConsultaStatus.trasladando:
@@ -26,8 +23,6 @@ enum ConsultaStatus {
 
   String get subtitle {
     switch (this) {
-      case ConsultaStatus.registrado:
-        return 'El paciente ha sido ingresado al sistema.';
       case ConsultaStatus.enEspera:
         return 'El personal de emergencias está evaluando al paciente.';
       case ConsultaStatus.trasladando:
@@ -41,8 +36,6 @@ enum ConsultaStatus {
 
   Color get color {
     switch (this) {
-      case ConsultaStatus.registrado:
-        return const Color(0xFFF39B27); // Naranja
       case ConsultaStatus.enEspera:
         return const Color(
           0xFFD4AC0D,
@@ -58,8 +51,6 @@ enum ConsultaStatus {
 
   Color get backgroundColor {
     switch (this) {
-      case ConsultaStatus.registrado:
-        return const Color(0xFFFFF4E5);
       case ConsultaStatus.enEspera:
         return const Color(0xFFFFFDE7); // Amarillo muy claro
       case ConsultaStatus.trasladando:
@@ -73,8 +64,6 @@ enum ConsultaStatus {
 
   Widget get iconWidget {
     switch (this) {
-      case ConsultaStatus.registrado:
-        return Icon(Icons.person_add_alt_1_outlined, color: color, size: 40);
       case ConsultaStatus.enEspera:
         return Icon(
           Icons.monitor_heart_outlined,

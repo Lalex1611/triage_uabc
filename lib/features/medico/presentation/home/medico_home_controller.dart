@@ -95,8 +95,7 @@ class MedicoHomeController extends ChangeNotifier {
         .where(
           (p) =>
               p.status == PatientStatus.trasladando ||
-              p.status == PatientStatus.enEspera ||
-              p.status == PatientStatus.registrado,
+              p.status == PatientStatus.enEspera
         )
         .length;
     final rojo = list
@@ -117,12 +116,11 @@ class MedicoHomeController extends ChangeNotifier {
     switch (f) {
       case MedicoPatientFilter.enCamino:
         return s == PatientStatus.trasladando ||
-            s == PatientStatus.enEspera ||
-            s == PatientStatus.registrado;
+            s == PatientStatus.enEspera;
       case MedicoPatientFilter.recibidos:
         return s == PatientStatus.recibido;
       case MedicoPatientFilter.independientes:
-        return s == PatientStatus.registrado;
+        return s == PatientStatus.enEspera;
       case MedicoPatientFilter.triageHospitalario:
         return true;
     }

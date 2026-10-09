@@ -29,8 +29,6 @@ class ParamedicoCatalogMappers {
 
   static PatientStatus statusFromDb(String raw) {
     switch (raw) {
-      case 'registrado':
-        return PatientStatus.registrado;
       case 'en_espera':
         return PatientStatus.enEspera;
       case 'trasladando':
@@ -40,7 +38,7 @@ class ParamedicoCatalogMappers {
       case 'alta_medica':
         return PatientStatus.alta;
       default:
-        return PatientStatus.registrado;
+        return PatientStatus.enEspera;
     }
   }
 

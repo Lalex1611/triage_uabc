@@ -3,7 +3,6 @@ import 'package:sistema_triage/core/constants/app_colors.dart';
 
 // Catálogo de estados posibles para un paciente durante un incidente
 enum PatientStatus {
-  registrado('REGISTRADO', Color(0xFFF39B27)), // Naranja
   enEspera(
     'EN ESPERA',
     AppColors.medicoStatus_enEspera,

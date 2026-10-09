@@ -100,7 +100,7 @@ class _IncidentDetailsVisualTestState extends State<IncidentDetailsVisualTest> {
                 name: 'Paciente Numero 1 - 12-Mar-2026 14:32 - Blvd. 2000',
                 dateStr: '12/03/206 14:32:54',
                 coordinates: '19.4326, -99.1332',
-                status: PatientStatus.registrado,
+                status: PatientStatus.enEspera,
                 onEditTap: () => _showEditMock(context, 'Paciente Numero 1'),
               ),
               PatientCardData(
