@@ -7,7 +7,6 @@ import 'package:sistema_triage/core/ui/app_snackbar.dart';
 import 'package:sistema_triage/core/theme/app_theme.dart';
 import 'package:sistema_triage/features/auth/domain/constants/auth_role_type.dart';
 import 'package:sistema_triage/features/auth/domain/user_role.dart';
-import 'package:sistema_triage/features/auth/presentation/login/widgets/auth_user_type_selector.dart';
 import 'package:sistema_triage/features/auth/presentation/login/widgets/auth_text_field.dart';
 import 'package:sistema_triage/features/auth/presentation/login/widgets/auth_action_button.dart';
 import 'package:sistema_triage/features/auth/presentation/login/widgets/auth_consult_button.dart';
@@ -22,7 +21,7 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  AuthRoleType _currentRole = AuthRoleType.none;
+  final AuthRoleType _currentRole = AuthRoleType.none;
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _busy = false;
@@ -34,24 +33,7 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  /// Rol de personal esperado según el selector
-  AppUserRole? _staffRoleFromSelector(AuthRoleType t) {
-    switch (t) {
-      case AuthRoleType.paramedico:
-        return AppUserRole.paramedico;
-      case AuthRoleType.medico:
-        return AppUserRole.medico;
-      case AuthRoleType.none:
-        return null;
-    }
-  }
-
   Future<void> _submit() async {
-    if (_currentRole == AuthRoleType.none) {
-      showAppSnackBar(context, 'Selecciona un tipo de usuario.');
-      return;
-    }
-
     if (!SupabaseEnv.isConfigured) {
       showAppSnackBar(
         context,
@@ -83,9 +65,9 @@ class _LoginScreenState extends State<LoginScreen> {
         if (!mounted) return;
         showAppSnackBar(
           context,
-          'Tu cuenta no es de personal (paramédico/médico). '
-          'Para consultar el estado de un paciente no uses correo aquí: '
-          'toca «Consultar estado» abajo e ingresa el código.',
+          'Tu cuenta aún no tiene un rol asignado. Si eres paramédico o médico, '
+          'pide a un administrador que lo active. Para consultar el estado de un '
+          'paciente, toca «Consultar estado» abajo e ingresa el código.',
           isError: true,
         );
         return;
@@ -99,19 +81,6 @@ class _LoginScreenState extends State<LoginScreen> {
         showAppSnackBar(
           context,
           'No se encontró el perfil de usuario en la base de datos.',
-          isError: true,
-        );
-        return;
-      }
-
-      final expected = _staffRoleFromSelector(_currentRole);
-      if (expected != null && role != expected) {
-        await AuthGate.instance.signOut();
-        if (!mounted) return;
-        showAppSnackBar(
-          context,
-          'El tipo de acceso elegido no coincide con tu cuenta. '
-          'Elige Paramédico o Médico según cómo esté registrado tu usuario.',
           isError: true,
         );
         return;
@@ -148,12 +117,6 @@ class _LoginScreenState extends State<LoginScreen> {
                   fit: BoxFit.contain,
                 ),
                 const SizedBox(height: 70),
-                AuthUserTypeSelector(
-                  currentRole: _currentRole,
-                  onRoleSelected: (role) {
-                    setState(() => _currentRole = role);
-                  },
-                ),
                 const SizedBox(height: 35),
                 SizedBox(
                   width: 270,
@@ -190,10 +153,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   )
                 else
-                  AuthActionButton(
-                    roleType: _currentRole,
-                    onTap: _submit,
-                  ),
+                  AuthActionButton(roleType: _currentRole, onTap: _submit),
                 const SizedBox(height: 47),
                 Text(
                   '¿Eres paciente o quieres saber el estado de tu familiar?',
@@ -203,9 +163,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ),
                 const SizedBox(height: 4),
-                AuthConsultButton(
-                  onTap: () => context.go('/consulta-externa'),
-                ),
+                AuthConsultButton(onTap: () => context.go('/consulta-externa')),
                 const SizedBox(height: 28),
                 const AuthPartnerLogosFooter(),
                 const SizedBox(height: 32),
