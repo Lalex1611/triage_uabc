@@ -65,7 +65,7 @@ class _LoginScreenState extends State<LoginScreen> {
         if (!mounted) return;
         showAppSnackBar(
           context,
-          'Tu cuenta aún no tiene un rol asignado. Si eres paramédico o médico, '
+          'Tu cuenta no tiene un rol de la salud asignado. Si eres paramédico o médico, '
           'pide a un administrador que lo active. Para consultar el estado de un '
           'paciente, toca «Consultar estado» abajo e ingresa el código.',
           isError: true,
