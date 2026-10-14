@@ -22,6 +22,7 @@ class _ConsultaInputScreenState extends State<ConsultaInputScreen> {
   final _controller = TextEditingController();
   final _repo = ConsultaRepository();
   bool _busy = false;
+  bool _codeInvalid = false;
 
   /// Incluye code/details de PostgREST para diagnosticar fallos de API
   String _postgrestDebugMessage(PostgrestException e) {
@@ -56,7 +57,10 @@ class _ConsultaInputScreenState extends State<ConsultaInputScreen> {
       return;
     }
 
-    setState(() => _busy = true);
+    setState(() {
+      _busy = true;
+      _codeInvalid = false;
+    });
 
     try {
       final result = await _repo.lookupByCode(code);
@@ -64,10 +68,11 @@ class _ConsultaInputScreenState extends State<ConsultaInputScreen> {
       context.push('/consulta-status', extra: result);
     } on PostgrestException catch (e) {
       if (!mounted) return;
-      final msg = e.message.contains('not_found') || e.code == 'P0001'
-          ? 'Código no válido o expirado.'
-          : _postgrestDebugMessage(e);
-      showAppSnackBar(context, msg, isError: true);
+      if (e.message.contains('not_found') || e.code == 'P0001') {
+        setState(() => _codeInvalid = true);
+      } else {
+        showAppSnackBar(context, _postgrestDebugMessage(e), isError: true);
+      }
     } catch (e) {
       if (!mounted) return;
       showAppSnackBar(context, '$e', isError: true);
@@ -212,24 +217,28 @@ class _ConsultaInputScreenState extends State<ConsultaInputScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(
-          'Escribe el código de consulta',
-          style: AppTextStyles.ESC_Bold_titleSmall.copyWith(
-            fontSize: 22,
-            height: 1.27,
-            color: const Color(0xFF121924),
+        if (_codeInvalid)
+          _buildInvalidCodeNotice()
+        else ...[
+          Text(
+            'Escribe el código de consulta',
+            style: AppTextStyles.ESC_Bold_titleSmall.copyWith(
+              fontSize: 22,
+              height: 1.27,
+              color: const Color(0xFF121924),
+            ),
           ),
-        ),
-        const SizedBox(height: 18),
-        Text(
-          'Alfanumérico (guiones permitidos). Escribe el código completo.',
-          style: AppTextStyles.ESC_Regular_bodyMedium.copyWith(
-            fontSize: 15,
-            height: 1.47,
-            color: const Color(0xFF4A5667),
+          const SizedBox(height: 18),
+          Text(
+            'Alfanumérico (guiones permitidos). Escribe el código completo.',
+            style: AppTextStyles.ESC_Regular_bodyMedium.copyWith(
+              fontSize: 15,
+              height: 1.47,
+              color: const Color(0xFF4A5667),
+            ),
           ),
-        ),
-        const SizedBox(height: 20),
+        ],
+        SizedBox(height: _codeInvalid ? 18 : 20),
         // Un único campo conserva los códigos de hasta 64 caracteres y guiones.
         TextField(
           controller: _controller,
@@ -243,7 +252,9 @@ class _ConsultaInputScreenState extends State<ConsultaInputScreen> {
             fontSize: 24,
             height: 1.17,
             letterSpacing: 8,
-            color: const Color(0xFF121924),
+            color: _codeInvalid
+                ? const Color(0xFFC30508)
+                : const Color(0xFF121924),
           ),
           decoration: InputDecoration(
             counterText: '',
@@ -255,28 +266,37 @@ class _ConsultaInputScreenState extends State<ConsultaInputScreen> {
             ),
             semanticCounterText: 'Código de consulta',
             filled: true,
-            fillColor: Colors.white,
+            fillColor: _codeInvalid ? const Color(0xFFFDECEC) : Colors.white,
             contentPadding: const EdgeInsets.symmetric(
               horizontal: 16,
               vertical: 17,
             ),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
-              borderSide: const BorderSide(
-                color: Color(0xFFD4DCE5),
-                width: 1.25,
+              borderSide: BorderSide(
+                color: _codeInvalid
+                    ? const Color(0xFFC30508)
+                    : const Color(0xFFD4DCE5),
+                width: _codeInvalid ? 1.5 : 1.25,
               ),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
-              borderSide: const BorderSide(
-                color: Color(0xFFD4DCE5),
-                width: 1.25,
+              borderSide: BorderSide(
+                color: _codeInvalid
+                    ? const Color(0xFFC30508)
+                    : const Color(0xFFD4DCE5),
+                width: _codeInvalid ? 1.5 : 1.25,
               ),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
-              borderSide: const BorderSide(color: Color(0xFF0A7EA4), width: 2),
+              borderSide: BorderSide(
+                color: _codeInvalid
+                    ? const Color(0xFFC30508)
+                    : const Color(0xFF0A7EA4),
+                width: 2,
+              ),
             ),
           ),
         ),
@@ -303,26 +323,28 @@ class _ConsultaInputScreenState extends State<ConsultaInputScreen> {
                     color: Colors.white,
                   ),
                 )
-              : const Text('Consultar estado'),
+              : Text(_codeInvalid ? 'Intentar de nuevo' : 'Consultar estado'),
         ),
         const SizedBox(height: 18),
-        Row(
-          children: [
-            const Expanded(child: Divider(color: Color(0xFFD4DCE5))),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              child: Text(
-                'o',
-                style: AppTextStyles.ESC_Regular_bodyMedium.copyWith(
-                  fontSize: 13,
-                  color: const Color(0xFF8695A8),
+        if (!_codeInvalid) ...[
+          Row(
+            children: [
+              const Expanded(child: Divider(color: Color(0xFFD4DCE5))),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Text(
+                  'o',
+                  style: AppTextStyles.ESC_Regular_bodyMedium.copyWith(
+                    fontSize: 13,
+                    color: const Color(0xFF8695A8),
+                  ),
                 ),
               ),
-            ),
-            const Expanded(child: Divider(color: Color(0xFFD4DCE5))),
-          ],
-        ),
-        const SizedBox(height: 18),
+              const Expanded(child: Divider(color: Color(0xFFD4DCE5))),
+            ],
+          ),
+          const SizedBox(height: 18),
+        ],
         OutlinedButton(
           onPressed: () {
             showAppSnackBar(
@@ -344,6 +366,54 @@ class _ConsultaInputScreenState extends State<ConsultaInputScreen> {
           child: const Text('Escanear código QR'),
         ),
       ],
+    );
+  }
+
+  Widget _buildInvalidCodeNotice() {
+    return Semantics(
+      liveRegion: true,
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFDECEC),
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Icon(
+              Icons.cancel_outlined,
+              size: 20,
+              color: Color(0xFFC30508),
+            ),
+            const SizedBox(width: 11),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'El código no existe o ya venció',
+                    style: AppTextStyles.ESC_SemiBold_bodyMedium.copyWith(
+                      fontSize: 13,
+                      height: 1.38,
+                      color: const Color(0xFFC30508),
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    'Revisa que esté escrito igual, con mayúsculas. Si sigue sin funcionar, pídelo de nuevo en el hospital.',
+                    style: AppTextStyles.ESC_Regular_bodyMedium.copyWith(
+                      fontSize: 13,
+                      height: 1.46,
+                      color: const Color(0xFF4A5667),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
