@@ -4,32 +4,44 @@ import 'package:sistema_triage/core/constants/app_icons.dart';
 import 'package:sistema_triage/core/theme/app_theme.dart';
 
 class ConsultaInfoCard extends StatelessWidget {
-  const ConsultaInfoCard({super.key});
+  /// Variante visual de A04; las pantallas de estado conservan su presentación.
+  final bool outlined;
+
+  const ConsultaInfoCard({super.key, this.outlined = false});
 
   @override
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.all(outlined ? 18 : 20),
       decoration: BoxDecoration(
-        color: const Color(0xFFEAEAEA),
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        color: outlined ? Colors.white : const Color(0xFFEAEAEA),
+        borderRadius: BorderRadius.circular(outlined ? 20 : 16),
+        border: outlined
+            ? Border.all(color: const Color(0xFFE6EBF1), width: 1.25)
+            : null,
+        boxShadow: outlined
+            ? []
+            : [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.1),
+                  blurRadius: 4,
+                  offset: const Offset(0, 2),
+                ),
+              ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             '¿Cómo funciona?',
-            style: AppTextStyles.ESC_Bold_titleSmall.copyWith(fontSize: 20),
+            style: AppTextStyles.ESC_Bold_titleSmall.copyWith(
+              fontSize: outlined ? 15 : 20,
+              height: outlined ? 1.33 : null,
+              color: outlined ? const Color(0xFF121924) : null,
+            ),
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: outlined ? 12 : 16),
           _buildInfoRow(
             AppIcons.consultaSecurity,
             'No requiere crear cuenta ni proporcionar datos personales.',
@@ -55,17 +67,23 @@ class ConsultaInfoCard extends StatelessWidget {
       children: [
         SvgPicture.asset(
           iconAsset,
-          width: 20,
-          height: 20,
-          colorFilter: const ColorFilter.mode(Colors.black, BlendMode.srcIn),
+          width: outlined ? 18 : 20,
+          height: outlined ? 18 : 20,
+          colorFilter: ColorFilter.mode(
+            outlined ? const Color(0xFF8695A8) : Colors.black,
+            BlendMode.srcIn,
+          ),
         ),
-        const SizedBox(width: 12),
+        SizedBox(width: outlined ? 10 : 12),
         Expanded(
           child: Text(
             text,
             style: AppTextStyles.ESC_Regular_bodyMedium.copyWith(
-              fontSize: 12,
-              color: const Color(0xFF7B7B7B),
+              fontSize: outlined ? 13 : 12,
+              height: outlined ? 1.46 : null,
+              color: outlined
+                  ? const Color(0xFF4A5667)
+                  : const Color(0xFF7B7B7B),
             ),
           ),
         ),

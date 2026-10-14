@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:sistema_triage/core/config/supabase_env.dart';
-import 'package:sistema_triage/core/constants/app_icons.dart';
+import 'package:sistema_triage/core/layout/app_responsive.dart';
 import 'package:sistema_triage/core/session/auth_gate.dart';
 import 'package:sistema_triage/core/theme/app_theme.dart';
 import 'package:sistema_triage/core/ui/app_snackbar.dart';
@@ -79,26 +78,61 @@ class _ConsultaInputScreenState extends State<ConsultaInputScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final horizontalPadding = AppResponsive.isCompactWidth(context)
+        ? 16.0
+        : 20.0;
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F5F5),
+      backgroundColor: Colors.white,
       body: SafeArea(
         bottom: false,
-        child: Column(
-          children: [
-            _buildHeader(context),
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(16),
+        child: ColoredBox(
+          color: const Color(0xFFF1F5F9),
+          child: LayoutBuilder(
+            builder: (context, constraints) => SingleChildScrollView(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minHeight: constraints.maxHeight),
                 child: Column(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    _buildInputCard(context),
-                    const SizedBox(height: 16),
-                    const ConsultaInfoCard(),
+                    Column(
+                      children: [
+                        _buildHeader(context),
+                        Padding(
+                          padding: EdgeInsets.fromLTRB(
+                            horizontalPadding,
+                            22,
+                            horizontalPadding,
+                            0,
+                          ),
+                          child: Center(
+                            child: ConstrainedBox(
+                              constraints: const BoxConstraints(maxWidth: 520),
+                              child: _buildInputCard(context),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    Padding(
+                      padding: EdgeInsets.fromLTRB(
+                        horizontalPadding,
+                        32,
+                        horizontalPadding,
+                        30 + MediaQuery.paddingOf(context).bottom,
+                      ),
+                      child: Center(
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 520),
+                          child: const ConsultaInfoCard(outlined: true),
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ),
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -107,92 +141,62 @@ class _ConsultaInputScreenState extends State<ConsultaInputScreen> {
   Widget _buildHeader(BuildContext context) {
     return Container(
       width: double.infinity,
-      color: const Color(0xFFCE1125),
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      padding: const EdgeInsets.fromLTRB(14, 6, 20, 12),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(bottom: BorderSide(color: Color(0xFFE6EBF1))),
+      ),
+      child: Row(
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(4),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: SvgPicture.asset(AppIcons.logoBase, height: 40),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Sistema de emergencias',
-                      style: AppTextStyles.ESC_Bold_titleSmall.copyWith(
-                        color: Colors.white,
-                        fontSize: 14,
-                      ),
-                    ),
-                    Text(
-                      'Cruz Roja - Tijuana',
-                      style: AppTextStyles.ESC_Regular_bodyMedium.copyWith(
-                        color: Colors.white,
-                        fontSize: 10,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Sistema de Consulta de Pacientes',
-                      style: AppTextStyles.ESC_Regular_bodyMedium.copyWith(
-                        color: Colors.white,
-                        fontSize: 10,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              IconButton(
-                style: IconButton.styleFrom(
-                  minimumSize: const Size(48, 48),
-                  tapTargetSize: MaterialTapTargetSize.padded,
-                ),
-                onPressed: () {
-                  if (context.canPop()) {
-                    context.pop();
-                    return;
-                  }
-                  final session = Supabase.instance.client.auth.currentSession;
-                  final role = AuthGate.instance.role;
-                  if (session != null &&
-                      role != null &&
-                      role != AppUserRole.consultaExterna) {
-                    context.go(role.homePath);
-                    return;
-                  }
-                  context.go('/auth');
-                },
-                icon: const Icon(Icons.close, color: Colors.white, size: 28),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          Text(
-            '¿Eres paciente o quieres saber el estado de tu familiar?',
-            style: AppTextStyles.ESC_Bold_titleSmall.copyWith(
-              color: Colors.white,
-              fontSize: 16,
-              decoration: TextDecoration.underline,
-              decorationColor: Colors.white,
+          IconButton(
+            tooltip: 'Regresar',
+            style: IconButton.styleFrom(
+              minimumSize: const Size(48, 48),
+              tapTargetSize: MaterialTapTargetSize.padded,
+            ),
+            onPressed: () {
+              if (context.canPop()) {
+                context.pop();
+                return;
+              }
+              final session = Supabase.instance.client.auth.currentSession;
+              final role = AuthGate.instance.role;
+              if (session != null &&
+                  role != null &&
+                  role != AppUserRole.consultaExterna) {
+                context.go(role.homePath);
+                return;
+              }
+              context.go('/auth');
+            },
+            icon: const Icon(
+              Icons.arrow_back,
+              color: Color(0xFF121924),
+              size: 22,
             ),
           ),
-          const SizedBox(height: 12),
-          Text(
-            'Ingresa el código que te proporcionó el personal de Cruz Roja o Hospitalario para consultar tu estado o el estado de tu familiar/allegado.',
-            style: AppTextStyles.ESC_Regular_bodyMedium.copyWith(
-              color: Colors.white,
-              fontSize: 14,
+          const SizedBox(width: 2),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Consulta de paciente',
+                  style: AppTextStyles.ESC_SemiBold_titleMedium.copyWith(
+                    fontSize: 18,
+                    height: 1.33,
+                    color: const Color(0xFF121924),
+                  ),
+                ),
+                Text(
+                  'Sin iniciar sesión',
+                  style: AppTextStyles.ESC_Regular_bodyMedium.copyWith(
+                    fontSize: 13,
+                    height: 1.46,
+                    color: const Color(0xFF4A5667),
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -201,160 +205,145 @@ class _ConsultaInputScreenState extends State<ConsultaInputScreen> {
   }
 
   Widget _buildInputCard(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: const Color(0xFFEAEAEA),
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
+    final actionStyle = AppTextStyles.ESC_SemiBold_bodyMedium.copyWith(
+      fontSize: 15,
+      height: 1.33,
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          'Escribe el código de consulta',
+          style: AppTextStyles.ESC_Bold_titleSmall.copyWith(
+            fontSize: 22,
+            height: 1.27,
+            color: const Color(0xFF121924),
           ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Código de consulta',
-            style: AppTextStyles.ESC_Bold_titleSmall.copyWith(fontSize: 20),
+        ),
+        const SizedBox(height: 18),
+        Text(
+          'Alfanumérico (guiones permitidos). Escribe el código completo.',
+          style: AppTextStyles.ESC_Regular_bodyMedium.copyWith(
+            fontSize: 15,
+            height: 1.47,
+            color: const Color(0xFF4A5667),
           ),
-          const SizedBox(height: 4),
-          Text(
-            'Alfanumérico (guiones permitidos). Escribe el código completo.',
-            style: AppTextStyles.ESC_SemiBold_bodyMedium.copyWith(
-              fontSize: 12,
-              color: const Color(0xFF7B7B7B),
+        ),
+        const SizedBox(height: 20),
+        // Un único campo conserva los códigos de hasta 64 caracteres y guiones.
+        TextField(
+          controller: _controller,
+          textAlign: TextAlign.center,
+          maxLength: 64,
+          textCapitalization: TextCapitalization.characters,
+          inputFormatters: [
+            FilteringTextInputFormatter.allow(RegExp(r'[A-Za-z0-9\-]')),
+          ],
+          style: AppTextStyles.ESC_Bold_titleSmall.copyWith(
+            fontSize: 24,
+            height: 1.17,
+            letterSpacing: 8,
+            color: const Color(0xFF121924),
+          ),
+          decoration: InputDecoration(
+            counterText: '',
+            hintText: 'AB3K7X',
+            hintStyle: AppTextStyles.ESC_Bold_titleSmall.copyWith(
+              fontSize: 24,
+              letterSpacing: 8,
+              color: const Color(0xFF8695A8),
+            ),
+            semanticCounterText: 'Código de consulta',
+            filled: true,
+            fillColor: Colors.white,
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 17,
+            ),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: const BorderSide(
+                color: Color(0xFFD4DCE5),
+                width: 1.25,
+              ),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: const BorderSide(
+                color: Color(0xFFD4DCE5),
+                width: 1.25,
+              ),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: const BorderSide(color: Color(0xFF0A7EA4), width: 2),
             ),
           ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: Container(
-                  height: 60,
-                  decoration: BoxDecoration(
+        ),
+        const SizedBox(height: 18),
+        ElevatedButton(
+          onPressed: _busy ? null : _consultar,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Theme.of(context).colorScheme.secondary,
+            foregroundColor: Colors.white,
+            minimumSize: const Size.fromHeight(54),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            elevation: 0,
+            textStyle: actionStyle,
+          ),
+          child: _busy
+              ? const SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
                     color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: const Color(0xFFD9D9D9),
-                      width: 2,
-                    ),
                   ),
-                  child: TextField(
-                    controller: _controller,
-                    textAlign: TextAlign.center,
-                    maxLength: 64,
-                    textCapitalization: TextCapitalization.characters,
-                    inputFormatters: [
-                      FilteringTextInputFormatter.allow(
-                        RegExp(r'[A-Za-z0-9\-]'),
-                      ),
-                    ],
-                    style: AppTextStyles.ESC_Regular_bodyMedium.copyWith(
-                      fontSize: 24,
-                      letterSpacing: 12,
-                    ),
-                    decoration: const InputDecoration(
-                      counterText: '',
-                      border: InputBorder.none,
-                      hintText: 'A B 3 K 7 X',
-                      hintStyle: TextStyle(color: Color(0xFFCCCCCC)),
-                    ),
-                  ),
+                )
+              : const Text('Consultar estado'),
+        ),
+        const SizedBox(height: 18),
+        Row(
+          children: [
+            const Expanded(child: Divider(color: Color(0xFFD4DCE5))),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: Text(
+                'o',
+                style: AppTextStyles.ESC_Regular_bodyMedium.copyWith(
+                  fontSize: 13,
+                  color: const Color(0xFF8695A8),
                 ),
-              ),
-              const SizedBox(width: 12),
-              Container(
-                width: 60,
-                height: 60,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: const Color(0xFFD9D9D9), width: 2),
-                ),
-                child: IconButton(
-                  onPressed: () {
-                    showAppSnackBar(
-                      context,
-                      'Escaneo QR disponible en una futura versión.',
-                    );
-                  },
-                  icon: SvgPicture.asset(AppIcons.consultaQr, width: 32),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          Center(
-            child: SizedBox(
-              width: 220,
-              height: 48,
-              child: ElevatedButton(
-                onPressed: _busy ? null : _consultar,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFDF7E8A),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(24),
-                  ),
-                  elevation: 0,
-                ),
-                child: _busy
-                    ? const SizedBox(
-                        width: 22,
-                        height: 22,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
-                        ),
-                      )
-                    : Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Icon(Icons.search, color: Colors.white),
-                          const SizedBox(width: 8),
-                          Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Consultar estado',
-                                style: AppTextStyles.ESC_Regular_bodyMedium.copyWith(
-                                  color: Colors.white,
-                                  fontSize: 12,
-                                  height: 1.1,
-                                ),
-                              ),
-                              Text(
-                                'del paciente',
-                                style: AppTextStyles.ESC_Regular_bodyMedium.copyWith(
-                                  color: Colors.white,
-                                  fontSize: 12,
-                                  height: 1.1,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
               ),
             ),
-          ),
-          const SizedBox(height: 12),
-          Center(
-            child: Text(
-              '¿Tienes un QR? Toca el ícono para escanearlo',
-              style: AppTextStyles.ESC_Regular_bodyMedium.copyWith(
-                fontSize: 10,
-                color: const Color(0xFF999A9D),
-              ),
+            const Expanded(child: Divider(color: Color(0xFFD4DCE5))),
+          ],
+        ),
+        const SizedBox(height: 18),
+        OutlinedButton(
+          onPressed: () {
+            showAppSnackBar(
+              context,
+              'Escaneo QR disponible en una futura versión.',
+            );
+          },
+          style: OutlinedButton.styleFrom(
+            backgroundColor: Colors.white,
+            foregroundColor: const Color(0xFF121924),
+            minimumSize: const Size.fromHeight(54),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            side: const BorderSide(color: Color(0xFFD4DCE5), width: 1.25),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
             ),
+            textStyle: actionStyle,
           ),
-        ],
-      ),
+          child: const Text('Escanear código QR'),
+        ),
+      ],
     );
   }
 }
