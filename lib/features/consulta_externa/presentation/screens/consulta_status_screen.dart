@@ -1,16 +1,166 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:postgrest/postgrest.dart';
+import 'package:sistema_triage/core/config/supabase_env.dart';
 import 'package:sistema_triage/core/constants/app_icons.dart';
 import 'package:sistema_triage/core/layout/app_responsive.dart';
 import 'package:sistema_triage/core/theme/app_theme.dart';
 import 'package:sistema_triage/features/consulta_externa/domain/constants/consulta_status.dart';
 import 'package:sistema_triage/features/consulta_externa/domain/consulta_lookup_result.dart';
+import 'package:sistema_triage/features/consulta_externa/domain/consulta_code.dart';
+import 'package:sistema_triage/features/consulta_externa/domain/consulta_rate_limit_exception.dart';
+import 'package:sistema_triage/features/consulta_externa/data/repositories/consulta_repository.dart';
 import 'package:sistema_triage/features/consulta_externa/presentation/widgets/consulta_status_updated_at.dart';
 
-class ConsultaStatusScreen extends StatelessWidget {
+class ConsultaStatusScreen extends StatefulWidget {
   final ConsultaLookupResult result;
+  final ConsultaRepository? repository;
 
-  const ConsultaStatusScreen({super.key, required this.result});
+  const ConsultaStatusScreen({
+    super.key,
+    required this.result,
+    this.repository,
+  });
+
+  @override
+  State<ConsultaStatusScreen> createState() => _ConsultaStatusScreenState();
+}
+
+class _ConsultaStatusScreenState extends State<ConsultaStatusScreen>
+    with WidgetsBindingObserver {
+  late final ConsultaRepository _repo;
+  late ConsultaLookupResult result;
+  Timer? _pollTimer;
+  Timer? _cooldownTimer;
+  bool _active = true;
+  bool _refreshing = false;
+  bool _canRefresh = true;
+  bool _codeInvalid = false;
+  String? _refreshNotice;
+  int _requestVersion = 0;
+
+  bool get _hasLookupCode =>
+      SupabaseEnv.isConfigured && ConsultaCode.isValid(result.code ?? '');
+
+  @override
+  void initState() {
+    super.initState();
+    _repo = widget.repository ?? ConsultaRepository();
+    result = widget.result;
+    _active =
+        WidgetsBinding.instance.lifecycleState == null ||
+        WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed;
+    WidgetsBinding.instance.addObserver(this);
+    _schedulePoll();
+  }
+
+  @override
+  void didUpdateWidget(covariant ConsultaStatusScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.result, widget.result)) {
+      _requestVersion++;
+      _pollTimer?.cancel();
+      _cooldownTimer?.cancel();
+      result = widget.result;
+      _refreshing = false;
+      _canRefresh = true;
+      _codeInvalid = false;
+      _refreshNotice = null;
+      _schedulePoll();
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _active = state == AppLifecycleState.resumed;
+    if (!_active) {
+      _pollTimer?.cancel();
+    } else if (_canRefresh && !_refreshing) {
+      unawaited(_refresh());
+    } else {
+      _schedulePoll();
+    }
+  }
+
+  void _schedulePoll([Duration delay = const Duration(minutes: 1)]) {
+    _pollTimer?.cancel();
+    if (!_active || !_hasLookupCode || _codeInvalid || _refreshing) return;
+    _pollTimer = Timer(delay, () => unawaited(_refresh()));
+  }
+
+  Future<void> _refresh() async {
+    if (!_active ||
+        !_hasLookupCode ||
+        _refreshing ||
+        !_canRefresh ||
+        _codeInvalid) {
+      return;
+    }
+    final version = ++_requestVersion;
+    _pollTimer?.cancel();
+    _cooldownTimer?.cancel();
+    setState(() {
+      _refreshing = true;
+      _canRefresh = false;
+    });
+    var cooldown = const Duration(seconds: 35);
+    var nextPoll = const Duration(minutes: 1);
+    try {
+      final updated = await _repo.lookupByCode(result.code!);
+      if (!mounted || version != _requestVersion) return;
+      setState(() {
+        result = updated;
+        _refreshNotice = null;
+      });
+    } on ConsultaRateLimitException catch (error) {
+      if (!mounted || version != _requestVersion) return;
+      cooldown = nextPoll = const Duration(minutes: 5);
+      setState(
+        () => _refreshNotice =
+            '$error Se muestra la última información consultada.',
+      );
+    } on PostgrestException catch (error) {
+      if (!mounted || version != _requestVersion) return;
+      setState(() {
+        _codeInvalid =
+            error.message.contains('not_found') || error.code == 'P0001';
+        _refreshNotice = _codeInvalid
+            ? 'El código no existe o ya venció. Regresa para consultar otro código.'
+            : 'No pudimos actualizar el estado. Se muestra la última información consultada.';
+      });
+    } catch (_) {
+      if (!mounted || version != _requestVersion) return;
+      setState(
+        () => _refreshNotice =
+            'No pudimos actualizar el estado. Se muestra la última información consultada. Verifica tu conexión e inténtalo de nuevo.',
+      );
+    } finally {
+      if (mounted && version == _requestVersion) {
+        setState(() => _refreshing = false);
+        if (!_codeInvalid) {
+          _cooldownTimer = Timer(cooldown, () {
+            if (!mounted) return;
+            setState(() => _canRefresh = true);
+            if (!(_pollTimer?.isActive ?? false)) {
+              _schedulePoll(Duration.zero);
+            }
+          });
+          _schedulePoll(nextPoll);
+        }
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _requestVersion++;
+    WidgetsBinding.instance.removeObserver(this);
+    _pollTimer?.cancel();
+    _cooldownTimer?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -41,16 +191,46 @@ class ConsultaStatusScreen extends StatelessWidget {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            _buildProgressBar(),
-                            const SizedBox(height: 14),
-                            _buildStatusCard(),
-                            const SizedBox(height: 14),
-                            _buildHospitalCard(context),
-                            if (result.statusChangedAt != null) ...[
-                              const SizedBox(height: 14),
-                              ConsultaStatusUpdatedAt(
-                                timestamp: result.statusChangedAt!,
+                            if (_refreshNotice != null) ...[
+                              Semantics(
+                                liveRegion: true,
+                                child: Container(
+                                  padding: const EdgeInsets.all(14),
+                                  decoration: BoxDecoration(
+                                    color: _codeInvalid
+                                        ? const Color(0xFFFDECEC)
+                                        : const Color(0xFFFFF8E1),
+                                    borderRadius: BorderRadius.circular(14),
+                                  ),
+                                  child: Text(
+                                    _refreshNotice!,
+                                    style:
+                                        AppTextStyles
+                                            .ESC_Regular_bodyMedium.copyWith(
+                                          fontSize: 14,
+                                        ),
+                                  ),
+                                ),
                               ),
+                              const SizedBox(height: 14),
+                            ],
+                            if (_codeInvalid)
+                              OutlinedButton(
+                                onPressed: () => Navigator.pop(context),
+                                child: const Text('Consultar otro código'),
+                              ),
+                            if (!_codeInvalid) ...[
+                              _buildProgressBar(),
+                              const SizedBox(height: 14),
+                              _buildStatusCard(),
+                              const SizedBox(height: 14),
+                              _buildHospitalCard(context),
+                              if (result.statusChangedAt != null) ...[
+                                const SizedBox(height: 14),
+                                ConsultaStatusUpdatedAt(
+                                  timestamp: result.statusChangedAt!,
+                                ),
+                              ],
                             ],
                             const SizedBox(height: 14),
                             _buildPrivacyNotice(),
@@ -115,6 +295,23 @@ class ConsultaStatusScreen extends StatelessWidget {
               ],
             ),
           ),
+          if (_hasLookupCode && !_codeInvalid)
+            IconButton(
+              tooltip: _canRefresh
+                  ? 'Actualizar estado'
+                  : 'Espera antes de volver a actualizar',
+              onPressed: _refreshing || !_canRefresh
+                  ? null
+                  : () => unawaited(_refresh()),
+              style: IconButton.styleFrom(minimumSize: const Size(48, 48)),
+              icon: _refreshing
+                  ? const SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.refresh, color: Color(0xFF0A7EA4)),
+            ),
         ],
       ),
     );

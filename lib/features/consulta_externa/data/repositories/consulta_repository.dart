@@ -7,6 +7,7 @@ import 'package:sistema_triage/features/consulta_externa/data/models/consulta_rp
 import 'package:sistema_triage/features/consulta_externa/domain/constants/consulta_status.dart';
 import 'package:sistema_triage/features/consulta_externa/domain/consulta_lookup_result.dart';
 import 'package:sistema_triage/features/consulta_externa/domain/consulta_code.dart';
+import 'package:sistema_triage/features/consulta_externa/domain/consulta_rate_limit_exception.dart';
 
 /// Permite realizar la consulta pública del estado del paciente mediante su código
 class ConsultaRepository {
@@ -70,9 +71,7 @@ class ConsultaRepository {
                 code: map['error'] as String,
               );
             case 'rate_limited':
-              throw Exception(
-                'Demasiadas consultas. Espera cinco minutos antes de intentarlo de nuevo.',
-              );
+              throw const ConsultaRateLimitException();
             default:
               throw Exception('El servidor respondió de una forma inesperada');
           }

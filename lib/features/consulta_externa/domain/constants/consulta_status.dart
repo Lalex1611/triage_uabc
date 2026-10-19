@@ -26,7 +26,7 @@ enum ConsultaStatus {
       case ConsultaStatus.enEspera:
         return 'El personal de emergencias está evaluando al paciente.';
       case ConsultaStatus.trasladando:
-        return 'Estado actualizándose en tiempo real.';
+        return 'El paciente está siendo trasladado al hospital.';
       case ConsultaStatus.recibido:
         return 'El paciente ha llegado y fue recibido por el hospital.';
       case ConsultaStatus.alta:

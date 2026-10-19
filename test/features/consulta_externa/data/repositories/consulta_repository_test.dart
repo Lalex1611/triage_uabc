@@ -7,6 +7,7 @@ import 'package:postgrest/postgrest.dart';
 import 'package:sistema_triage/core/config/supabase_env.dart';
 import 'package:sistema_triage/features/consulta_externa/data/repositories/consulta_repository.dart';
 import 'package:sistema_triage/features/consulta_externa/domain/constants/consulta_status.dart';
+import 'package:sistema_triage/features/consulta_externa/domain/consulta_rate_limit_exception.dart';
 
 void main() {
   setUp(() {
@@ -99,7 +100,7 @@ void main() {
       () => expectLater(
         ConsultaRepository().lookupByCode('AB3K7X'),
         throwsA(
-          isA<Exception>().having(
+          isA<ConsultaRateLimitException>().having(
             (error) => error.toString(),
             'mensaje',
             contains('cinco minutos'),
