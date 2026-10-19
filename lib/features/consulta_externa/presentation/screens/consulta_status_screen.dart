@@ -322,9 +322,20 @@ class _ConsultaStatusScreenState extends State<ConsultaStatusScreen>
       : result.status.color;
 
   Widget _buildProgressBar() {
-    const steps = ['En espera', 'Trasladando', 'Recibido', 'Alta médica'];
+    const steps = [
+      'Registro',
+      'En espera',
+      'Trasladando',
+      'Recibido',
+      'Alta médica',
+    ];
+    // Registro es una etapa visual completada, no otro estado del paciente.
+    final activeIndex = result.status.index + 1;
     return Container(
-      padding: const EdgeInsets.all(18),
+      padding: EdgeInsets.symmetric(
+        horizontal: AppResponsive.isCompactWidth(context) ? 12 : 18,
+        vertical: 18,
+      ),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
@@ -333,8 +344,8 @@ class _ConsultaStatusScreenState extends State<ConsultaStatusScreen>
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: List.generate(steps.length, (index) {
-          final isActive = index == result.status.index;
-          final isReached = index <= result.status.index;
+          final isActive = index == activeIndex;
+          final isReached = index <= activeIndex;
           return Expanded(
             child: Semantics(
               selected: isActive,

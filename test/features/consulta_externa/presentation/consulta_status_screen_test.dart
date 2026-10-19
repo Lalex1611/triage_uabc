@@ -52,7 +52,8 @@ void main() {
       expect(find.text('Código AB3K7X'), findsOneWidget);
       expect(find.text('Consulta externa'), findsNothing);
       expect(find.textContaining('ya fue avisado'), findsNothing);
-      expect(find.text('Registro'), findsNothing);
+      expect(find.text('Registro'), findsOneWidget);
+      expect(find.byIcon(Icons.check), findsNWidgets(3));
       final active = tester
           .widgetList<Semantics>(find.byType(Semantics))
           .where((widget) => widget.properties.selected == true);
@@ -187,6 +188,8 @@ void main() {
         expect(find.text(status.title), findsWidgets);
         expect(find.text(status.subtitle), findsOneWidget);
         expect(find.text('Esta consulta es limitada'), findsOneWidget);
+        expect(find.text('Registro'), findsOneWidget);
+        expect(find.byIcon(Icons.check), findsNWidgets(status.index + 2));
         final active = tester
             .widgetList<Semantics>(find.byType(Semantics))
             .where((widget) => widget.properties.selected == true);
