@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:sistema_triage/core/config/supabase_env.dart';
 import 'package:sistema_triage/core/layout/app_responsive.dart';
@@ -8,6 +7,8 @@ import 'package:sistema_triage/core/theme/app_theme.dart';
 import 'package:sistema_triage/core/ui/app_snackbar.dart';
 import 'package:sistema_triage/features/auth/domain/user_role.dart';
 import 'package:sistema_triage/features/consulta_externa/data/repositories/consulta_repository.dart';
+import 'package:sistema_triage/features/consulta_externa/domain/consulta_code.dart';
+import 'package:sistema_triage/features/consulta_externa/presentation/widgets/consulta_code_input.dart';
 import 'package:sistema_triage/features/consulta_externa/presentation/widgets/consulta_info_card.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -51,8 +52,8 @@ class _ConsultaInputScreenState extends State<ConsultaInputScreen> {
       return;
     }
 
-    final code = _controller.text.trim().toUpperCase();
-    if (code.replaceAll(RegExp(r'\s+'), '').length < 4) {
+    final code = ConsultaCode.normalize(_controller.text);
+    if (!ConsultaCode.isValid(code)) {
       showAppSnackBar(context, 'Ingresa el código completo.');
       return;
     }
@@ -230,7 +231,7 @@ class _ConsultaInputScreenState extends State<ConsultaInputScreen> {
           ),
           const SizedBox(height: 18),
           Text(
-            'Alfanumérico (guiones permitidos). Escribe el código completo.',
+            'Son 6 caracteres en mayúsculas. Te lo entregó el paramédico o el hospital.',
             style: AppTextStyles.ESC_Regular_bodyMedium.copyWith(
               fontSize: 15,
               height: 1.47,
@@ -239,65 +240,12 @@ class _ConsultaInputScreenState extends State<ConsultaInputScreen> {
           ),
         ],
         SizedBox(height: _codeInvalid ? 18 : 20),
-        // Un único campo conserva los códigos de hasta 64 caracteres y guiones.
-        TextField(
+        ConsultaCodeInput(
           controller: _controller,
-          textAlign: TextAlign.center,
-          maxLength: 64,
-          textCapitalization: TextCapitalization.characters,
-          inputFormatters: [
-            FilteringTextInputFormatter.allow(RegExp(r'[A-Za-z0-9\-]')),
-          ],
-          style: AppTextStyles.ESC_Bold_titleSmall.copyWith(
-            fontSize: 24,
-            height: 1.17,
-            letterSpacing: 8,
-            color: _codeInvalid
-                ? const Color(0xFFC30508)
-                : const Color(0xFF121924),
-          ),
-          decoration: InputDecoration(
-            counterText: '',
-            hintText: 'AB3K7X',
-            hintStyle: AppTextStyles.ESC_Bold_titleSmall.copyWith(
-              fontSize: 24,
-              letterSpacing: 8,
-              color: const Color(0xFF8695A8),
-            ),
-            semanticCounterText: 'Código de consulta',
-            filled: true,
-            fillColor: _codeInvalid ? const Color(0xFFFDECEC) : Colors.white,
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 17,
-            ),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
-              borderSide: BorderSide(
-                color: _codeInvalid
-                    ? const Color(0xFFC30508)
-                    : const Color(0xFFD4DCE5),
-                width: _codeInvalid ? 1.5 : 1.25,
-              ),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
-              borderSide: BorderSide(
-                color: _codeInvalid
-                    ? const Color(0xFFC30508)
-                    : const Color(0xFFD4DCE5),
-                width: _codeInvalid ? 1.5 : 1.25,
-              ),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
-              borderSide: BorderSide(
-                color: _codeInvalid
-                    ? const Color(0xFFC30508)
-                    : const Color(0xFF0A7EA4),
-                width: 2,
-              ),
-            ),
+          hasError: _codeInvalid,
+          onRejectedInput: () => showAppSnackBar(
+            context,
+            'Usa seis letras o números. El contenido no se recorta.',
           ),
         ),
         const SizedBox(height: 18),

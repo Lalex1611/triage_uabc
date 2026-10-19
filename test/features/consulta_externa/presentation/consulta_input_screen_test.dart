@@ -30,20 +30,26 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  testWidgets('Conserva guiones, filtrado y códigos de hasta 64 caracteres', (
-    tester,
-  ) async {
-    await pumpScreen(tester);
-    final field = find.byType(TextField);
-    await tester.enterText(field, 'ab-12 !@');
-    expect(tester.widget<TextField>(field).controller!.text, 'ab-12');
-
-    final longCode = List.filled(64, 'A').join();
-    await tester.enterText(field, '${longCode}B');
-    expect(tester.widget<TextField>(field).controller!.text, longCode);
-    await tester.pumpAndSettle();
-    expect(tester.takeException(), isNull);
-  });
+  testWidgets(
+    'Normaliza seis caracteres sin consultar y rechaza entradas largas',
+    (tester) async {
+      await pumpScreen(tester);
+      final field = find.byType(TextField);
+      await tester.enterText(field, 'ab-3 k7x');
+      expect(tester.widget<TextField>(field).controller!.text, 'AB3K7X');
+      for (var index = 0; index < 6; index++) {
+        expect(
+          find.byKey(ValueKey('consulta-code-cell-$index')),
+          findsOneWidget,
+        );
+      }
+      await tester.enterText(field, 'ABCDEFG');
+      expect(tester.widget<TextField>(field).controller!.text, 'AB3K7X');
+      expect(find.text('Consultar estado'), findsOneWidget);
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   for (final size in [
     const Size(320, 568),

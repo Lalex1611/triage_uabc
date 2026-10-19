@@ -86,13 +86,13 @@ void main() {
       tester,
     ) async {
       await pumpScreen(tester);
-      await tester.enterText(find.byType(TextField), 'ab-123');
+      await tester.enterText(find.byType(TextField), 'ab-3k7x');
       var requests = 0;
       final client = MockClient((request) async {
         requests++;
         expect(request.method, 'POST');
         expect(request.url.path, '/rest/v1/rpc/get_patient_status_by_code');
-        expect(jsonDecode(request.body), {'p_code': 'AB-123'});
+        expect(jsonDecode(request.body), {'p_code': 'AB3K7X'});
         return http.Response(jsonEncode(error), 400);
       });
       await submit(tester, client);
@@ -101,7 +101,7 @@ void main() {
       expect(find.text('Intentar de nuevo'), findsOneWidget);
       expect(
         tester.widget<TextField>(find.byType(TextField)).controller!.text,
-        'ab-123',
+        'AB3K7X',
       );
       expect(find.byType(SnackBar), findsNothing);
       expect(find.byType(ConsultaStatusScreen), findsNothing);
@@ -113,7 +113,7 @@ void main() {
     'Reintentar consulta el código editado y navega con los datos de la respuesta',
     (tester) async {
       await pumpScreen(tester);
-      await tester.enterText(find.byType(TextField), 'AB-123');
+      await tester.enterText(find.byType(TextField), 'AB3K7X');
       final codes = <String>[];
       final client = MockClient((request) async {
         codes.add((jsonDecode(request.body) as Map)['p_code'] as String);
@@ -129,9 +129,9 @@ void main() {
         );
       });
       await submit(tester, client);
-      await tester.enterText(find.byType(TextField), 'cd-456');
+      await tester.enterText(find.byType(TextField), 'cd-4p9z');
       await submit(tester, client, label: 'Intentar de nuevo');
-      expect(codes, ['AB-123', 'CD-456']);
+      expect(codes, ['AB3K7X', 'CD4P9Z']);
       expect(find.byType(ConsultaStatusScreen), findsOneWidget);
       expect(find.text('Recibido en hospital'), findsOneWidget);
       expect(find.text('Hospital simulado de la respuesta'), findsOneWidget);
