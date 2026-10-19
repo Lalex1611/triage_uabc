@@ -49,6 +49,7 @@ void main() {
         () async {
           final result = await ConsultaRepository().lookupByCode(' ab-3 k7x\n');
           expect(result.code, 'AB3K7X');
+          expect(result.statusChangedAt, DateTime.utc(2026, 10, 19, 12, 30));
           expect(result.status, ConsultaStatus.recibido);
           expect(result.hospitalName, 'Hospital de la respuesta');
         },
@@ -60,6 +61,7 @@ void main() {
           return http.Response(
             jsonEncode({
               'found': true,
+              'status_changed_at': '2026-10-19T12:30:00+00:00',
               'patient_status': 'recibido',
               'hospital_name': 'Hospital de la respuesta',
             }),

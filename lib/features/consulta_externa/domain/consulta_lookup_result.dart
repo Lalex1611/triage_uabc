@@ -6,6 +6,7 @@ class ConsultaLookupResult {
 
   /// Código normalizado utilizado en la consulta; no procede de la RPC.
   final String? code;
+  final DateTime? statusChangedAt;
   final String? hospitalName;
   final String? hospitalAddress;
   final String? hospitalPhone;
@@ -13,6 +14,7 @@ class ConsultaLookupResult {
   const ConsultaLookupResult({
     required this.status,
     this.code,
+    this.statusChangedAt,
     this.hospitalName,
     this.hospitalAddress,
     this.hospitalPhone,

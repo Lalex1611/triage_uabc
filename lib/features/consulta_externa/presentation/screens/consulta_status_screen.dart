@@ -5,6 +5,7 @@ import 'package:sistema_triage/core/layout/app_responsive.dart';
 import 'package:sistema_triage/core/theme/app_theme.dart';
 import 'package:sistema_triage/features/consulta_externa/domain/constants/consulta_status.dart';
 import 'package:sistema_triage/features/consulta_externa/domain/consulta_lookup_result.dart';
+import 'package:sistema_triage/features/consulta_externa/presentation/widgets/consulta_status_updated_at.dart';
 
 class ConsultaStatusScreen extends StatelessWidget {
   final ConsultaLookupResult result;
@@ -45,6 +46,12 @@ class ConsultaStatusScreen extends StatelessWidget {
                             _buildStatusCard(),
                             const SizedBox(height: 14),
                             _buildHospitalCard(context),
+                            if (result.statusChangedAt != null) ...[
+                              const SizedBox(height: 14),
+                              ConsultaStatusUpdatedAt(
+                                timestamp: result.statusChangedAt!,
+                              ),
+                            ],
                             const SizedBox(height: 14),
                             _buildPrivacyNotice(),
                           ],

@@ -106,6 +106,68 @@ void main() {
   });
 
   const stepLabels = ['En espera', 'Trasladando', 'Recibido', 'Alta médica'];
+  for (final example in [
+    (
+      age: const Duration(seconds: 10),
+      label: 'Actualizado hace menos de un minuto',
+    ),
+    (
+      age: const Duration(minutes: 1, seconds: 5),
+      label: 'Actualizado hace 1 minuto',
+    ),
+    (age: const Duration(minutes: 3), label: 'Actualizado hace 3 minutos'),
+    (
+      age: const Duration(hours: 1, minutes: 5),
+      label: 'Actualizado hace 1 hora',
+    ),
+    (age: const Duration(hours: 4), label: 'Actualizado hace 4 horas'),
+    (age: const Duration(days: 1, minutes: 5), label: 'Actualizado hace 1 día'),
+    (age: const Duration(days: 3), label: 'Actualizado hace 3 días'),
+  ]) {
+    testWidgets('A06 muestra el último cambio: ${example.label}', (
+      tester,
+    ) async {
+      final timestamp = DateTime.now().subtract(example.age);
+      await pumpScreen(
+        tester,
+        ConsultaLookupResult(
+          status: ConsultaStatus.trasladando,
+          code: 'AB3K7X',
+          statusChangedAt: timestamp,
+          hospitalName: 'Hospital de prueba',
+        ),
+        size: const Size(320, 568),
+        textScale: 2,
+      );
+      await tester.ensureVisible(find.text(example.label));
+      expect(find.text(example.label), findsOneWidget);
+      final tooltip = tester.widget<Tooltip>(find.byType(Tooltip).last);
+      expect(tooltip.message, startsWith('Último cambio de estado: '));
+      expect(tooltip.message, contains('(hora local)'));
+      expect(tester.takeException(), isNull);
+      // El contador debe detenerse cuando se abandona A06.
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump(const Duration(minutes: 2));
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets(
+    'Una fecha futura se muestra exacta sin inventar tiempo transcurrido',
+    (tester) async {
+      await pumpScreen(
+        tester,
+        ConsultaLookupResult(
+          status: ConsultaStatus.enEspera,
+          statusChangedAt: DateTime.now().add(const Duration(days: 1)),
+        ),
+      );
+      expect(find.textContaining('Actualizado el '), findsOneWidget);
+      expect(find.textContaining('Actualizado hace'), findsNothing);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
+
   for (final status in ConsultaStatus.values) {
     testWidgets(
       'A06 refleja el estado ${status.name} y conserva la asignación',
