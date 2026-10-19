@@ -85,6 +85,7 @@ class ConsultaRepository {
 
         return ConsultaLookupResult(
           status: status,
+          code: normalized,
           hospitalName: row.hospitalName,
           hospitalAddress: row.hospitalAddress,
           hospitalPhone: row.hospitalPhone,

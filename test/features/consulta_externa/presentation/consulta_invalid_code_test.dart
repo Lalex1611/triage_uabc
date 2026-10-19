@@ -180,6 +180,8 @@ void main() {
       await submit(tester, client, label: 'Intentar de nuevo');
       expect(codes, ['AB3K7X', 'CD4P9Z']);
       expect(find.byType(ConsultaStatusScreen), findsOneWidget);
+      expect(find.text('Código CD4P9Z'), findsOneWidget);
+      expect(find.text('Código AB3K7X'), findsNothing);
       expect(find.text('Recibido en hospital'), findsOneWidget);
       expect(find.text('Hospital simulado de la respuesta'), findsOneWidget);
       expect(find.text(errorTitle), findsNothing);

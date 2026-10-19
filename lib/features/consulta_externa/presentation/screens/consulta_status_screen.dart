@@ -62,6 +62,7 @@ class ConsultaStatusScreen extends StatelessWidget {
   }
 
   Widget _buildHeader(BuildContext context) {
+    final code = result.code?.trim();
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(14, 6, 20, 12),
@@ -95,7 +96,9 @@ class ConsultaStatusScreen extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  'Consulta externa',
+                  code != null && code.isNotEmpty
+                      ? 'Código $code'
+                      : 'Consulta externa',
                   style: AppTextStyles.ESC_Regular_bodyMedium.copyWith(
                     fontSize: 13,
                     height: 1.46,

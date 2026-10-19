@@ -48,6 +48,7 @@ void main() {
       await http.runWithClient(
         () async {
           final result = await ConsultaRepository().lookupByCode(' ab-3 k7x\n');
+          expect(result.code, 'AB3K7X');
           expect(result.status, ConsultaStatus.recibido);
           expect(result.hospitalName, 'Hospital de la respuesta');
         },

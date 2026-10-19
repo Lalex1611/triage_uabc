@@ -8,6 +8,7 @@ import 'package:sistema_triage/features/consulta_externa/presentation/screens/co
 void main() {
   const transfer = ConsultaLookupResult(
     status: ConsultaStatus.trasladando,
+    code: 'AB3K7X',
     hospitalName: 'Hospital de prueba',
     hospitalAddress: 'Dirección de prueba 123',
     hospitalPhone: '664-123-4567',
@@ -38,7 +39,7 @@ void main() {
   }
 
   testWidgets(
-    'Traslado muestra los datos recibidos sin inventar código ni fecha',
+    'Traslado muestra el código consultado y los datos recibidos sin inventar fecha',
     (tester) async {
       await pumpScreen(tester, transfer);
       expect(find.text('Estado del paciente'), findsOneWidget);
@@ -48,7 +49,8 @@ void main() {
       expect(find.text(transfer.hospitalAddress!), findsOneWidget);
       expect(find.text(transfer.hospitalPhone!), findsOneWidget);
       expect(find.textContaining('Actualizado hace'), findsNothing);
-      expect(find.textContaining('Código AB'), findsNothing);
+      expect(find.text('Código AB3K7X'), findsOneWidget);
+      expect(find.text('Consulta externa'), findsNothing);
       expect(find.textContaining('ya fue avisado'), findsNothing);
       expect(find.text('Registro'), findsNothing);
       final active = tester
@@ -81,6 +83,8 @@ void main() {
       );
       expect(find.text('Aún no asignado'), findsOneWidget);
       expect(find.text('No debe mostrarse'), findsNothing);
+      expect(find.text('Consulta externa'), findsOneWidget);
+      expect(find.textContaining('Código '), findsNothing);
       expect(tester.takeException(), isNull);
     });
   }
@@ -110,12 +114,14 @@ void main() {
           tester,
           ConsultaLookupResult(
             status: status,
+            code: 'AB3K7X',
             hospitalName: 'Hospital de prueba',
             hospitalAddress: 'Dirección de prueba',
             hospitalPhone: '664-000-0000',
           ),
         );
         expect(find.text('Estado del paciente'), findsOneWidget);
+        expect(find.text('Código AB3K7X'), findsOneWidget);
         expect(find.text(status.title), findsWidgets);
         expect(find.text(status.subtitle), findsOneWidget);
         expect(find.text('Esta consulta es limitada'), findsOneWidget);
@@ -159,6 +165,7 @@ void main() {
           tester,
           ConsultaLookupResult(
             status: status,
+            code: 'AB3K7X',
             hospitalName:
                 'Hospital con un nombre particularmente largo de prueba',
             hospitalAddress:
