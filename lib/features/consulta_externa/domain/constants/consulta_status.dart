@@ -43,9 +43,9 @@ enum ConsultaStatus {
       case ConsultaStatus.trasladando:
         return const Color(0xFF3B82F6); // Azul
       case ConsultaStatus.recibido:
-        return const Color(0xFF00E676); // Verde fosforescente
+        return const Color(0xFF0A7EA4); // Azul, como Trasladando en A06
       case ConsultaStatus.alta:
-        return const Color(0xFF999A9D); // Gris
+        return const Color(0xFF00E676); // Verde
     }
   }
 
@@ -56,9 +56,9 @@ enum ConsultaStatus {
       case ConsultaStatus.trasladando:
         return const Color(0xFFEBF5FF); // Azul claro
       case ConsultaStatus.recibido:
-        return const Color(0xFFE9F7EF); // Verde claro
+        return const Color(0xFFE4F4F9); // Azul claro
       case ConsultaStatus.alta:
-        return const Color(0xFFF5F5F5); // Gris claro
+        return const Color(0xFFE9F7EF); // Verde claro
     }
   }
 
