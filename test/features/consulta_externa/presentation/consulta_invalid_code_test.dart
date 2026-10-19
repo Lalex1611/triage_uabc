@@ -109,6 +109,52 @@ void main() {
     });
   }
 
+  for (final error in ['not_found', 'invalid_code']) {
+    testWidgets('HTTP 200 con $error muestra A07 y conserva el código', (
+      tester,
+    ) async {
+      await pumpScreen(tester);
+      await tester.enterText(find.byType(TextField), 'AB3K7X');
+      await submit(
+        tester,
+        MockClient(
+          (_) async =>
+              http.Response(jsonEncode({'found': false, 'error': error}), 200),
+        ),
+      );
+      expect(find.text(errorTitle), findsOneWidget);
+      expect(find.text('Intentar de nuevo'), findsOneWidget);
+      expect(
+        tester.widget<TextField>(find.byType(TextField)).controller!.text,
+        'AB3K7X',
+      );
+      expect(find.byType(ConsultaStatusScreen), findsNothing);
+      expect(find.byType(SnackBar), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  for (final failure in [
+    (body: '{"found":false,"error":"rate_limited"}', message: 'cinco minutos'),
+    (body: '{"found":true}', message: 'forma inesperada'),
+  ]) {
+    testWidgets('El fallo ${failure.body} no abre la pantalla de estado', (
+      tester,
+    ) async {
+      await pumpScreen(tester);
+      await tester.enterText(find.byType(TextField), 'AB3K7X');
+      await submit(
+        tester,
+        MockClient((_) async => http.Response(failure.body, 200)),
+      );
+      expect(find.byType(ConsultaStatusScreen), findsNothing);
+      expect(find.text(errorTitle), findsNothing);
+      expect(find.textContaining(failure.message), findsOneWidget);
+      expect(find.text('Consultar estado'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   testWidgets(
     'Reintentar consulta el código editado y navega con los datos de la respuesta',
     (tester) async {
@@ -118,10 +164,11 @@ void main() {
       final client = MockClient((request) async {
         codes.add((jsonDecode(request.body) as Map)['p_code'] as String);
         if (codes.length == 1) {
-          return http.Response('{"message":"not_found","code":"P0001"}', 400);
+          return http.Response('{"found":false,"error":"not_found"}', 200);
         }
         return http.Response(
           jsonEncode({
+            'found': true,
             'patient_status': 'recibido',
             'hospital_name': 'Hospital simulado de la respuesta',
           }),

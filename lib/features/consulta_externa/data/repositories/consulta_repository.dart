@@ -59,6 +59,27 @@ class ConsultaRepository {
           throw Exception('El servidor respondió de una forma inesperada');
         }
         final map = Map<String, dynamic>.from(decoded);
+        // La RPC devuelve los errores de consulta dentro de un HTTP 200.
+        // Validarlos antes de leer el estado evita inventar un paciente en espera.
+        if (map['found'] == false) {
+          switch (map['error']) {
+            case 'not_found':
+            case 'invalid_code':
+              throw PostgrestException(
+                message: 'not_found',
+                code: map['error'] as String,
+              );
+            case 'rate_limited':
+              throw Exception(
+                'Demasiadas consultas. Espera cinco minutos antes de intentarlo de nuevo.',
+              );
+            default:
+              throw Exception('El servidor respondió de una forma inesperada');
+          }
+        }
+        if (map['found'] != true || map['error'] != null) {
+          throw Exception('El servidor respondió de una forma inesperada');
+        }
         final row = ConsultaRpcRow.fromJson(map);
         final status = _parseLifecycle(row.patientStatusRaw);
 
@@ -107,7 +128,7 @@ class ConsultaRepository {
       case 'alta_medica':
         return ConsultaStatus.alta;
       default:
-        return ConsultaStatus.enEspera;
+        throw Exception('El servidor respondió de una forma inesperada');
     }
   }
 }
