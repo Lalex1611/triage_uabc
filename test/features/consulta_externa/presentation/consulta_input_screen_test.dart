@@ -3,8 +3,11 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:sistema_triage/core/theme/app_theme.dart';
 import 'package:sistema_triage/features/consulta_externa/presentation/screens/consulta_input_screen.dart';
+import 'package:sistema_triage/features/consulta_externa/presentation/screens/consulta_qr_screen.dart';
+import '../support/fake_qr_camera.dart';
 
 void main() {
+  setUp(installFakeQrCamera);
   Future<void> pumpScreen(
     WidgetTester tester, {
     Size size = const Size(390, 844),
@@ -64,10 +67,10 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('Escanear código QR'));
       await tester.pumpAndSettle();
-      expect(
-        find.text('Escaneo QR disponible en una futura versión.'),
-        findsOneWidget,
-      );
+      expect(find.byType(ConsultaQrScreen), findsOneWidget);
+      await tester.tap(find.text('Mejor escribo el código'));
+      await tester.pumpAndSettle();
+      expect(find.byType(ConsultaInputScreen), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
   }

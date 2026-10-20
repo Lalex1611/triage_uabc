@@ -10,11 +10,14 @@ import 'package:sistema_triage/core/theme/app_theme.dart';
 import 'package:sistema_triage/features/consulta_externa/domain/consulta_lookup_result.dart';
 import 'package:sistema_triage/features/consulta_externa/presentation/screens/consulta_input_screen.dart';
 import 'package:sistema_triage/features/consulta_externa/presentation/screens/consulta_status_screen.dart';
+import 'package:sistema_triage/features/consulta_externa/presentation/screens/consulta_qr_screen.dart';
+import '../support/fake_qr_camera.dart';
 
 void main() {
   const errorTitle = 'El código no existe o ya venció';
 
   setUp(() {
+    installFakeQrCamera();
     SupabaseEnv.applyRuntimeFallback(
       url: 'https://consulta.example.test',
       anonKey: 'test-only-key',
@@ -249,9 +252,13 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('Escanear código QR'));
       await tester.pumpAndSettle();
+      expect(find.byType(ConsultaQrScreen), findsOneWidget);
+      await tester.tap(find.text('Mejor escribo el código'));
+      await tester.pumpAndSettle();
+      expect(find.text(errorTitle), findsOneWidget);
       expect(
-        find.text('Escaneo QR disponible en una futura versión.'),
-        findsOneWidget,
+        tester.widget<TextField>(find.byType(TextField)).controller!.text,
+        'AB3K7X',
       );
       expect(tester.takeException(), isNull);
     });

@@ -8,12 +8,15 @@ import 'package:sistema_triage/core/ui/app_snackbar.dart';
 import 'package:sistema_triage/features/auth/domain/user_role.dart';
 import 'package:sistema_triage/features/consulta_externa/data/repositories/consulta_repository.dart';
 import 'package:sistema_triage/features/consulta_externa/domain/consulta_code.dart';
+import 'package:sistema_triage/features/consulta_externa/presentation/screens/consulta_qr_screen.dart';
 import 'package:sistema_triage/features/consulta_externa/presentation/widgets/consulta_code_input.dart';
 import 'package:sistema_triage/features/consulta_externa/presentation/widgets/consulta_info_card.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class ConsultaInputScreen extends StatefulWidget {
-  const ConsultaInputScreen({super.key});
+  final ConsultaRepository? repository;
+
+  const ConsultaInputScreen({super.key, this.repository});
 
   @override
   State<ConsultaInputScreen> createState() => _ConsultaInputScreenState();
@@ -21,9 +24,16 @@ class ConsultaInputScreen extends StatefulWidget {
 
 class _ConsultaInputScreenState extends State<ConsultaInputScreen> {
   final _controller = TextEditingController();
-  final _repo = ConsultaRepository();
+  late final ConsultaRepository _repo;
   bool _busy = false;
   bool _codeInvalid = false;
+  bool _scannerOpen = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _repo = widget.repository ?? ConsultaRepository();
+  }
 
   /// Incluye code/details de PostgREST para diagnosticar fallos de API
   String _postgrestDebugMessage(PostgrestException e) {
@@ -44,6 +54,7 @@ class _ConsultaInputScreenState extends State<ConsultaInputScreen> {
   }
 
   Future<void> _consultar() async {
+    if (_busy) return;
     if (!SupabaseEnv.isConfigured) {
       showAppSnackBar(
         context,
@@ -79,6 +90,25 @@ class _ConsultaInputScreenState extends State<ConsultaInputScreen> {
       showAppSnackBar(context, '$e', isError: true);
     } finally {
       if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _openScanner() async {
+    if (_busy || _scannerOpen) return;
+    FocusScope.of(context).unfocus();
+    setState(() => _scannerOpen = true);
+    try {
+      final code = await Navigator.of(context).push<String>(
+        MaterialPageRoute(builder: (_) => const ConsultaQrScreen()),
+      );
+      if (!mounted || code == null) return;
+      _controller.value = TextEditingValue(
+        text: code,
+        selection: TextSelection.collapsed(offset: code.length),
+      );
+      await _consultar();
+    } finally {
+      if (mounted) setState(() => _scannerOpen = false);
     }
   }
 
@@ -294,12 +324,7 @@ class _ConsultaInputScreenState extends State<ConsultaInputScreen> {
           const SizedBox(height: 18),
         ],
         OutlinedButton(
-          onPressed: () {
-            showAppSnackBar(
-              context,
-              'Escaneo QR disponible en una futura versión.',
-            );
-          },
+          onPressed: _busy || _scannerOpen ? null : _openScanner,
           style: OutlinedButton.styleFrom(
             backgroundColor: Colors.white,
             foregroundColor: const Color(0xFF121924),
