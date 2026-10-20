@@ -63,7 +63,7 @@ class ConsultaInfoCard extends StatelessWidget {
 
   Widget _buildInfoRow(String iconAsset, String text) {
     return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         SvgPicture.asset(
           iconAsset,
