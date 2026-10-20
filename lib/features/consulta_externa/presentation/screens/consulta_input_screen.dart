@@ -304,25 +304,23 @@ class _ConsultaInputScreenState extends State<ConsultaInputScreen> {
               : Text(_codeInvalid ? 'Intentar de nuevo' : 'Consultar estado'),
         ),
         const SizedBox(height: 18),
-        if (!_codeInvalid) ...[
-          Row(
-            children: [
-              const Expanded(child: Divider(color: Color(0xFFD4DCE5))),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                child: Text(
-                  'o',
-                  style: AppTextStyles.ESC_Regular_bodyMedium.copyWith(
-                    fontSize: 13,
-                    color: const Color(0xFF8695A8),
-                  ),
+        Row(
+          children: [
+            const Expanded(child: Divider(color: Color(0xFFD4DCE5))),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: Text(
+                'o',
+                style: AppTextStyles.ESC_Regular_bodyMedium.copyWith(
+                  fontSize: 13,
+                  color: const Color(0xFF8695A8),
                 ),
               ),
-              const Expanded(child: Divider(color: Color(0xFFD4DCE5))),
-            ],
-          ),
-          const SizedBox(height: 18),
-        ],
+            ),
+            const Expanded(child: Divider(color: Color(0xFFD4DCE5))),
+          ],
+        ),
+        const SizedBox(height: 18),
         OutlinedButton(
           onPressed: _busy || _scannerOpen ? null : _openScanner,
           style: OutlinedButton.styleFrom(
