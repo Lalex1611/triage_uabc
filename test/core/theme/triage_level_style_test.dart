@@ -30,11 +30,12 @@ void main() {
     }
   });
 
-  test('texto oscuro sobre amarillo y naranja, blanco en el resto', () {
+  test('texto oscuro sobre amarillo, naranja y verde; blanco en el resto', () {
+    const dark = {TriageLevel.yellow, TriageLevel.orange, TriageLevel.green};
     for (final level in TriageLevel.values) {
       expect(
         level.onColor,
-        level == TriageLevel.yellow || level == TriageLevel.orange
+        dark.contains(level)
             ? TriageColors.textPrimary
             : TriageColors.textInverse,
         reason: level.name,
@@ -47,10 +48,10 @@ void main() {
     expect(labels.length, TriageLevel.values.length);
   });
 
-  test('contraste texto/fondo ≥ 3:1 (WCAG AA texto grande)', () {
+  test('contraste texto/fondo ≥ 4.5:1 (WCAG AA texto normal)', () {
     for (final level in TriageLevel.values) {
       final ratio = _contrast(level.onColor, level.color);
-      expect(ratio, greaterThanOrEqualTo(3), reason: level.name);
+      expect(ratio, greaterThanOrEqualTo(4.5), reason: level.name);
     }
   });
 }

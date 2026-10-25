@@ -28,10 +28,13 @@ extension TriageLevelStyle on TriageLevel {
 
   /// Color de texto e íconos sobre [color]
   ///
-  /// Oscuro sobre amarillo y naranja: Figma usa blanco en naranja, pero da 2.94:1,
-  /// por debajo del mínimo WCAG; con texto oscuro sube a 6.01:1.
+  /// Oscuro sobre amarillo, naranja y verde para llegar a 4.5:1 (WCAG AA texto
+  /// normal): Figma usa blanco en naranja (2.94:1) y verde (3.30:1); con texto
+  /// oscuro suben a 6.01:1 y 5.35:1.
   Color get onColor => switch (this) {
-    TriageLevel.yellow || TriageLevel.orange => TriageColors.textPrimary,
+    TriageLevel.yellow ||
+    TriageLevel.orange ||
+    TriageLevel.green => TriageColors.textPrimary,
     _ => TriageColors.textInverse,
   };
 
