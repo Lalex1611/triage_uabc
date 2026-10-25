@@ -42,6 +42,11 @@ class TriageColors {
   static const Color info = Color(0xFF0A7EA4);
   static const Color infoBackground = Color(0xFFE4F4F9);
 
+  // Texto de señal sobre su fondo: más oscuro que Figma para llegar a 4.5:1 (WCAG AA)
+  static const Color warningText = Color(0xFF9E6000);
+  static const Color infoText = Color(0xFF09769A);
+  static const Color successText = Color(0xFF0C7F47);
+
   // TRIAGE (Figma no define fondo para naranja ni azul)
   static const Color triageRed = Color(0xFFC30508);
   static const Color triageRedBackground = Color(0xFFFDECEF);
