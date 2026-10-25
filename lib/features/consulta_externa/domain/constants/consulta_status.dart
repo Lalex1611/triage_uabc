@@ -45,7 +45,7 @@ enum ConsultaStatus {
       case ConsultaStatus.recibido:
         return const Color(0xFF0A7EA4); // Azul, como Trasladando en A06
       case ConsultaStatus.alta:
-        return const Color(0xFF00E676); // Verde
+        return const Color(0xFF1E8E4E); // Verde oscuro para las palomitas blancas
     }
   }
 
