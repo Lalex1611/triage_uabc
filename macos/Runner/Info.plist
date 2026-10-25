@@ -28,5 +28,7 @@
 	<string>MainMenu</string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
+	<key>NSCameraUsageDescription</key>
+	<string>La cámara permite escanear el código QR para consultar el estado del paciente.</string>
 </dict>
 </plist>
