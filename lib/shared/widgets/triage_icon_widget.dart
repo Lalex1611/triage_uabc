@@ -5,7 +5,7 @@ import 'package:sistema_triage/core/theme/triage_tokens.dart';
 
 /// Ícono del rediseño: pinta un SVG de [TriageIcons] en un solo color
 ///
-/// Se comporta como `Icon`: sin [size] ni [color] los toma del `IconTheme`
+/// Se comporta como `Icon`: respeta `IconTheme.opacity` y, sin [size] ni [color], los toma del `IconTheme`
 /// más cercano (bajo `MaterialApp` siempre hay uno: el `iconTheme` de la app),
 /// así un componente puede teñir todos sus íconos con un solo `IconTheme`.
 /// Los componentes del rediseño pasan [color] explícito según Figma.
@@ -29,7 +29,14 @@ class TriageIcon extends StatelessWidget {
   Widget build(BuildContext context) {
     final iconTheme = IconTheme.of(context);
     final resolvedSize = size ?? iconTheme.size ?? 24;
-    final resolvedColor = color ?? iconTheme.color ?? TriageColors.textPrimary;
+    final opacity = iconTheme.opacity ?? 1.0;
+    var resolvedColor = color ?? iconTheme.color ?? TriageColors.textPrimary;
+    // Igual que Icon: la opacidad del IconTheme aplica también al color explícito
+    if (opacity != 1.0) {
+      resolvedColor = resolvedColor.withValues(
+        alpha: resolvedColor.a * opacity,
+      );
+    }
 
     return SvgPicture.asset(
       asset,

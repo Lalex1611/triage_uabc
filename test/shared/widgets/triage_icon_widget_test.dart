@@ -65,6 +65,26 @@ void main() {
     );
   });
 
+  testWidgets('aplica IconTheme.opacity incluso con color explícito', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _wrap(
+        const IconTheme(
+          data: IconThemeData(opacity: 0.5),
+          child: TriageIcon(TriageIcons.map, color: TriageColors.danger),
+        ),
+      ),
+    );
+    expect(
+      _filter(tester),
+      ColorFilter.mode(
+        TriageColors.danger.withValues(alpha: 0.5),
+        BlendMode.srcIn,
+      ),
+    );
+  });
+
   testWidgets('decorativo sin etiqueta; con etiqueta se anuncia', (
     tester,
   ) async {
