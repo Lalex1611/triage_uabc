@@ -1,12 +1,44 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:sistema_triage/core/theme/triage_role_theme.dart';
+import 'package:sistema_triage/core/theme/triage_tokens.dart';
 import 'package:sistema_triage/shared/widgets/triage_button_widget.dart';
 
-Widget _wrap(Widget child) => MaterialApp(
+Widget _wrap(Widget child, {TriageRoleTheme? role}) => MaterialApp(
+  theme: ThemeData(extensions: [?role]),
   home: Scaffold(body: Center(child: child)),
 );
 
+Color? _background(WidgetTester tester) {
+  final box = tester.widget<DecoratedBox>(
+    find
+        .descendant(
+          of: find.byType(TriageButton),
+          matching: find.byType(DecoratedBox),
+        )
+        .first,
+  );
+  return (box.decoration as BoxDecoration).color;
+}
+
 void main() {
+  testWidgets('primary toma el color del rol: hospital → azul', (tester) async {
+    await tester.pumpWidget(
+      _wrap(
+        TriageButton(label: 'Aceptar', onPressed: () {}),
+        role: TriageRoleTheme.hospital,
+      ),
+    );
+    expect(_background(tester), TriageColors.hospitalAccent);
+  });
+
+  testWidgets('primary sin tema de rol → rojo de campo', (tester) async {
+    await tester.pumpWidget(
+      _wrap(TriageButton(label: 'Entrar', onPressed: () {})),
+    );
+    expect(_background(tester), TriageColors.paramedicAccent);
+  });
+
   testWidgets('habilitado: llama onPressed', (tester) async {
     var taps = 0;
     await tester.pumpWidget(

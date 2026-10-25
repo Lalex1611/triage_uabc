@@ -1,23 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:sistema_triage/core/theme/triage_role_theme.dart';
 import 'package:sistema_triage/core/theme/triage_tokens.dart';
 
 /// Botón de acción del rediseño (Figma "TRIAGE/Botón")
 ///
-/// - [TriageButtonVariant.primaryParamedic] para la operación de campo (rojo)
-///   y [TriageButtonVariant.primaryHospital] para la operación médica (azul).
+/// - [TriageButtonVariant.primary] toma el color del rol activo
+///   ([TriageRoleTheme]): rojo en campo, azul en hospital.
 /// - Deshabilitado: `onPressed == null` → opacidad 40 % y sin sombra.
 /// - Cargando: `isLoading` → spinner en lugar del texto, conserva el ancho y no responde a toques.
 ///
 /// Se ajusta al contenido; para ocupar todo el ancho, envolver en
 /// `SizedBox(width: double.infinity)`.
-enum TriageButtonVariant {
-  primaryParamedic,
-  primaryHospital,
-  secondary,
-  subtle,
-  danger,
-  success,
-}
+enum TriageButtonVariant { primary, secondary, subtle, danger, success }
 
 enum TriageButtonSize { large, medium }
 
@@ -26,7 +20,7 @@ class TriageButton extends StatelessWidget {
     super.key,
     required this.label,
     required this.onPressed,
-    this.variant = TriageButtonVariant.primaryParamedic,
+    this.variant = TriageButtonVariant.primary,
     this.size = TriageButtonSize.large,
     this.isLoading = false,
   });
@@ -48,15 +42,10 @@ class TriageButton extends StatelessWidget {
       Color foreground,
       List<BoxShadow>? shadow,
     ) = switch (variant) {
-      TriageButtonVariant.primaryParamedic => (
-        TriageColors.paramedicAccent,
+      TriageButtonVariant.primary => (
+        context.triageRole.accent,
         TriageColors.textInverse,
-        TriageShadows.paramedicButton,
-      ),
-      TriageButtonVariant.primaryHospital => (
-        TriageColors.hospitalAccent,
-        TriageColors.textInverse,
-        TriageShadows.hospitalButton,
+        context.triageRole.accentShadow,
       ),
       TriageButtonVariant.secondary => (
         TriageColors.surface,
