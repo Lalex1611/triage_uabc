@@ -1,5 +1,6 @@
 // Sandbox visual de TriageButton: flutter run -t test/shared/widgets/triage_button_visual_test.dart
 import 'package:flutter/material.dart';
+import 'package:sistema_triage/core/theme/triage_role_theme.dart';
 import 'package:sistema_triage/core/theme/triage_tokens.dart';
 import 'package:sistema_triage/shared/widgets/triage_button_widget.dart';
 
@@ -47,6 +48,26 @@ void main() {
                 ),
                 const SizedBox(height: 20),
               ],
+              Text(
+                'primary con rol hospital',
+                style: TriageTextStyles.labelSmall,
+              ),
+              const SizedBox(height: 8),
+              Theme(
+                data: ThemeData(extensions: const [TriageRoleTheme.hospital]),
+                child: Wrap(
+                  spacing: 12,
+                  children: [
+                    TriageButton(label: 'Aceptar paciente', onPressed: () {}),
+                    TriageButton(
+                      label: 'Cargando',
+                      isLoading: true,
+                      onPressed: () {},
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
               Text('Ancho completo', style: TriageTextStyles.labelSmall),
               const SizedBox(height: 8),
               SizedBox(

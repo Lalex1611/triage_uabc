@@ -1,7 +1,6 @@
 /// Set de íconos del rediseño (Figma "TRIAGE/Ícono/*"), 24×24 de un solo color
 ///
-/// Se pintan con `SvgPicture.asset(TriageIcons.x,
-/// colorFilter: ColorFilter.mode(color, BlendMode.srcIn))`.
+/// Se pintan con `TriageIcon(TriageIcons.x)`.
 /// Sustituyen a [AppIcons] conforme se migra cada pantalla.
 class TriageIcons {
   TriageIcons._();
