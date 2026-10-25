@@ -6,6 +6,8 @@ import 'package:sistema_triage/core/connectivity/app_connectivity_notifier.dart'
 import 'package:sistema_triage/core/router/app_router.dart';
 import 'package:sistema_triage/core/session/auth_gate.dart';
 import 'package:sistema_triage/core/theme/app_theme.dart';
+import 'package:sistema_triage/core/theme/triage_role_theme.dart';
+import 'package:sistema_triage/features/auth/domain/user_role.dart';
 import 'package:sistema_triage/shared/widgets/offline_connection_banner.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -34,10 +36,22 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // El tema de rol sigue a la sesión: azul para médico, rojo para el resto
+    return ListenableBuilder(
+      listenable: AuthGate.instance,
+      builder: (context, _) => _buildApp(
+        AuthGate.instance.role == AppUserRole.medico
+            ? TriageRoleTheme.hospital
+            : TriageRoleTheme.paramedic,
+      ),
+    );
+  }
+
+  Widget _buildApp(TriageRoleTheme roleTheme) {
     return MaterialApp.router(
       debugShowCheckedModeBanner: false,
       title: 'Sistema Triage',
-      theme: appTheme,
+      theme: appTheme.copyWith(extensions: [roleTheme]),
       routerConfig: appRouter,
       builder: (context, child) {
         final mq = MediaQuery.of(context);
