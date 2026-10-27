@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -6,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:path/path.dart' as p;
 import 'package:postgrest/postgrest.dart';
 import 'package:sistema_triage/core/config/supabase_env.dart';
 import 'package:sistema_triage/core/theme/app_theme.dart';
@@ -130,6 +132,189 @@ void main() {
     await tester.tap(find.text('Elegir foto del QR'));
     await tester.pumpAndSettle();
   }
+
+  Future<File> pickedCachePhoto(WidgetTester tester) async {
+    const cacheChannel = MethodChannel('plugins.flutter.io/path_provider');
+    late Directory root;
+    late Directory base;
+    late Directory cache;
+    final file = await tester.runAsync(() async {
+      base = await Directory(
+        'build/consulta_qr_screen_cleanup_tests',
+      ).absolute.create(recursive: true);
+      root = await base.createTemp('case-');
+      cache = await Directory(p.join(root.path, 'cache')).create();
+      final photo = File(
+        p.join(cache.path, '11111111-2222-4333-8444-555555555555', 'QR.png'),
+      );
+      await photo.parent.create();
+      await photo.writeAsString('copia temporal de prueba');
+      await File(
+        p.join(root.path, 'original.png'),
+      ).writeAsString('original de prueba');
+      return photo;
+    });
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(cacheChannel, (call) async {
+          expect(call.method, 'getTemporaryDirectory');
+          return cache.path;
+        });
+    addTearDown(() async {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(cacheChannel, null);
+      final basePath = await base.resolveSymbolicLinks();
+      final rootPath = await root.resolveSymbolicLinks();
+      if (!p.isWithin(basePath, rootPath)) {
+        throw StateError('Limpieza fuera de las pruebas');
+      }
+      await Directory(rootPath).delete(recursive: true);
+    });
+    pickPhoto = () async => file!.path;
+    return file!;
+  }
+
+  Future<void> waitForCleanup(WidgetTester tester, File file) async {
+    await tester.runAsync(() async {
+      final deadline = DateTime.now().add(const Duration(seconds: 3));
+      while (await file.exists()) {
+        if (DateTime.now().isAfter(deadline)) {
+          throw StateError('No se borró la copia temporal');
+        }
+        await Future<void>.delayed(const Duration(milliseconds: 5));
+      }
+    });
+    await tester.pumpAndSettle();
+  }
+
+  testWidgets(
+    'La copia temporal se elimina antes de consultar y el original permanece',
+    (tester) async {
+      final photo = await pickedCachePhoto(tester);
+      final original = File(
+        p.join(photo.parent.parent.parent.path, 'original.png'),
+      );
+      camera.imageCapture = photoCapture('AB3K7X');
+      final repo = _QrRepository((code) async {
+        expect(photo.existsSync(), isFalse);
+        expect(original.existsSync(), isTrue);
+        return ConsultaLookupResult(
+          status: ConsultaStatus.recibido,
+          code: code,
+        );
+      });
+      await pumpInput(tester, repo);
+      await openScanner(tester);
+      await tester.runAsync(() => tester.tap(find.text('Elegir foto del QR')));
+      await tester.pump();
+      await waitForCleanup(tester, photo);
+      expect(repo.codes, ['AB3K7X']);
+      expect(find.text('Código AB3K7X'), findsOneWidget);
+      await close(tester);
+    },
+  );
+
+  testWidgets('Un error de análisis también elimina la copia temporal', (
+    tester,
+  ) async {
+    final photo = await pickedCachePhoto(tester);
+    camera.imageError = Exception('Imagen dañada');
+    final repo = successfulRepository();
+    await pumpInput(tester, repo);
+    await openScanner(tester);
+    await tester.runAsync(() => tester.tap(find.text('Elegir foto del QR')));
+    await tester.pump();
+    await waitForCleanup(tester, photo);
+    expect(repo.codes, isEmpty);
+    expect(find.textContaining('No pudimos leer la foto'), findsOneWidget);
+    await close(tester);
+  });
+
+  testWidgets('Una foto recibida después de salir se limpia sin analizarla', (
+    tester,
+  ) async {
+    final photo = await pickedCachePhoto(tester);
+    final pending = Completer<String?>();
+    pickPhoto = () => pending.future;
+    final repo = successfulRepository();
+    await pumpInput(tester, repo);
+    await openScanner(tester);
+    await tester.runAsync(() => tester.tap(find.text('Elegir foto del QR')));
+    await tester.pump();
+    await tester.tap(find.text('Mejor escribo el código'));
+    await tester.pumpAndSettle();
+    pending.complete(photo.path);
+    await tester.pump();
+    await waitForCleanup(tester, photo);
+    expect(camera.analyzedImages, isEmpty);
+    expect(repo.codes, isEmpty);
+    await close(tester);
+  });
+
+  testWidgets(
+    'Salir durante el análisis espera al resultado antes de borrar la copia',
+    (tester) async {
+      final photo = await pickedCachePhoto(tester);
+      camera.imageGate = Completer<BarcodeCapture?>();
+      final repo = successfulRepository();
+      await pumpInput(tester, repo);
+      await openScanner(tester);
+      await tester.runAsync(() => tester.tap(find.text('Elegir foto del QR')));
+      await tester.pump();
+      expect(camera.analyzedImages, [photo.path]);
+      expect(photo.existsSync(), isTrue);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(photo.existsSync(), isTrue);
+      camera.imageGate!.complete(photoCapture('AB3K7X'));
+      await tester.pump();
+      await waitForCleanup(tester, photo);
+      expect(repo.codes, isEmpty);
+      expect(camera.disposals, greaterThan(0));
+      await close(tester);
+    },
+  );
+
+  testWidgets(
+    'Si no se puede verificar la caché se informa el fallo de limpieza',
+    (tester) async {
+      final photo = await pickedCachePhoto(tester);
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(
+            const MethodChannel('plugins.flutter.io/path_provider'),
+            (_) async {
+              throw PlatformException(code: 'cache_unavailable');
+            },
+          );
+      camera.imageCapture = photoCapture('AB3K7X');
+      final repo = successfulRepository();
+      await pumpInput(tester, repo);
+      await openScanner(tester);
+      await tester.runAsync(() => tester.tap(find.text('Elegir foto del QR')));
+      await tester.pump();
+      for (
+        var i = 0;
+        i < 100 &&
+            find
+                .textContaining('No pudimos eliminar la copia temporal')
+                .evaluate()
+                .isEmpty;
+        i++
+      ) {
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 10)),
+        );
+        await tester.pump();
+      }
+      await tester.pumpAndSettle();
+      expect(
+        find.textContaining('No pudimos eliminar la copia temporal'),
+        findsOneWidget,
+      );
+      expect(photo.existsSync(), isTrue);
+      expect(repo.codes, isEmpty);
+      await close(tester);
+    },
+  );
 
   testWidgets('Una foto con QR consulta el código normalizado una sola vez', (
     tester,

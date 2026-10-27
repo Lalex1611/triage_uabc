@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:sistema_triage/core/theme/app_theme.dart';
+import 'package:sistema_triage/features/consulta_externa/data/services/consulta_qr_photo_cleanup.dart';
 import 'package:sistema_triage/features/consulta_externa/domain/consulta_code.dart';
 
 /// Devuelve solamente el código leído. La consulta remota sigue a cargo de A04.
@@ -20,6 +21,7 @@ class ConsultaQrScreen extends StatefulWidget {
 class _ConsultaQrScreenState extends State<ConsultaQrScreen>
     with WidgetsBindingObserver {
   MobileScannerController? _camera;
+  final _photoCleanup = ConsultaQrPhotoCleanup();
   Future<void>? _startOperation;
   Future<void>? _stopOperation;
   Future<BarcodeCapture?>? _imageOperation;
@@ -179,12 +181,9 @@ class _ConsultaQrScreenState extends State<ConsultaQrScreen>
         source: ImageSource.gallery,
         requestFullMetadata: false,
       );
-      if (!mounted || _returning || image == null) return;
+      if (image == null) return;
 
-      final operation = camera.analyzeImage(
-        image.path,
-        formats: const [BarcodeFormat.qrCode],
-      );
+      final operation = _readPhotoAndClean(camera, image.path);
       _imageOperation = operation;
       final capture = await operation;
       if (!mounted || _returning) return;
@@ -208,6 +207,12 @@ class _ConsultaQrScreenState extends State<ConsultaQrScreen>
               : 'No encontramos un QR de consulta válido en la foto. Elige otra imagen o escribe el código.',
         );
       }
+    } on ConsultaQrPhotoCleanupException {
+      if (!mounted || _returning) return;
+      setState(
+        () => _scanNotice =
+            'No pudimos eliminar la copia temporal de la foto. Intenta de nuevo o escribe el código.',
+      );
     } on PlatformException catch (error) {
       if (!mounted || _returning) return;
       setState(
@@ -240,6 +245,22 @@ class _ConsultaQrScreenState extends State<ConsultaQrScreen>
           unawaited(_startCamera());
         }
       }
+    }
+  }
+
+  Future<BarcodeCapture?> _readPhotoAndClean(
+    MobileScannerController camera,
+    String path,
+  ) async {
+    try {
+      if (!mounted || _returning) return null;
+      return await camera.analyzeImage(
+        path,
+        formats: const [BarcodeFormat.qrCode],
+      );
+    } finally {
+      // Incluye fallos de análisis y resultados tardíos tras salir de A05.
+      await _photoCleanup.deleteTemporaryPhoto(path);
     }
   }
 
