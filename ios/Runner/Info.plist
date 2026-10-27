@@ -68,5 +68,7 @@
 	<string>La app usa tu ubicación para registrar el punto del incidente en el mapa.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>La cámara permite escanear el código QR para consultar el estado del paciente.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Permite seleccionar una foto para leer el código QR de consulta del paciente.</string>
 </dict>
 </plist>
