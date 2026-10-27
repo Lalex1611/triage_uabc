@@ -14,6 +14,22 @@ class FakeQrCamera extends MobileScannerPlatform {
   int starts = 0;
   int stops = 0;
   int disposals = 0;
+  BarcodeCapture? imageCapture;
+  Object? imageError;
+  Completer<BarcodeCapture?>? imageGate;
+  final analyzedImages = <String>[];
+  List<BarcodeFormat>? imageFormats;
+
+  @override
+  Future<BarcodeCapture?> analyzeImage(
+    String path, {
+    List<BarcodeFormat> formats = const <BarcodeFormat>[],
+  }) async {
+    analyzedImages.add(path);
+    imageFormats = formats;
+    if (imageError != null) throw imageError!;
+    return imageGate == null ? imageCapture : await imageGate!.future;
+  }
 
   @override
   Stream<BarcodeCapture?> get barcodesStream => captures.stream;
