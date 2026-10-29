@@ -6,7 +6,7 @@ import 'package:sistema_triage/features/paramedico/domain/entities/incident_deta
 import 'package:sistema_triage/features/paramedico/domain/entities/incident_details/patient_triage_filters_data.dart';
 import 'package:sistema_triage/features/paramedico/presentation/incident_details/widgets/patient_card_widget.dart';
 import 'package:sistema_triage/features/paramedico/presentation/incident_details/widgets/patient_list_header_widget.dart';
-import 'package:sistema_triage/features/paramedico/presentation/incident_details/widgets/patient_search_bar_widget.dart';
+//import 'package:sistema_triage/features/paramedico/presentation/incident_details/widgets/patient_search_bar_widget.dart';
 import 'package:sistema_triage/features/paramedico/presentation/incident_details/widgets/patient_triage_filters_widget.dart';
 
 // Pestaña Lista de la vista de detalles de incidente
@@ -39,10 +39,10 @@ class IncidentDetailsListTab extends StatelessWidget {
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(0, 10, 0, 120),
         children: [
-          PatientSearchBar(
-            controller: searchController,
-            onChanged: onSearchChanged,
-          ),
+          //PatientSearchBar(
+          //controller: searchController,
+          //onChanged: onSearchChanged,
+          //),
           const SizedBox(height: 16),
           PatientListHeader(data: listHeaderData),
           const SizedBox(height: 12),

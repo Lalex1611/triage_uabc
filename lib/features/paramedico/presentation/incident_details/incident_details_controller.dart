@@ -346,7 +346,9 @@ class IncidentDetailsController extends ChangeNotifier {
         ],
       ),
     );
-    controller.dispose();
+    Future.delayed(const Duration(milliseconds: 300), () {
+      controller.dispose();
+    }); // Se edita el titulo del incidente
     if (nextTitle == null) return;
     final trimmed = nextTitle.trim();
     if (trimmed.isEmpty) {

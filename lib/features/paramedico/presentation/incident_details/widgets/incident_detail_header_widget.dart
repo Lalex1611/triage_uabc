@@ -14,7 +14,7 @@ class IncidentDetailHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: AppColors.primaryParamedico, // Rojo de cabecera de emergencia
+      color: Colors.white, // Cambio a blanco
       padding: const EdgeInsets.fromLTRB(24, 16, 24, 39),
       width: double.infinity,
       child: Column(
@@ -33,7 +33,7 @@ class IncidentDetailHeader extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: AppTextStyles.ESC_Medium_bodyMedium.copyWith(
-                      color: Colors.white,
+                      color: const Color.fromARGB(255, 0, 0, 0),
                       fontSize: 13.5,
                     ),
                   ),
@@ -51,7 +51,7 @@ class IncidentDetailHeader extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     textAlign: TextAlign.right,
                     style: AppTextStyles.ESC_Medium_bodyMedium.copyWith(
-                      color: Colors.white,
+                      color: const Color.fromARGB(255, 0, 0, 0),
                       fontSize: 12.5,
                     ),
                   ),
@@ -67,7 +67,7 @@ class IncidentDetailHeader extends StatelessWidget {
                 child: Text(
                   data.title,
                   style: AppTextStyles.ESC_SemiBold_displayLarge.copyWith(
-                    color: Colors.white,
+                    color: Colors.black,
                     fontSize: 30,
                     height: 1.1,
                   ),
@@ -82,7 +82,7 @@ class IncidentDetailHeader extends StatelessWidget {
                     height: 24,
                     width: 24,
                     colorFilter: const ColorFilter.mode(
-                      Colors.white,
+                      Colors.black, // editable titulo
                       BlendMode.srcIn,
                     ),
                   ),
@@ -90,28 +90,24 @@ class IncidentDetailHeader extends StatelessWidget {
               ],
             ],
           ),
-          const SizedBox(height: 16),
-          Text(
-            'GPS capturado',
-            style: AppTextStyles.ESC_Bold_titleSmall.copyWith(
-              color: Colors.white,
-              fontSize: 12,
-            ),
-          ),
           const SizedBox(height: 4),
           Row(
             children: [
               SvgPicture.asset(
                 AppIcons.paramedicoIncidenteLocation,
-                height: 12,
-                width: 12,
+                height: 15,
+                width: 15,
+                colorFilter: const ColorFilter.mode(
+                  Colors.white,
+                  BlendMode.color,
+                ),
               ),
-              const SizedBox(width: 4),
+              const SizedBox(width: 8),
               Flexible(
                 child: Text(
                   data.gpsCoordinates,
                   style: AppTextStyles.ESC_Regular_bodyMedium.copyWith(
-                    color: Colors.white,
+                    color: Colors.black,
                     fontSize: 10,
                   ),
                   overflow: TextOverflow.ellipsis,
@@ -124,10 +120,10 @@ class IncidentDetailHeader extends StatelessWidget {
                   child: Text(
                     'Mostrar',
                     style: AppTextStyles.ESC_Bold_titleSmall.copyWith(
-                      color: Colors.white,
+                      color: Colors.black,
                       fontSize: 10,
                       decoration: TextDecoration.underline,
-                      decorationColor: Colors.white,
+                      decorationColor: Colors.black,
                     ),
                   ),
                 ),
@@ -139,10 +135,10 @@ class IncidentDetailHeader extends StatelessWidget {
                   child: Text(
                     'Editar',
                     style: AppTextStyles.ESC_Bold_titleSmall.copyWith(
-                      color: Colors.white,
+                      color: Colors.black,
                       fontSize: 10,
                       decoration: TextDecoration.underline,
-                      decorationColor: Colors.white,
+                      decorationColor: Colors.black,
                     ),
                   ),
                 ),
@@ -175,8 +171,7 @@ class IncidentDetailHeader extends StatelessWidget {
       margin: const EdgeInsets.only(right: 8),
       decoration: BoxDecoration(
         color: color,
-        borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: Colors.white, width: 0.5),
+        borderRadius: BorderRadius.circular(7),
       ),
       alignment: Alignment.center,
       child: Text(
@@ -195,8 +190,8 @@ class IncidentDetailHeader extends StatelessWidget {
       constraints: const BoxConstraints(minWidth: 42),
       padding: const EdgeInsets.symmetric(horizontal: 8),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(15),
-        border: Border.all(color: Colors.white, width: 1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.black, width: 0.5),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -207,13 +202,14 @@ class IncidentDetailHeader extends StatelessWidget {
             AppIcons.paramedicoIncidentePeopleQuantity,
             height: 15,
             width: 15,
+            colorFilter: const ColorFilter.mode(Colors.white, BlendMode.color),
           ),
-          const SizedBox(width: 4),
+          const SizedBox(width: 8),
           Text(
-            data.totalPatients.toString(),
+            "${data.totalPatients} Pacientes",
             style: AppTextStyles.ESC_Bold_titleSmall.copyWith(
-              color: Colors.white,
-              fontSize: 12,
+              color: Colors.black,
+              fontSize: 11,
               height: 1,
             ),
           ),

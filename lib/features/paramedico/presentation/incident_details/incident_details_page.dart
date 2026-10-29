@@ -7,7 +7,8 @@ import 'package:sistema_triage/features/paramedico/presentation/incident_details
 import 'package:sistema_triage/features/paramedico/presentation/incident_details/widgets/incident_action_buttons_widget.dart';
 import 'package:sistema_triage/features/paramedico/presentation/incident_details/widgets/incident_custom_tab_bar_widget.dart';
 import 'package:sistema_triage/features/paramedico/presentation/incident_details/widgets/incident_detail_header_widget.dart';
-import 'package:sistema_triage/features/paramedico/presentation/incident_details/widgets/incident_metadata_card_widget.dart';
+
+//import 'package:sistema_triage/features/paramedico/presentation/incident_details/widgets/incident_metadata_card_widget.dart';
 
 // Cascarón de la vista de detalles de incidente (paramédico)
 class IncidentDetailsPage extends StatelessWidget {
@@ -147,16 +148,16 @@ class _ContentShell extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       IncidentDetailHeader(data: headerData),
-                      Transform.translate(
-                        offset: const Offset(0, -15),
-                        child: IncidentMetadataCard(data: metadataData),
-                      ),
+                      //Transform.translate(
+                      //  offset: const Offset(0, -15),
+                      //  child: IncidentMetadataCard(data: metadataData),
+                      //),
                     ],
                   ),
                 ),
               ),
               ColoredBox(
-                color: const Color(0xFFF1EFEF).withValues(alpha: 0.35),
+                color: const Color(0xFFEFEFF1).withValues(alpha: 0.35),
                 child: Column(
                   children: [
                     const SizedBox(height: 10),
