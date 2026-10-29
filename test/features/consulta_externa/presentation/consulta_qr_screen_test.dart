@@ -1,9 +1,13 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:path/path.dart' as p;
 import 'package:postgrest/postgrest.dart';
 import 'package:sistema_triage/core/config/supabase_env.dart';
 import 'package:sistema_triage/core/theme/app_theme.dart';
@@ -31,9 +35,27 @@ class _QrRepository extends ConsultaRepository {
 
 void main() {
   late FakeQrCamera camera;
+  const photoChannel = MethodChannel('plugins.flutter.io/image_picker');
+  late Future<String?> Function() pickPhoto;
+  final photoCalls = <MethodCall>[];
 
   setUp(() {
     camera = installFakeQrCamera();
+    photoCalls.clear();
+    pickPhoto = () async => '/test/qr.png';
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(photoChannel, (call) {
+          expect(call.method, 'pickImage');
+          if (camera.startError == null) {
+            expect(camera.stops, greaterThan(0));
+          }
+          photoCalls.add(call);
+          return pickPhoto();
+        });
+    addTearDown(() {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(photoChannel, null);
+    });
     SupabaseEnv.applyRuntimeFallback(
       url: 'https://consulta.example.test',
       anonKey: 'test-only-key',
@@ -101,6 +123,481 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pumpAndSettle();
   }
+
+  BarcodeCapture photoCapture(String value) => BarcodeCapture(
+    barcodes: [Barcode(rawValue: value, format: BarcodeFormat.qrCode)],
+  );
+
+  Future<void> choosePhoto(WidgetTester tester) async {
+    await tester.tap(find.text('Elegir foto del QR'));
+    await tester.pumpAndSettle();
+  }
+
+  Future<File> pickedCachePhoto(WidgetTester tester) async {
+    const cacheChannel = MethodChannel('plugins.flutter.io/path_provider');
+    late Directory root;
+    late Directory base;
+    late Directory cache;
+    final file = await tester.runAsync(() async {
+      base = await Directory(
+        'build/consulta_qr_screen_cleanup_tests',
+      ).absolute.create(recursive: true);
+      root = await base.createTemp('case-');
+      cache = await Directory(p.join(root.path, 'cache')).create();
+      final photo = File(
+        p.join(cache.path, '11111111-2222-4333-8444-555555555555', 'QR.png'),
+      );
+      await photo.parent.create();
+      await photo.writeAsString('copia temporal de prueba');
+      await File(
+        p.join(root.path, 'original.png'),
+      ).writeAsString('original de prueba');
+      return photo;
+    });
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(cacheChannel, (call) async {
+          expect(call.method, 'getTemporaryDirectory');
+          return cache.path;
+        });
+    addTearDown(() async {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(cacheChannel, null);
+      final basePath = await base.resolveSymbolicLinks();
+      final rootPath = await root.resolveSymbolicLinks();
+      if (!p.isWithin(basePath, rootPath)) {
+        throw StateError('Limpieza fuera de las pruebas');
+      }
+      await Directory(rootPath).delete(recursive: true);
+    });
+    pickPhoto = () async => file!.path;
+    return file!;
+  }
+
+  Future<void> waitForCleanup(WidgetTester tester, File file) async {
+    await tester.runAsync(() async {
+      final deadline = DateTime.now().add(const Duration(seconds: 3));
+      while (await file.exists()) {
+        if (DateTime.now().isAfter(deadline)) {
+          throw StateError('No se borró la copia temporal');
+        }
+        await Future<void>.delayed(const Duration(milliseconds: 5));
+      }
+    });
+    await tester.pumpAndSettle();
+  }
+
+  testWidgets(
+    'La copia temporal se elimina antes de consultar y el original permanece',
+    (tester) async {
+      final photo = await pickedCachePhoto(tester);
+      final original = File(
+        p.join(photo.parent.parent.parent.path, 'original.png'),
+      );
+      camera.imageCapture = photoCapture('AB3K7X');
+      final repo = _QrRepository((code) async {
+        expect(photo.existsSync(), isFalse);
+        expect(original.existsSync(), isTrue);
+        return ConsultaLookupResult(
+          status: ConsultaStatus.recibido,
+          code: code,
+        );
+      });
+      await pumpInput(tester, repo);
+      await openScanner(tester);
+      await tester.runAsync(() => tester.tap(find.text('Elegir foto del QR')));
+      await tester.pump();
+      await waitForCleanup(tester, photo);
+      expect(repo.codes, ['AB3K7X']);
+      expect(find.text('Código AB3K7X'), findsOneWidget);
+      await close(tester);
+    },
+  );
+
+  testWidgets('Un error de análisis también elimina la copia temporal', (
+    tester,
+  ) async {
+    final photo = await pickedCachePhoto(tester);
+    camera.imageError = Exception('Imagen dañada');
+    final repo = successfulRepository();
+    await pumpInput(tester, repo);
+    await openScanner(tester);
+    await tester.runAsync(() => tester.tap(find.text('Elegir foto del QR')));
+    await tester.pump();
+    await waitForCleanup(tester, photo);
+    expect(repo.codes, isEmpty);
+    expect(find.textContaining('No pudimos leer la foto'), findsOneWidget);
+    await close(tester);
+  });
+
+  testWidgets('Una foto recibida después de salir se limpia sin analizarla', (
+    tester,
+  ) async {
+    final photo = await pickedCachePhoto(tester);
+    final pending = Completer<String?>();
+    pickPhoto = () => pending.future;
+    final repo = successfulRepository();
+    await pumpInput(tester, repo);
+    await openScanner(tester);
+    await tester.runAsync(() => tester.tap(find.text('Elegir foto del QR')));
+    await tester.pump();
+    await tester.tap(find.text('Mejor escribo el código'));
+    await tester.pumpAndSettle();
+    pending.complete(photo.path);
+    await tester.pump();
+    await waitForCleanup(tester, photo);
+    expect(camera.analyzedImages, isEmpty);
+    expect(repo.codes, isEmpty);
+    await close(tester);
+  });
+
+  testWidgets(
+    'Salir durante el análisis espera al resultado antes de borrar la copia',
+    (tester) async {
+      final photo = await pickedCachePhoto(tester);
+      camera.imageGate = Completer<BarcodeCapture?>();
+      final repo = successfulRepository();
+      await pumpInput(tester, repo);
+      await openScanner(tester);
+      await tester.runAsync(() => tester.tap(find.text('Elegir foto del QR')));
+      await tester.pump();
+      expect(camera.analyzedImages, [photo.path]);
+      expect(photo.existsSync(), isTrue);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(photo.existsSync(), isTrue);
+      camera.imageGate!.complete(photoCapture('AB3K7X'));
+      await tester.pump();
+      await waitForCleanup(tester, photo);
+      expect(repo.codes, isEmpty);
+      expect(camera.disposals, greaterThan(0));
+      await close(tester);
+    },
+  );
+
+  testWidgets(
+    'Si no se puede verificar la caché se informa el fallo de limpieza',
+    (tester) async {
+      final photo = await pickedCachePhoto(tester);
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(
+            const MethodChannel('plugins.flutter.io/path_provider'),
+            (_) async {
+              throw PlatformException(code: 'cache_unavailable');
+            },
+          );
+      camera.imageCapture = photoCapture('AB3K7X');
+      final repo = successfulRepository();
+      await pumpInput(tester, repo);
+      await openScanner(tester);
+      await tester.runAsync(() => tester.tap(find.text('Elegir foto del QR')));
+      await tester.pump();
+      for (
+        var i = 0;
+        i < 100 &&
+            find
+                .textContaining('No pudimos eliminar la copia temporal')
+                .evaluate()
+                .isEmpty;
+        i++
+      ) {
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 10)),
+        );
+        await tester.pump();
+      }
+      await tester.pumpAndSettle();
+      expect(
+        find.textContaining('No pudimos eliminar la copia temporal'),
+        findsOneWidget,
+      );
+      expect(photo.existsSync(), isTrue);
+      expect(repo.codes, isEmpty);
+      await close(tester);
+    },
+  );
+
+  testWidgets('Una foto con QR consulta el código normalizado una sola vez', (
+    tester,
+  ) async {
+    final repo = successfulRepository();
+    camera.imageCapture = photoCapture('ab-3k7x');
+    await pumpInput(tester, repo);
+    await openScanner(tester);
+    await choosePhoto(tester);
+    expect(repo.codes, ['AB3K7X']);
+    expect(camera.analyzedImages, ['/test/qr.png']);
+    expect(camera.imageFormats, [BarcodeFormat.qrCode]);
+    expect(
+      photoCalls.single.arguments,
+      containsPair('source', ImageSource.gallery.index),
+    );
+    expect(
+      photoCalls.single.arguments,
+      containsPair('requestFullMetadata', false),
+    );
+    expect(find.text('Código AB3K7X'), findsOneWidget);
+    expect(camera.disposals, greaterThan(0));
+    await close(tester);
+  });
+
+  testWidgets('Un código inexistente leído de una foto termina en A07', (
+    tester,
+  ) async {
+    camera.imageCapture = photoCapture('AB3K7X');
+    final repo = _QrRepository(
+      (_) async => throw const PostgrestException(
+        message: 'not_found',
+        code: 'not_found',
+      ),
+    );
+    await pumpInput(tester, repo);
+    await openScanner(tester);
+    await choosePhoto(tester);
+    expect(repo.codes, ['AB3K7X']);
+    expect(find.text('El código no existe o ya venció'), findsOneWidget);
+    expect(
+      tester.widget<TextField>(find.byType(TextField)).controller!.text,
+      'AB3K7X',
+    );
+    await close(tester);
+  });
+
+  testWidgets(
+    'Elegir foto espera el arranque pendiente y reanuda la cámara al cancelar',
+    (tester) async {
+      camera.startGate = Completer<void>();
+      pickPhoto = () async => null;
+      await pumpInput(tester, successfulRepository());
+      await openScanner(tester);
+      await tester.tap(find.text('Elegir foto del QR'));
+      await tester.pump();
+      expect(photoCalls, isEmpty);
+      camera.startGate!.complete();
+      await tester.pumpAndSettle();
+      expect(photoCalls, hasLength(1));
+      expect(camera.starts, 2);
+      await close(tester);
+    },
+  );
+
+  testWidgets('Cancelar la galería conserva el código y reanuda la cámara', (
+    tester,
+  ) async {
+    pickPhoto = () async => null;
+    final repo = successfulRepository();
+    await pumpInput(tester, repo);
+    await tester.enterText(find.byType(TextField), 'CD4P9Z');
+    await openScanner(tester);
+    await choosePhoto(tester);
+    expect(camera.analyzedImages, isEmpty);
+    expect(camera.starts, 2);
+    expect(repo.codes, isEmpty);
+    await tester.tap(find.text('Mejor escribo el código'));
+    await tester.pumpAndSettle();
+    expect(
+      tester.widget<TextField>(find.byType(TextField)).controller!.text,
+      'CD4P9Z',
+    );
+    await close(tester);
+  });
+
+  for (final raw in <String?>[
+    null,
+    '',
+    'ABCDEFG',
+    'https://ejemplo.test/AB3K7X',
+    'AB!K7X',
+  ]) {
+    testWidgets('Foto sin QR válido permite elegir otra imagen: $raw', (
+      tester,
+    ) async {
+      final repo = successfulRepository();
+      camera.imageCapture = raw == null ? null : photoCapture(raw);
+      await pumpInput(tester, repo);
+      await openScanner(tester);
+      await choosePhoto(tester);
+      expect(repo.codes, isEmpty);
+      expect(find.textContaining('No encontramos un QR'), findsOneWidget);
+      expect(camera.starts, 2);
+      camera.imageCapture = photoCapture('CD4P9Z');
+      await choosePhoto(tester);
+      expect(repo.codes, ['CD4P9Z']);
+      await close(tester);
+    });
+  }
+
+  testWidgets('Una foto con varios códigos distintos solicita otra imagen', (
+    tester,
+  ) async {
+    final repo = successfulRepository();
+    camera.imageCapture = BarcodeCapture(
+      barcodes: [
+        Barcode(rawValue: 'AB3K7X', format: BarcodeFormat.qrCode),
+        Barcode(rawValue: 'CD4P9Z', format: BarcodeFormat.qrCode),
+      ],
+    );
+    await pumpInput(tester, repo);
+    await openScanner(tester);
+    await choosePhoto(tester);
+    expect(repo.codes, isEmpty);
+    expect(find.textContaining('varios códigos'), findsOneWidget);
+    await close(tester);
+  });
+
+  testWidgets('El mismo QR repetido en una foto produce una sola consulta', (
+    tester,
+  ) async {
+    final repo = successfulRepository();
+    camera.imageCapture = BarcodeCapture(
+      barcodes: [
+        Barcode(rawValue: 'AB3K7X', format: BarcodeFormat.qrCode),
+        Barcode(rawValue: 'ab3k7x', format: BarcodeFormat.qrCode),
+        Barcode(rawValue: 'CD4P9Z', format: BarcodeFormat.code128),
+      ],
+    );
+    await pumpInput(tester, repo);
+    await openScanner(tester);
+    await choosePhoto(tester);
+    expect(repo.codes, ['AB3K7X']);
+    await close(tester);
+  });
+
+  for (final code in ['photo_access_denied', 'photo_access_restricted']) {
+    testWidgets('Permiso de fotos $code conserva cámara e ingreso manual', (
+      tester,
+    ) async {
+      pickPhoto = () async => throw PlatformException(code: code);
+      final repo = successfulRepository();
+      await pumpInput(tester, repo);
+      await openScanner(tester);
+      await choosePhoto(tester);
+      expect(repo.codes, isEmpty);
+      expect(camera.starts, 2);
+      expect(
+        find.textContaining('Permite el acceso a tus fotos'),
+        findsOneWidget,
+      );
+      expect(
+        find.text('Mejor escribo el código').hitTestable(),
+        findsOneWidget,
+      );
+      await close(tester);
+    });
+  }
+
+  for (final error in [
+    Exception('Imagen dañada'),
+    UnsupportedError('Simulador'),
+  ]) {
+    testWidgets('Un fallo de lectura de foto permite continuar: $error', (
+      tester,
+    ) async {
+      camera.imageError = error;
+      final repo = successfulRepository();
+      await pumpInput(tester, repo);
+      await openScanner(tester);
+      await choosePhoto(tester);
+      expect(repo.codes, isEmpty);
+      expect(camera.starts, 2);
+      expect(
+        find.textContaining(
+          error is UnsupportedError
+              ? 'no está disponible'
+              : 'No pudimos leer la foto',
+        ),
+        findsOneWidget,
+      );
+      await close(tester);
+    });
+  }
+
+  testWidgets('La foto permite consultar aunque se haya denegado la cámara', (
+    tester,
+  ) async {
+    camera.startError = const MobileScannerException(
+      errorCode: MobileScannerErrorCode.permissionDenied,
+    );
+    camera.imageCapture = photoCapture('AB3K7X');
+    final repo = successfulRepository();
+    await pumpInput(tester, repo);
+    await openScanner(tester);
+    await choosePhoto(tester);
+    expect(repo.codes, ['AB3K7X']);
+    expect(camera.starts, 1);
+    await close(tester);
+  });
+
+  testWidgets(
+    'La galería bloquea lecturas de cámara y no reinicia al volver de segundo plano',
+    (tester) async {
+      final pending = Completer<String?>();
+      pickPhoto = () => pending.future;
+      final repo = successfulRepository();
+      await pumpInput(tester, repo);
+      await openScanner(tester);
+      await tester.tap(find.text('Elegir foto del QR'));
+      await tester.pump();
+      camera.detect('AB3K7X');
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pump();
+      expect(camera.starts, 1);
+      expect(photoCalls, hasLength(1));
+      expect(repo.codes, isEmpty);
+      expect(find.text('Leyendo foto…'), findsOneWidget);
+      pending.complete(null);
+      await tester.pumpAndSettle();
+      expect(camera.starts, 2);
+      await close(tester);
+    },
+  );
+
+  testWidgets('Salir de A05 durante la selección ignora la foto tardía', (
+    tester,
+  ) async {
+    final pending = Completer<String?>();
+    pickPhoto = () => pending.future;
+    final repo = successfulRepository();
+    await pumpInput(tester, repo);
+    await openScanner(tester);
+    await tester.tap(find.text('Elegir foto del QR'));
+    await tester.pump();
+    await tester.tap(find.text('Mejor escribo el código'));
+    await tester.pumpAndSettle();
+    pending.complete('/test/qr.png');
+    await tester.pumpAndSettle();
+    expect(camera.analyzedImages, isEmpty);
+    expect(repo.codes, isEmpty);
+    expect(find.byType(ConsultaInputScreen), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await close(tester);
+  });
+
+  testWidgets(
+    'Salir durante el análisis libera la cámara sin consultar la foto tardía',
+    (tester) async {
+      camera.imageGate = Completer<BarcodeCapture?>();
+      final repo = successfulRepository();
+      await pumpInput(tester, repo);
+      await openScanner(tester);
+      await tester.tap(find.text('Elegir foto del QR'));
+      await tester.pump();
+      expect(camera.analyzedImages, hasLength(1));
+      camera.detect('AB3K7X');
+      await tester.pump();
+      expect(repo.codes, isEmpty);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(camera.disposals, 0);
+      camera.imageGate!.complete(photoCapture('AB3K7X'));
+      await tester.pumpAndSettle();
+      expect(camera.disposals, greaterThan(0));
+      expect(repo.codes, isEmpty);
+      expect(find.byType(ConsultaInputScreen), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await close(tester);
+    },
+  );
 
   testWidgets(
     'Un QR válido consulta una sola vez y detiene la cámara antes de la RPC',
@@ -372,6 +869,8 @@ void main() {
     ) async {
       await pumpInput(tester, successfulRepository(), size: size, textScale: 2);
       await openScanner(tester);
+      expect(find.text('Elegir foto del QR').hitTestable(), findsOneWidget);
+      expect(find.text('Elegir foto del QR').hitTestable(), findsOneWidget);
       expect(
         find.text('Mejor escribo el código').hitTestable(),
         findsOneWidget,

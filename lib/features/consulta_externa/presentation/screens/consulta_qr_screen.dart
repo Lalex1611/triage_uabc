@@ -3,8 +3,11 @@ import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:sistema_triage/core/theme/app_theme.dart';
+import 'package:sistema_triage/features/consulta_externa/data/services/consulta_qr_photo_cleanup.dart';
 import 'package:sistema_triage/features/consulta_externa/domain/consulta_code.dart';
 
 /// Devuelve solamente el código leído. La consulta remota sigue a cargo de A04.
@@ -18,9 +21,12 @@ class ConsultaQrScreen extends StatefulWidget {
 class _ConsultaQrScreenState extends State<ConsultaQrScreen>
     with WidgetsBindingObserver {
   MobileScannerController? _camera;
+  final _photoCleanup = ConsultaQrPhotoCleanup();
   Future<void>? _startOperation;
   Future<void>? _stopOperation;
+  Future<BarcodeCapture?>? _imageOperation;
   bool _starting = false;
+  bool _readingPhoto = false;
   bool _returning = false;
   bool _active = true;
   bool _unexpectedCameraError = false;
@@ -31,6 +37,8 @@ class _ConsultaQrScreenState extends State<ConsultaQrScreen>
       defaultTargetPlatform == TargetPlatform.android ||
       defaultTargetPlatform == TargetPlatform.iOS ||
       defaultTargetPlatform == TargetPlatform.macOS;
+
+  bool get _supportsPhoto => !kIsWeb && _supported;
 
   @override
   void initState() {
@@ -57,6 +65,7 @@ class _ConsultaQrScreenState extends State<ConsultaQrScreen>
     if (!mounted ||
         !_active ||
         _returning ||
+        _readingPhoto ||
         camera == null ||
         _starting ||
         camera.value.isRunning) {
@@ -67,12 +76,14 @@ class _ConsultaQrScreenState extends State<ConsultaQrScreen>
     var started = false;
     try {
       await _stopOperation;
-      if (!mounted || !_active || _returning) return;
+      if (!mounted || !_active || _returning || _readingPhoto) return;
       final operation = camera.start();
       _startOperation = operation;
       await operation;
       started = camera.value.isRunning;
-      if (!mounted || !_active || _returning) await _stopCamera();
+      if (!mounted || !_active || _returning || _readingPhoto) {
+        await _stopCamera();
+      }
     } catch (_) {
       if (mounted && !_returning) setState(() => _unexpectedCameraError = true);
     } finally {
@@ -112,7 +123,7 @@ class _ConsultaQrScreenState extends State<ConsultaQrScreen>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     _active = state == AppLifecycleState.resumed;
-    if (_returning || _camera == null) return;
+    if (_returning || _readingPhoto || _camera == null) return;
     // El diálogo de permiso puede cambiar el ciclo de vida durante el arranque.
     if (!_camera!.value.hasCameraPermission) return;
     if (_active) {
@@ -123,7 +134,7 @@ class _ConsultaQrScreenState extends State<ConsultaQrScreen>
   }
 
   void _onDetect(BarcodeCapture capture) {
-    if (_returning || !_active) return;
+    if (_returning || !_active || _readingPhoto) return;
     var hasContent = false;
     for (final barcode in capture.barcodes) {
       final raw = barcode.rawValue;
@@ -146,6 +157,113 @@ class _ConsultaQrScreenState extends State<ConsultaQrScreen>
     }
   }
 
+  Future<void> _pickQrPhoto() async {
+    final camera = _camera;
+    if (!mounted ||
+        _returning ||
+        _readingPhoto ||
+        !_supportsPhoto ||
+        camera == null) {
+      return;
+    }
+    var resumeCamera = camera.value.isRunning || _starting;
+    setState(() {
+      _readingPhoto = true;
+      _scanNotice = null;
+    });
+    try {
+      await _startOperation;
+      resumeCamera = resumeCamera || camera.value.isRunning;
+      await _stopCamera();
+      if (!mounted || _returning) return;
+
+      final image = await ImagePicker().pickImage(
+        source: ImageSource.gallery,
+        requestFullMetadata: false,
+      );
+      if (image == null) return;
+
+      final operation = _readPhotoAndClean(camera, image.path);
+      _imageOperation = operation;
+      final capture = await operation;
+      if (!mounted || _returning) return;
+
+      final codes = <String>{};
+      for (final barcode in capture?.barcodes ?? <Barcode>[]) {
+        if (barcode.format != BarcodeFormat.qrCode ||
+            barcode.rawValue == null) {
+          continue;
+        }
+        final code = ConsultaCode.normalize(barcode.rawValue!);
+        if (ConsultaCode.isValid(code)) codes.add(code);
+      }
+      if (codes.length == 1) {
+        _returning = true;
+        await _returnCode(codes.single);
+      } else {
+        setState(
+          () => _scanNotice = codes.length > 1
+              ? 'La foto contiene varios códigos de consulta. Elige una foto con un solo QR.'
+              : 'No encontramos un QR de consulta válido en la foto. Elige otra imagen o escribe el código.',
+        );
+      }
+    } on ConsultaQrPhotoCleanupException {
+      if (!mounted || _returning) return;
+      setState(
+        () => _scanNotice =
+            'No pudimos eliminar la copia temporal de la foto. Intenta de nuevo o escribe el código.',
+      );
+    } on PlatformException catch (error) {
+      if (!mounted || _returning) return;
+      setState(
+        () => _scanNotice =
+            error.code == 'photo_access_denied' ||
+                error.code == 'photo_access_restricted'
+            ? 'Permite el acceso a tus fotos en los ajustes de la aplicación o escribe el código.'
+            : 'No pudimos abrir la foto. Intenta con otra imagen o escribe el código.',
+      );
+    } on UnsupportedError {
+      if (!mounted || _returning) return;
+      setState(
+        () => _scanNotice =
+            'La lectura de fotos no está disponible en este dispositivo. Usa la cámara o escribe el código.',
+      );
+    } catch (_) {
+      if (!mounted || _returning) return;
+      setState(
+        () => _scanNotice =
+            'No pudimos leer la foto. Intenta con otra imagen o escribe el código.',
+      );
+    } finally {
+      _imageOperation = null;
+      if (mounted) {
+        setState(() => _readingPhoto = false);
+        if (!_returning &&
+            _active &&
+            resumeCamera &&
+            camera.value.hasCameraPermission) {
+          unawaited(_startCamera());
+        }
+      }
+    }
+  }
+
+  Future<BarcodeCapture?> _readPhotoAndClean(
+    MobileScannerController camera,
+    String path,
+  ) async {
+    try {
+      if (!mounted || _returning) return null;
+      return await camera.analyzeImage(
+        path,
+        formats: const [BarcodeFormat.qrCode],
+      );
+    } finally {
+      // Incluye fallos de análisis y resultados tardíos tras salir de A05.
+      await _photoCleanup.deleteTemporaryPhoto(path);
+    }
+  }
+
   Future<void> _returnCode(String code) async {
     await _stopCamera();
     if (mounted) Navigator.of(context).pop(code);
@@ -162,6 +280,9 @@ class _ConsultaQrScreenState extends State<ConsultaQrScreen>
     // Si se sale mientras se solicita permiso, liberar también el arranque tardío.
     try {
       await _startOperation;
+    } catch (_) {}
+    try {
+      await _imageOperation;
     } catch (_) {}
     await _stopCamera();
     try {
@@ -211,7 +332,11 @@ class _ConsultaQrScreenState extends State<ConsultaQrScreen>
             const SizedBox(height: 8),
             Text(
               permissionDenied
-                  ? 'Activa el permiso de cámara en los ajustes de la aplicación o escribe el código.'
+                  ? _supportsPhoto
+                        ? 'Activa el permiso de cámara en los ajustes, elige una foto o escribe el código.'
+                        : 'Activa el permiso de cámara en los ajustes de la aplicación o escribe el código.'
+                  : _supportsPhoto
+                  ? 'Puedes elegir una foto del QR o escribir el código para continuar.'
                   : 'Puedes escribir el código para continuar con la consulta.',
               textAlign: TextAlign.center,
               style: AppTextStyles.ESC_Regular_bodyMedium.copyWith(
@@ -221,7 +346,9 @@ class _ConsultaQrScreenState extends State<ConsultaQrScreen>
             ),
             if (_camera != null)
               TextButton(
-                onPressed: () => unawaited(_startCamera()),
+                onPressed: _readingPhoto
+                    ? null
+                    : () => unawaited(_startCamera()),
                 style: TextButton.styleFrom(
                   foregroundColor: Colors.white,
                   minimumSize: const Size(48, 48),
@@ -250,7 +377,7 @@ class _ConsultaQrScreenState extends State<ConsultaQrScreen>
                     useAppLifecycleState: false,
                     onDetect: _onDetect,
                     onDetectError: (_, _) {
-                      if (mounted && !_returning) {
+                      if (mounted && !_returning && !_readingPhoto) {
                         setState(
                           () => _scanNotice =
                               'No pudimos leer el QR. Ajusta la distancia o escribe el código.',
@@ -290,6 +417,8 @@ class _ConsultaQrScreenState extends State<ConsultaQrScreen>
       },
       child: Scaffold(
         backgroundColor: const Color(0xFF131A24),
+        // La cámara no usa teclado; conserva el espacio al salir del ingreso manual.
+        resizeToAvoidBottomInset: false,
         body: SafeArea(
           child: Column(
             children: [
@@ -403,30 +532,77 @@ class _ConsultaQrScreenState extends State<ConsultaQrScreen>
                 child: Center(
                   child: ConstrainedBox(
                     constraints: const BoxConstraints(maxWidth: 520),
-                    child: SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton(
-                        onPressed: _returnToManual,
-                        style: OutlinedButton.styleFrom(
-                          backgroundColor: Colors.white,
-                          foregroundColor: const Color(0xFF121924),
-                          minimumSize: const Size.fromHeight(54),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 16,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (_supportsPhoto) ...[
+                          OutlinedButton.icon(
+                            onPressed: _readingPhoto || _returning
+                                ? null
+                                : _pickQrPhoto,
+                            icon: _readingPhoto
+                                ? const SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.white,
+                                    ),
+                                  )
+                                : const Icon(Icons.photo_library_outlined),
+                            label: Text(
+                              _readingPhoto
+                                  ? 'Leyendo foto…'
+                                  : 'Elegir foto del QR',
+                            ),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: Colors.white,
+                              disabledForegroundColor: const Color(0xFFCDD4DD),
+                              minimumSize: const Size.fromHeight(54),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 16,
+                              ),
+                              side: const BorderSide(
+                                color: Color(0xFFD4DCE5),
+                                width: 1.25,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              textStyle:
+                                  AppTextStyles
+                                      .ESC_SemiBold_bodyMedium.copyWith(
+                                    fontSize: 15,
+                                  ),
+                            ),
                           ),
-                          side: const BorderSide(
-                            color: Color(0xFFD4DCE5),
-                            width: 1.25,
+                          const SizedBox(height: 12),
+                        ],
+                        OutlinedButton(
+                          onPressed: _returnToManual,
+                          style: OutlinedButton.styleFrom(
+                            backgroundColor: Colors.white,
+                            foregroundColor: const Color(0xFF121924),
+                            minimumSize: const Size.fromHeight(54),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 16,
+                            ),
+                            side: const BorderSide(
+                              color: Color(0xFFD4DCE5),
+                              width: 1.25,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            textStyle: AppTextStyles
+                                .ESC_SemiBold_bodyMedium.copyWith(fontSize: 15),
                           ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          textStyle: AppTextStyles
-                              .ESC_SemiBold_bodyMedium.copyWith(fontSize: 15),
+                          child: const Text('Mejor escribo el código'),
                         ),
-                        child: const Text('Mejor escribo el código'),
-                      ),
+                      ],
                     ),
                   ),
                 ),
