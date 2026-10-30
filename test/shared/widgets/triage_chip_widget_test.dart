@@ -65,7 +65,6 @@ void main() {
     await tester.pumpWidget(
       _wrap(TriageChip(label: 'Todos', selected: true, onTap: () {})),
     );
-    final handle = tester.ensureSemantics();
     expect(
       tester.getSemantics(find.text('Todos')),
       isSemantics(
@@ -75,6 +74,5 @@ void main() {
         hasTapAction: true,
       ),
     );
-    handle.dispose();
   });
 }

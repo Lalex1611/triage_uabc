@@ -10,7 +10,7 @@ import 'package:sistema_triage/shared/domain/patient_lifecycle_status.dart';
 /// - [TriageStatusBadge.patient] para [PatientLifecycleStatus].
 /// - [TriageStatusBadge.rejected] para un traslado rechazado por el hospital.
 ///
-/// La etiqueta se muestra en mayúsculas; si no cabe, se corta con "…".
+/// La etiqueta se muestra en mayúsculas; si no cabe, pasa a otra línea.
 class TriageStatusBadge extends StatelessWidget {
   const TriageStatusBadge({
     super.key,
@@ -64,8 +64,6 @@ class TriageStatusBadge extends StatelessWidget {
           Flexible(
             child: Text(
               label.toUpperCase(),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
               style: TriageTextStyles.labelSmall.copyWith(color: textColor),
             ),
           ),
