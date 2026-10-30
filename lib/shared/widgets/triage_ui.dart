@@ -19,3 +19,4 @@ export 'package:sistema_triage/shared/domain/triage_level.dart';
 // Componentes
 export 'package:sistema_triage/shared/widgets/triage_button_widget.dart';
 export 'package:sistema_triage/shared/widgets/triage_icon_widget.dart';
+export 'package:sistema_triage/shared/widgets/triage_status_badge_widget.dart';
