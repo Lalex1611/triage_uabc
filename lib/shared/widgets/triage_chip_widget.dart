@@ -37,13 +37,17 @@ class TriageChip extends StatelessWidget {
     return MergeSemantics(
       child: Semantics(
         button: true,
+        enabled: onTap != null,
         selected: selected,
         // El margen invisible alrededor de la píldora también responde al toque
         child: GestureDetector(
           behavior: HitTestBehavior.opaque,
           onTap: onTap,
           child: ConstrainedBox(
-            constraints: const BoxConstraints(minHeight: _minTouchTarget),
+            constraints: const BoxConstraints(
+              minWidth: _minTouchTarget,
+              minHeight: _minTouchTarget,
+            ),
             child: Center(
               widthFactor: 1,
               heightFactor: 1,

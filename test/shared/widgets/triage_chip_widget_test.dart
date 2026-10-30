@@ -45,6 +45,28 @@ void main() {
     expect(tester.getSize(find.byType(InkWell)).height, 38);
   });
 
+  testWidgets('etiqueta corta: zona táctil de al menos 44 de ancho', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _wrap(TriageChip(label: 'A', selected: false, onTap: () {})),
+    );
+    expect(
+      tester.getSize(find.byType(TriageChip)).width,
+      greaterThanOrEqualTo(44),
+    );
+  });
+
+  testWidgets('sin onTap se anuncia desactivado', (tester) async {
+    await tester.pumpWidget(
+      _wrap(const TriageChip(label: 'Azul', selected: false, onTap: null)),
+    );
+    expect(
+      tester.getSemantics(find.text('Azul')),
+      isSemantics(isButton: true, hasEnabledState: true, isEnabled: false),
+    );
+  });
+
   testWidgets('responde al toque en la píldora y en el margen invisible', (
     tester,
   ) async {
@@ -70,6 +92,7 @@ void main() {
       isSemantics(
         label: 'Todos',
         isButton: true,
+        isEnabled: true,
         isSelected: true,
         hasTapAction: true,
       ),
