@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:sistema_triage/core/constants/app_colors.dart';
 import 'package:sistema_triage/core/layout/app_responsive.dart';
-import 'package:sistema_triage/core/theme/app_theme.dart';
-import 'package:sistema_triage/features/paramedico/presentation/shared/paramedico_compact_action_button.dart';
+import 'package:sistema_triage/shared/widgets/triage_ui.dart';
 
 // Pestaña Mapa de la vista de detalles de incidente
 class IncidentDetailsMapTab extends StatelessWidget {
@@ -45,7 +43,7 @@ class IncidentDetailsMapTab extends StatelessWidget {
                     ? Padding(
                         padding: const EdgeInsets.fromLTRB(24, 8, 24, 0),
                         child: ClipRRect(
-                          borderRadius: BorderRadius.circular(10),
+                          borderRadius: BorderRadius.circular(16),
                           child: FlutterMap(
                             options: MapOptions(
                               initialCenter: LatLng(lat, lng),
@@ -67,9 +65,9 @@ class IncidentDetailsMapTab extends StatelessWidget {
                                     height: 44,
                                     point: LatLng(lat, lng),
                                     alignment: Alignment.bottomCenter,
-                                    child: const Icon(
-                                      Icons.location_pin,
-                                      color: AppColors.primaryParamedico,
+                                    child: const TriageIcon(
+                                      TriageIcons.location,
+                                      color: TriageColors.paramedicAccent,
                                       size: 44,
                                     ),
                                   ),
@@ -85,11 +83,9 @@ class IncidentDetailsMapTab extends StatelessWidget {
                           child: Text(
                             'Este incidente no tiene coordenadas registradas.\nUse Editar en el encabezado para fijar la ubicación.',
                             textAlign: TextAlign.center,
-                            style:
-                                AppTextStyles.ESC_Regular_bodyMedium.copyWith(
-                                  fontSize: 14,
-                                  color: Colors.black54,
-                                ),
+                            style: TriageTextStyles.bodyMedium.copyWith(
+                              color: TriageColors.textSecondary,
+                            ),
                           ),
                         ),
                       ),
@@ -97,10 +93,14 @@ class IncidentDetailsMapTab extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.fromLTRB(24, 12, 24, 16),
                 child: Center(
-                  child: ParamedicoCompactActionButton(
-                    label: 'mapa interactivo',
+                  child: SizedBox(
                     width: 200,
-                    onTap: hasLocation ? onOpenInteractiveMap : null,
+                    child: TriageButton(
+                      label: 'MAPA INTERACTIVO',
+                      variant: TriageButtonVariant.secondary,
+                      size: TriageButtonSize.medium,
+                      onPressed: hasLocation ? onOpenInteractiveMap : null,
+                    ),
                   ),
                 ),
               ),

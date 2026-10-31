@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:sistema_triage/core/constants/app_colors.dart';
+//import 'package:sistema_triage/core/constants/app_colors.dart';
 import 'package:sistema_triage/features/paramedico/domain/entities/incident_details/incident_tab_data.dart';
 import 'package:sistema_triage/features/paramedico/presentation/incident_details/incident_details_controller.dart';
 import 'package:sistema_triage/features/paramedico/presentation/incident_details/incident_details_page.dart';
@@ -61,15 +61,11 @@ class _IncidentDetailsFlowPageState extends State<IncidentDetailsFlowPage> {
   PreferredSizeWidget _appBar(BuildContext context) {
     return AppHeader(
       type: HeaderType.incident,
-      color: AppColors.primaryParamedico,
+      color: Colors.white,
       isConnected: true,
       hasNotifications: false,
       backLabel: 'Regresar a Incidentes',
-      actionLabel: _controller.canEditIncident ? 'Cerrar incidente' : null,
       onBack: () => _controller.leave(context),
-      onAction: _controller.canEditIncident
-          ? () => _controller.confirmClose(context)
-          : null,
     );
   }
 
@@ -113,7 +109,9 @@ class _IncidentDetailsFlowPageState extends State<IncidentDetailsFlowPage> {
               unawaited(_controller.removeIncidentPhotoAt(context, index)),
         );
       case IncidentTabType.estadisticas:
-        return const IncidentDetailsStatsTab();
+        return IncidentDetailsStatsTab(
+          patients: _controller.patientCards(context),
+        );
     }
   }
 
@@ -136,6 +134,9 @@ class _IncidentDetailsFlowPageState extends State<IncidentDetailsFlowPage> {
           : null,
       onRegisterTap: inc != null
           ? () => unawaited(_controller.openRegisterAndRefresh(context))
+          : null,
+      onCloseIncidentTap: inc != null
+          ? () => unawaited(_controller.confirmClose(context))
           : null,
     );
   }
