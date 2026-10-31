@@ -123,7 +123,8 @@ class _CardsSandboxState extends State<_CardsSandbox> {
                   folio: folio,
                   timeAgo: 'hace ${18 + i * 16} min',
                   title: title,
-                  location: '$place · a ${1.4 + i * 1.7} km',
+                  location:
+                      '$place · a ${(1.4 + i * 1.7).toStringAsFixed(1)} km',
                   counts: const {
                     TriageLevel.red: 3,
                     TriageLevel.yellow: 2,
