@@ -65,11 +65,7 @@ class _IncidentDetailsFlowPageState extends State<IncidentDetailsFlowPage> {
       isConnected: true,
       hasNotifications: false,
       backLabel: 'Regresar a Incidentes',
-      actionLabel: _controller.canEditIncident ? 'Cerrar incidente' : null,
       onBack: () => _controller.leave(context),
-      onAction: _controller.canEditIncident
-          ? () => _controller.confirmClose(context)
-          : null,
     );
   }
 
@@ -138,6 +134,9 @@ class _IncidentDetailsFlowPageState extends State<IncidentDetailsFlowPage> {
           : null,
       onRegisterTap: inc != null
           ? () => unawaited(_controller.openRegisterAndRefresh(context))
+          : null,
+      onCloseIncidentTap: inc != null
+          ? () => unawaited(_controller.confirmClose(context))
           : null,
     );
   }

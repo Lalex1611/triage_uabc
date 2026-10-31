@@ -1,11 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
-import 'package:sistema_triage/core/constants/app_icons.dart';
-import 'package:sistema_triage/core/theme/app_theme.dart';
 import 'package:sistema_triage/features/paramedico/domain/entities/incident_details/patient_card_data.dart';
-import 'package:sistema_triage/shared/widgets/patient_lifecycle_status_badge.dart';
+import 'package:sistema_triage/shared/widgets/triage_ui.dart';
 
-// Tarjeta de paciente
 class PatientCard extends StatelessWidget {
   final PatientCardData data;
 
@@ -13,7 +9,6 @@ class PatientCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Si no hay nombre registrado, muestra 'Paciente sin nombre'
     final displayName = data.name.trim().isNotEmpty
         ? data.name
         : 'Paciente sin nombre';
@@ -21,16 +16,10 @@ class PatientCard extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: TriageColors.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFF3F4F6), width: 1),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        border: Border.all(color: TriageColors.borderSubtle, width: 1),
+        boxShadow: TriageShadows.card,
       ),
       child: Material(
         color: Colors.transparent,
@@ -43,11 +32,11 @@ class PatientCard extends StatelessWidget {
             child: IntrinsicHeight(
               child: Row(
                 children: [
-                  // Línea de color del triaje fina y redondeada (Píldora)
+                  // Píldora delgada con color dinámico de TriageLevel
                   Container(
-                    width: 12,
+                    width: 6,
                     decoration: BoxDecoration(
-                      color: data.triageCategory.color,
+                      color: data.triageLevel.color,
                       borderRadius: BorderRadius.circular(8),
                     ),
                   ),
@@ -66,36 +55,26 @@ class PatientCard extends StatelessWidget {
                                 displayName,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style:
-                                    AppTextStyles
-                                        .ESC_SemiBold_bodyMedium.copyWith(
-                                      fontSize: 14,
-                                      color: const Color(0xFF111827),
-                                      fontWeight: FontWeight.w600,
-                                    ),
+                                style: TriageTextStyles.labelLarge.copyWith(
+                                  color: TriageColors.textPrimary,
+                                ),
                               ),
                             ),
                             const SizedBox(width: 8),
                             Text(
                               data.dateStr,
-                              style:
-                                  AppTextStyles.ESC_Regular_bodyMedium.copyWith(
-                                    fontSize: 11,
-                                    color: const Color(0xFF9CA3AF),
-                                  ),
+                              style: TriageTextStyles.bodySmall.copyWith(
+                                color: TriageColors.textSecondary,
+                              ),
                             ),
                             if (data.onEditTap != null) ...[
                               const SizedBox(width: 8),
                               GestureDetector(
                                 onTap: data.onEditTap,
-                                child: SvgPicture.asset(
-                                  AppIcons.paramedicoIncidenteEdit,
-                                  width: 15,
-                                  height: 15,
-                                  colorFilter: const ColorFilter.mode(
-                                    Color(0xFF6B7280),
-                                    BlendMode.srcIn,
-                                  ),
+                                child: const TriageIcon(
+                                  TriageIcons.pencil,
+                                  size: 15,
+                                  color: TriageColors.textSecondary,
                                 ),
                               ),
                             ],
@@ -104,57 +83,55 @@ class PatientCard extends StatelessWidget {
 
                         const SizedBox(height: 6),
 
-                        /* FILA 2: Código ID (PAC-4494), 'Ver mapa' y Flecha */
+                        /* FILA 2: ID del Paciente (PAC-XXXX), Ver mapa y Flecha */
                         Row(
                           children: [
-                            const Icon(
-                              Icons.badge_outlined,
+                            const TriageIcon(
+                              TriageIcons.user,
                               size: 14,
-                              color: Color(0xFF6B7280),
+                              color: TriageColors.textSecondary,
                             ),
                             const SizedBox(width: 4),
                             Text(
                               data.id.isNotEmpty ? data.id : 'Sin código',
-                              style:
-                                  AppTextStyles.ESC_Regular_bodyMedium.copyWith(
-                                    fontSize: 12,
-                                    color: const Color(0xFF4B5563),
-                                    fontWeight: FontWeight.w500,
-                                  ),
+                              style: TriageTextStyles.bodyMedium.copyWith(
+                                color: TriageColors.textSecondary,
+                              ),
                             ),
                             const SizedBox(width: 8),
-                            if (data.onMapTap != null) ...[
+                            if (data.onMapTap != null)
                               GestureDetector(
                                 onTap: data.onMapTap,
                                 child: Text(
                                   'Ver mapa',
-                                  style:
-                                      AppTextStyles
-                                          .ESC_Bold_titleSmall.copyWith(
-                                        fontSize: 11,
-                                        color: const Color(0xFF111827),
-                                        fontWeight: FontWeight.w600,
-                                        decoration: TextDecoration.underline,
-                                      ),
+                                  style: TriageTextStyles.labelSmall.copyWith(
+                                    color: TriageColors.textPrimary,
+                                    decoration: TextDecoration.underline,
+                                  ),
                                 ),
                               ),
-                            ],
                             const Spacer(),
-                            const Icon(
-                              Icons.chevron_right_rounded,
+                            const TriageIcon(
+                              TriageIcons.chevronRight,
                               size: 18,
-                              color: Color(0xFFD1D5DB),
+                              color: TriageColors.textTertiary,
                             ),
                           ],
                         ),
 
                         const SizedBox(height: 8),
 
-                        /* FILA 3: Estado del paciente */
+                        /* FILA 3: Insignia de estado con PatientLifecycleStatus */
                         Row(
-                          mainAxisAlignment: MainAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            PatientLifecycleStatusBadge(status: data.status),
+                            Text(
+                              'Estado:',
+                              style: TriageTextStyles.bodySmall.copyWith(
+                                color: TriageColors.textSecondary,
+                              ),
+                            ),
+                            _buildStatusBadge(data.status),
                           ],
                         ),
                       ],
@@ -165,6 +142,36 @@ class PatientCard extends StatelessWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildStatusBadge(PatientLifecycleStatus status) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: status.background,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 6,
+            height: 6,
+            decoration: BoxDecoration(
+              color: status.dotColor,
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            status.label,
+            style: TriageTextStyles.labelSmall.copyWith(
+              color: status.textColor,
+            ),
+          ),
+        ],
       ),
     );
   }

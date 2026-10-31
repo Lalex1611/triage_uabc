@@ -9,6 +9,7 @@ import 'package:sistema_triage/features/paramedico/domain/entities/incident_deta
 import 'package:sistema_triage/features/paramedico/domain/entities/incident_details/patient_triage_filters_data.dart';
 import 'package:sistema_triage/features/paramedico/domain/services/incident_presentation_formatters.dart';
 import 'package:sistema_triage/features/paramedico/domain/services/paramedico_catalog_mappers.dart';
+import 'package:sistema_triage/shared/widgets/triage_ui.dart';
 
 /// Convierte datos del repositorio a datos de la vista
 class IncidentDetailsViewMapper {
@@ -84,7 +85,6 @@ class IncidentDetailsViewMapper {
 
   static List<PatientCardData> patientCards({
     required List<ParamedicoPatientRow> filtered,
-    required String coordinatesLabel,
     required void Function(String patientId) onPatientTap,
   }) {
     return filtered.asMap().entries.map((e) {
@@ -93,11 +93,12 @@ class IncidentDetailsViewMapper {
       return PatientCardData(
         id: IncidentPresentationFormatters.shortPatientId(p.id),
         number: i + 1,
-        triageCategory: ParamedicoCatalogMappers.triageFromDb(p.triageColor),
+        triageLevel: TriageLevel.fromDb(p.triageColor) ?? TriageLevel.green,
         name: p.displayName,
         dateStr: IncidentPresentationFormatters.formatDateTime(p.createdAt),
-        coordinates: coordinatesLabel == '—' ? '—' : coordinatesLabel,
-        status: ParamedicoCatalogMappers.statusFromDb(p.status),
+        status:
+            PatientLifecycleStatus.fromDb(p.status) ??
+            PatientLifecycleStatus.waiting,
         onCardTap: () => onPatientTap(p.id),
       );
     }).toList();

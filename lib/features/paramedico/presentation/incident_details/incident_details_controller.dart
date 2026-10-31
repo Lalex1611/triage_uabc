@@ -19,6 +19,7 @@ import 'package:sistema_triage/features/paramedico/presentation/create_incident/
 import 'package:sistema_triage/features/paramedico/presentation/incident_details/incident_details_view_mapper.dart';
 import 'package:sistema_triage/features/paramedico/presentation/routing/patient_registration_route_seed.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:sistema_triage/shared/widgets/triage_ui.dart';
 
 enum IncidentDetailsShellMode { loading, error, ready }
 
@@ -179,11 +180,8 @@ class IncidentDetailsController extends ChangeNotifier {
   }
 
   List<PatientCardData> patientCards(BuildContext context) {
-    final inc = incident!;
-    final gps = IncidentPresentationFormatters.incidentGpsLabel(inc);
     return IncidentDetailsViewMapper.patientCards(
       filtered: filteredPatients,
-      coordinatesLabel: gps,
       onPatientTap: (id) =>
           pushParamedicoFullScreen(context, '/paramedico/patient/$id'),
     );
@@ -206,24 +204,48 @@ class IncidentDetailsController extends ChangeNotifier {
       );
       return;
     }
+
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Cerrar incidente'),
-        content: const Text('¿Marcar este incidente como cerrado?'),
+        backgroundColor: TriageColors.surface,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(
+          'Cerrar incidente',
+          style: TriageTextStyles.titleMedium.copyWith(
+            color: TriageColors.textPrimary,
+          ),
+        ),
+        content: Text(
+          '¿Marcar este incidente como cerrado?',
+          style: TriageTextStyles.bodyMedium.copyWith(
+            color: TriageColors.textSecondary,
+          ),
+        ),
+        actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancelar'),
+            child: Text(
+              'Cancelar',
+              style: TriageTextStyles.labelMedium.copyWith(
+                color: TriageColors.textSecondary,
+              ),
+            ),
           ),
-          FilledButton(
+          TriageButton(
+            label: 'Cerrar',
+            size: TriageButtonSize.medium,
+            variant: TriageButtonVariant.primary,
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Cerrar'),
           ),
         ],
       ),
     );
+
     if (ok != true || !context.mounted) return;
+
     try {
       await _repo.closeIncident(incidentId);
       if (!context.mounted) return;

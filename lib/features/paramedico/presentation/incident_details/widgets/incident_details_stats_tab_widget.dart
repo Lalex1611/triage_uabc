@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:sistema_triage/core/theme/app_theme.dart';
-import 'package:sistema_triage/features/paramedico/domain/constants/patient_status.dart';
-import 'package:sistema_triage/features/paramedico/domain/constants/triage_catalog.dart';
 import 'package:sistema_triage/features/paramedico/domain/entities/incident_details/patient_card_data.dart';
+import 'package:sistema_triage/shared/widgets/triage_ui.dart';
 
 class IncidentDetailsStatsTab extends StatelessWidget {
   final List<PatientCardData> patients;
@@ -11,36 +9,34 @@ class IncidentDetailsStatsTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    //Filtrado por categoría de Triaje usando TriageCategory
+    // Conteo por TriageLevel
     final inmediatos = patients
-        .where((p) => _matchesTriage(p.triageCategory, ['rojo', 'inmediato']))
+        .where((p) => p.triageLevel == TriageLevel.red)
         .length;
     final urgentes = patients
-        .where((p) => _matchesTriage(p.triageCategory, ['amarillo', 'urgente']))
+        .where((p) => p.triageLevel == TriageLevel.yellow)
         .length;
     final leves = patients
-        .where((p) => _matchesTriage(p.triageCategory, ['verde', 'leve']))
+        .where((p) => p.triageLevel == TriageLevel.green)
         .length;
     final fallecidos = patients
-        .where((p) => _matchesTriage(p.triageCategory, ['negro', 'fallecido']))
+        .where((p) => p.triageLevel == TriageLevel.black)
         .length;
 
-    //Avance de traslado accediendo directamente a PatientStatus
+    // Avance de traslado por PatientLifecycleStatus
     final registrados = patients.length;
     final enEspera = patients
-        .where((p) => p.status == PatientStatus.enEspera)
+        .where((p) => p.status == PatientLifecycleStatus.waiting)
         .length;
     final trasladando = patients
-        .where((p) => p.status == PatientStatus.trasladando)
+        .where((p) => p.status == PatientLifecycleStatus.transferring)
         .length;
     final recibidosHospital = patients
-        .where(
-          (p) =>
-              p.status == PatientStatus.recibido ||
-              p.status == PatientStatus.recibido,
-        )
+        .where((p) => p.status == PatientLifecycleStatus.received)
         .length;
-    final alta = patients.where((p) => p.status == PatientStatus.alta).length;
+    final alta = patients
+        .where((p) => p.status == PatientLifecycleStatus.discharged)
+        .length;
 
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
@@ -48,118 +44,78 @@ class IncidentDetailsStatsTab extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Métrica de Triage
+          /* Cuadrícula de métricas usando TriageMetric.level */
           GridView.count(
             crossAxisCount: 2,
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             crossAxisSpacing: 12,
-            mainAxisSpacing: 12,
+            mainAxisSpacing: 10,
             childAspectRatio: 1.4,
             children: [
-              _buildTriageCard(
-                count: inmediatos,
-                label: 'Inmediatos',
-                color: const Color(0xFFDC2626),
-                backgroundColor: const Color(0xFFFEE2E2),
+              TriageMetric.level(
+                TriageLevel.red,
+                value: '$inmediatos',
+                label: TriageLevel.red.label,
               ),
-              _buildTriageCard(
-                count: urgentes,
-                label: 'Urgentes',
-                color: const Color(0xFFD97706),
-                backgroundColor: const Color(0xFFFEF3C7),
+              TriageMetric.level(
+                TriageLevel.yellow,
+                value: '$urgentes',
+                label: TriageLevel.yellow.label,
               ),
-              _buildTriageCard(
-                count: leves,
-                label: 'Leves',
-                color: const Color(0xFF16A34A),
-                backgroundColor: const Color(0xFFDCFCE7),
+              TriageMetric.level(
+                TriageLevel.green,
+                value: '$leves',
+                label: TriageLevel.green.label,
               ),
-              _buildTriageCard(
-                count: fallecidos,
-                label: 'Fallecidos',
-                color: const Color(0xFF111827),
-                backgroundColor: const Color(0xFFF3F4F6),
+              TriageMetric.level(
+                TriageLevel.black,
+                value: '$fallecidos',
+                label: TriageLevel.black.label,
               ),
             ],
           ),
 
           const SizedBox(height: 20),
 
-          // Avance de traslado
+          /* Tarjeta de avance de traslado */
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: TriageColors.surface,
               borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.03),
-                  blurRadius: 10,
-                  offset: const Offset(0, 2),
-                ),
-              ],
+              border: Border.all(color: TriageColors.borderSubtle, width: 1),
+              boxShadow: TriageShadows.card,
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   'Avance del traslado',
-                  style: AppTextStyles.ESC_SemiBold_bodyMedium.copyWith(
-                    fontSize: 15,
-                    color: const Color(0xFF111827),
+                  style: TriageTextStyles.labelLarge.copyWith(
+                    color: TriageColors.textPrimary,
                   ),
                 ),
                 const SizedBox(height: 12),
                 _buildProgressRow('Registrados', registrados),
-                _buildProgressRow('En espera', enEspera),
-                _buildProgressRow('Trasladando', trasladando),
-                _buildProgressRow('Recibidos en hospital', recibidosHospital),
-                _buildProgressRow('Alta', alta, isLast: true),
+                _buildProgressRow(
+                  PatientLifecycleStatus.waiting.label,
+                  enEspera,
+                ),
+                _buildProgressRow(
+                  PatientLifecycleStatus.transferring.label,
+                  trasladando,
+                ),
+                _buildProgressRow(
+                  PatientLifecycleStatus.received.label,
+                  recibidosHospital,
+                ),
+                _buildProgressRow(
+                  PatientLifecycleStatus.discharged.label,
+                  alta,
+                  isLast: true,
+                ),
               ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // Compara la categoría de triaje de forma segura sin importar si es Enum o Clase
-  bool _matchesTriage(TriageCategory category, List<String> keywords) {
-    final catName = category.toString().toLowerCase();
-    return keywords.any((kw) => catName.contains(kw));
-  }
-
-  Widget _buildTriageCard({
-    required int count,
-    required String label,
-    required Color color,
-    required Color backgroundColor,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: backgroundColor,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(
-            '$count',
-            style: AppTextStyles.ESC_SemiBold_bodyMedium.copyWith(
-              fontSize: 28,
-              color: color,
-              height: 1.0,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            label,
-            style: AppTextStyles.ESC_Regular_bodyMedium.copyWith(
-              fontSize: 12,
-              color: const Color(0xFF374151),
             ),
           ),
         ],
@@ -177,23 +133,25 @@ class IncidentDetailsStatsTab extends StatelessWidget {
             children: [
               Text(
                 title,
-                style: AppTextStyles.ESC_Regular_bodyMedium.copyWith(
-                  fontSize: 13,
-                  color: const Color(0xFF4B5563),
+                style: TriageTextStyles.bodyMedium.copyWith(
+                  color: TriageColors.textSecondary,
                 ),
               ),
               Text(
                 '$count',
-                style: AppTextStyles.ESC_SemiBold_bodyMedium.copyWith(
-                  fontSize: 14,
-                  color: const Color(0xFF111827),
+                style: TriageTextStyles.labelLarge.copyWith(
+                  color: TriageColors.textPrimary,
                 ),
               ),
             ],
           ),
         ),
         if (!isLast)
-          const Divider(height: 1, thickness: 0.5, color: Color(0xFFF3F4F6)),
+          const Divider(
+            height: 1,
+            thickness: 1,
+            color: TriageColors.borderSubtle,
+          ),
       ],
     );
   }

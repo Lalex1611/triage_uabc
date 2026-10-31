@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:sistema_triage/core/constants/app_colors.dart';
 import 'package:sistema_triage/features/paramedico/domain/entities/incident_details/incident_header_data.dart';
 import 'package:sistema_triage/features/paramedico/domain/entities/incident_details/incident_metadata_data.dart';
 import 'package:sistema_triage/features/paramedico/domain/entities/incident_details/incident_tab_data.dart';
@@ -7,8 +6,7 @@ import 'package:sistema_triage/features/paramedico/presentation/incident_details
 import 'package:sistema_triage/features/paramedico/presentation/incident_details/widgets/incident_action_buttons_widget.dart';
 import 'package:sistema_triage/features/paramedico/presentation/incident_details/widgets/incident_custom_tab_bar_widget.dart';
 import 'package:sistema_triage/features/paramedico/presentation/incident_details/widgets/incident_detail_header_widget.dart';
-
-//import 'package:sistema_triage/features/paramedico/presentation/incident_details/widgets/incident_metadata_card_widget.dart';
+import 'package:sistema_triage/shared/widgets/triage_ui.dart';
 
 // Cascarón de la vista de detalles de incidente (paramédico)
 class IncidentDetailsPage extends StatelessWidget {
@@ -22,6 +20,7 @@ class IncidentDetailsPage extends StatelessWidget {
   final Widget? tabBody;
   final VoidCallback? onStartTap;
   final VoidCallback? onRegisterTap;
+  final VoidCallback? onCloseIncidentTap;
 
   const IncidentDetailsPage({
     super.key,
@@ -35,6 +34,7 @@ class IncidentDetailsPage extends StatelessWidget {
     this.tabBody,
     this.onStartTap,
     this.onRegisterTap,
+    this.onCloseIncidentTap,
   });
 
   @override
@@ -57,6 +57,7 @@ class IncidentDetailsPage extends StatelessWidget {
           tabBody: tabBody!,
           onStartTap: onStartTap,
           onRegisterTap: onRegisterTap,
+          onCloseIncidentTap: onCloseIncidentTap,
         );
     }
   }
@@ -71,17 +72,23 @@ class _LoadingShell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: TriageColors.canvas,
       appBar:
           appBar ??
           AppBar(
-            backgroundColor: AppColors.primaryParamedico,
-            foregroundColor: Colors.white,
+            backgroundColor: TriageColors.surface,
+            elevation: 0,
             leading: IconButton(
-              icon: const Icon(Icons.arrow_back),
+              icon: const TriageIcon(
+                TriageIcons.arrowLeft,
+                color: TriageColors.textPrimary,
+              ),
               onPressed: onBack,
             ),
           ),
-      body: const Center(child: CircularProgressIndicator()),
+      body: const Center(
+        child: CircularProgressIndicator(color: TriageColors.paramedicAccent),
+      ),
     );
   }
 }
@@ -96,18 +103,34 @@ class _ErrorShell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: TriageColors.canvas,
       appBar:
           appBar ??
           AppBar(
-            backgroundColor: AppColors.primaryParamedico,
-            foregroundColor: Colors.white,
-            title: const Text('Incidente'),
+            backgroundColor: TriageColors.surface,
+            elevation: 0,
+            title: Text(
+              'Incidente',
+              style: TriageTextStyles.titleSmall.copyWith(
+                color: TriageColors.textPrimary,
+              ),
+            ),
             leading: IconButton(
-              icon: const Icon(Icons.arrow_back),
+              icon: const TriageIcon(
+                TriageIcons.arrowLeft,
+                color: TriageColors.textPrimary,
+              ),
               onPressed: onBack,
             ),
           ),
-      body: Center(child: Text(message)),
+      body: Center(
+        child: Text(
+          message,
+          style: TriageTextStyles.bodyMedium.copyWith(
+            color: TriageColors.textSecondary,
+          ),
+        ),
+      ),
     );
   }
 }
@@ -120,6 +143,7 @@ class _ContentShell extends StatelessWidget {
   final Widget tabBody;
   final VoidCallback? onStartTap;
   final VoidCallback? onRegisterTap;
+  final VoidCallback? onCloseIncidentTap;
 
   const _ContentShell({
     this.appBar,
@@ -129,12 +153,13 @@ class _ContentShell extends StatelessWidget {
     required this.tabBody,
     this.onStartTap,
     this.onRegisterTap,
+    this.onCloseIncidentTap,
   });
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF9F9F9),
+      backgroundColor: TriageColors.canvas,
       appBar: appBar,
       body: Stack(
         children: [
@@ -157,7 +182,7 @@ class _ContentShell extends StatelessWidget {
                 ),
               ),
               ColoredBox(
-                color: const Color(0xFFEFEFF1).withValues(alpha: 0.35),
+                color: TriageColors.sunken,
                 child: Column(
                   children: [
                     const SizedBox(height: 10),
@@ -167,18 +192,18 @@ class _ContentShell extends StatelessWidget {
                 ),
               ),
               Expanded(
-                child: ColoredBox(
-                  color: const Color(0xFFF1EFEF).withValues(alpha: 0.35),
-                  child: tabBody,
-                ),
+                child: ColoredBox(color: TriageColors.canvas, child: tabBody),
               ),
             ],
           ),
           Align(
             alignment: Alignment.bottomCenter,
             child: IncidentActionButtons(
+              isStatsTab:
+                  tabSelectorData.activeTab == IncidentTabType.estadisticas,
               onStartTap: onStartTap,
               onRegisterTap: onRegisterTap,
+              onCloseIncidentTap: onCloseIncidentTap,
             ),
           ),
         ],

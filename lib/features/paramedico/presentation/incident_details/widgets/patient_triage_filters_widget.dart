@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
-//import 'package:sistema_triage/core/constants/app_colors.dart';
-import 'package:sistema_triage/core/theme/app_theme.dart';
 import 'package:sistema_triage/features/paramedico/domain/constants/patient_triage_filter.dart';
 import 'package:sistema_triage/features/paramedico/domain/entities/incident_details/patient_triage_filters_data.dart';
+import 'package:sistema_triage/shared/widgets/triage_ui.dart';
 
 // Barra de filtros horizontales tipo carrusel para segmentar la lista de pacientes por triage
 class PatientTriageFilters extends StatelessWidget {
@@ -38,19 +37,19 @@ class PatientTriageFilters extends StatelessWidget {
   Widget _buildChip(PatientTriageFilter filter) {
     final isSelected = data.activeFilter == filter;
 
-    // Colores según el diseño blanco
     final backgroundColor = isSelected
-        ? const Color(0xFF111827)
-        : const Color(0xFFF3F4F6);
-    final textColor = isSelected ? Colors.white : const Color(0xFF4B5563);
+        ? TriageColors.textPrimary
+        : TriageColors.canvas;
+    final textColor = isSelected
+        ? TriageColors.surface
+        : TriageColors.textSecondary;
 
     return GestureDetector(
       onTap: () => data.onFilterChanged(filter),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 150),
-        width: 71.34,
         height: 28,
-        padding: const EdgeInsets.symmetric(horizontal: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 12),
         decoration: BoxDecoration(
           color: backgroundColor,
           borderRadius: BorderRadius.circular(14),
@@ -58,11 +57,11 @@ class PatientTriageFilters extends StatelessWidget {
         alignment: Alignment.center,
         child: Text(
           filter.label,
-          style: AppTextStyles.ESC_Regular_bodyMedium.copyWith(
-            color: textColor,
-            fontSize: 11,
-            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-          ),
+          style:
+              (isSelected
+                      ? TriageTextStyles.labelSmall
+                      : TriageTextStyles.bodySmall)
+                  .copyWith(color: textColor),
         ),
       ),
     );

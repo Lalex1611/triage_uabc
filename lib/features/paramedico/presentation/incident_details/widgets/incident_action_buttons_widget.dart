@@ -1,14 +1,20 @@
 import 'package:flutter/material.dart';
-import 'package:sistema_triage/core/constants/app_colors.dart';
-import 'package:sistema_triage/core/theme/app_theme.dart';
-import 'package:sistema_triage/shared/widgets/app_sticky_action_bar.dart';
+import 'package:sistema_triage/shared/widgets/triage_ui.dart';
 
 // Contenedor de botones de acción principales flotantes
 class IncidentActionButtons extends StatelessWidget {
+  final bool isStatsTab;
   final VoidCallback? onStartTap;
   final VoidCallback? onRegisterTap;
+  final VoidCallback? onCloseIncidentTap;
 
-  const IncidentActionButtons({super.key, this.onStartTap, this.onRegisterTap});
+  const IncidentActionButtons({
+    super.key,
+    this.isStatsTab = false,
+    this.onStartTap,
+    this.onRegisterTap,
+    this.onCloseIncidentTap,
+  });
 
   void _showRegisterModal(BuildContext context) {
     showModalBottomSheet(
@@ -30,91 +36,29 @@ class IncidentActionButtons extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AppStickyActionBar(
-      child: SizedBox(
-        width: double.infinity,
-        height: 50,
-        child: _ActionButton(
-          label: 'REGISTRAR PACIENTE',
-          onTap: () => _showRegisterModal(context),
-          backgroundColor: AppColors.primaryParamedico,
-          textColor: Colors.white,
-          fontSize: 15,
-          hasShadow: true,
-        ),
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: const BoxDecoration(
+        color: TriageColors.surface,
+        boxShadow: TriageShadows.bar,
       ),
-    );
-  }
-}
-
-// Widget interno animado para la respuesta táctil de los botones
-class _ActionButton extends StatefulWidget {
-  final String label;
-  final VoidCallback? onTap;
-  final Color backgroundColor;
-  final Color textColor;
-  final double fontSize;
-  final bool hasShadow;
-
-  const _ActionButton({
-    required this.label,
-    required this.onTap,
-    required this.backgroundColor,
-    required this.textColor,
-    required this.fontSize,
-    this.hasShadow = false,
-  });
-
-  @override
-  State<_ActionButton> createState() => _ActionButtonState();
-}
-
-class _ActionButtonState extends State<_ActionButton> {
-  bool _isPressed = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final isDisabled = widget.onTap == null;
-
-    return GestureDetector(
-      onTapDown: (_) => setState(() => _isPressed = true),
-      onTapUp: (_) => setState(() => _isPressed = false),
-      onTapCancel: () => setState(() => _isPressed = false),
-      onTap: widget.onTap,
-      child: AnimatedScale(
-        scale: _isPressed ? 0.96 : 1.0,
-        duration: const Duration(milliseconds: 100),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 150),
-          decoration: BoxDecoration(
-            color: isDisabled
-                ? widget.backgroundColor.withValues(alpha: 0.5)
-                : widget.backgroundColor,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: widget.hasShadow && !isDisabled
-                ? [
-                    BoxShadow(
-                      color: const Color(0xFF111827).withValues(alpha: 0.15),
-                      blurRadius: 8,
-                      offset: const Offset(0, 3),
-                    ),
-                  ]
-                : [],
-          ),
-          alignment: Alignment.center,
-          padding: const EdgeInsets.symmetric(horizontal: 8),
-          child: FittedBox(
-            fit: BoxFit.scaleDown,
-            child: Text(
-              widget.label,
-              style: AppTextStyles.ESC_ExtraBold_titleLarge.copyWith(
-                fontSize: widget.fontSize,
-                color: widget.textColor,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.3,
-              ),
-            ),
-          ),
+      child: SafeArea(
+        top: false,
+        child: SizedBox(
+          width: double.infinity,
+          child: isStatsTab
+              ? TriageButton(
+                  label: 'CERRAR INCIDENTE',
+                  variant: TriageButtonVariant.secondary,
+                  size: TriageButtonSize.large,
+                  onPressed: onCloseIncidentTap,
+                )
+              : TriageButton(
+                  label: 'REGISTRAR PACIENTE',
+                  variant: TriageButtonVariant.primary,
+                  size: TriageButtonSize.large,
+                  onPressed: () => _showRegisterModal(context),
+                ),
         ),
       ),
     );
@@ -136,7 +80,7 @@ class _RegisterPatientModal extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.fromLTRB(24, 12, 24, 32),
       decoration: const BoxDecoration(
-        color: Colors.white,
+        color: TriageColors.surface,
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       child: Column(
@@ -150,7 +94,7 @@ class _RegisterPatientModal extends StatelessWidget {
               height: 4,
               margin: const EdgeInsets.only(bottom: 20),
               decoration: BoxDecoration(
-                color: const Color(0xFFE5E7EB),
+                color: TriageColors.borderSubtle,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -158,18 +102,15 @@ class _RegisterPatientModal extends StatelessWidget {
 
           Text(
             'Registrar paciente',
-            style: AppTextStyles.ESC_SemiBold_bodyMedium.copyWith(
-              fontSize: 18,
-              color: const Color(0xFF111827),
-              fontWeight: FontWeight.w700,
+            style: TriageTextStyles.titleMedium.copyWith(
+              color: TriageColors.textPrimary,
             ),
           ),
           const SizedBox(height: 4),
           Text(
             'Selecciona el método de evaluación para ingresar al paciente.',
-            style: AppTextStyles.ESC_Regular_bodyMedium.copyWith(
-              fontSize: 13,
-              color: const Color(0xFF6B7280),
+            style: TriageTextStyles.bodyMedium.copyWith(
+              color: TriageColors.textSecondary,
             ),
           ),
 
@@ -179,7 +120,7 @@ class _RegisterPatientModal extends StatelessWidget {
           _buildOptionCard(
             title: 'Triage Método START',
             subtitle: 'Evaluación guiada mediante el algoritmo sistemático.',
-            icon: Icons.checklist_rtl_rounded,
+            icon: TriageIcons.pulse,
             isPrimary: true,
             onTap: onStartRegister,
           ),
@@ -190,7 +131,7 @@ class _RegisterPatientModal extends StatelessWidget {
           _buildOptionCard(
             title: 'Registro Directo / Manual',
             subtitle: 'Ingreso rápido de datos y asignación manual de estado.',
-            icon: Icons.assignment_outlined,
+            icon: TriageIcons.clipboard,
             isPrimary: false,
             onTap: onNormalRegister,
           ),
@@ -202,11 +143,21 @@ class _RegisterPatientModal extends StatelessWidget {
   Widget _buildOptionCard({
     required String title,
     required String subtitle,
-    required IconData icon,
+    required String icon,
     required VoidCallback onTap,
     bool isPrimary = false,
     String? badgeText,
   }) {
+    final accentColor = isPrimary
+        ? TriageColors.paramedicAccent
+        : TriageColors.borderSubtle;
+    final backgroundColor = isPrimary
+        ? TriageColors.paramedicSoft
+        : TriageColors.surface;
+    final iconBackgroundColor = isPrimary
+        ? TriageColors.paramedicAccent
+        : TriageColors.canvas;
+
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -215,12 +166,10 @@ class _RegisterPatientModal extends StatelessWidget {
         child: Ink(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: isPrimary ? const Color(0xFFF9FAFB) : Colors.white,
+            color: backgroundColor,
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
-              color: isPrimary
-                  ? AppColors.primaryParamedico
-                  : const Color(0xFFE5E7EB),
+              color: accentColor,
               width: isPrimary ? 1.5 : 1.0,
             ),
           ),
@@ -230,14 +179,14 @@ class _RegisterPatientModal extends StatelessWidget {
                 width: 42,
                 height: 42,
                 decoration: BoxDecoration(
-                  color: isPrimary
-                      ? AppColors.primaryParamedico.withValues(alpha: 0.7)
-                      : const Color(0xFFF3F4F6),
+                  color: iconBackgroundColor,
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(
+                child: TriageIcon(
                   icon,
-                  color: isPrimary ? Colors.white : const Color(0xFF374151),
+                  color: isPrimary
+                      ? TriageColors.surface
+                      : TriageColors.textPrimary,
                   size: 20,
                 ),
               ),
@@ -250,9 +199,8 @@ class _RegisterPatientModal extends StatelessWidget {
                       children: [
                         Text(
                           title,
-                          style: AppTextStyles.ESC_SemiBold_bodyMedium.copyWith(
-                            fontSize: 14,
-                            color: const Color(0xFF111827),
+                          style: TriageTextStyles.labelLarge.copyWith(
+                            color: TriageColors.textPrimary,
                           ),
                         ),
                         if (badgeText != null) ...[
@@ -263,15 +211,13 @@ class _RegisterPatientModal extends StatelessWidget {
                               vertical: 2,
                             ),
                             decoration: BoxDecoration(
-                              color: const Color(0xFF111827),
+                              color: TriageColors.paramedicAccent,
                               borderRadius: BorderRadius.circular(6),
                             ),
                             child: Text(
                               badgeText,
-                              style: const TextStyle(
-                                fontSize: 9,
-                                fontWeight: FontWeight.w700,
-                                color: Colors.white,
+                              style: TriageTextStyles.labelSmall.copyWith(
+                                color: TriageColors.surface,
                               ),
                             ),
                           ),
@@ -281,17 +227,16 @@ class _RegisterPatientModal extends StatelessWidget {
                     const SizedBox(height: 2),
                     Text(
                       subtitle,
-                      style: AppTextStyles.ESC_Regular_bodyMedium.copyWith(
-                        fontSize: 12,
-                        color: const Color(0xFF6B7280),
+                      style: TriageTextStyles.bodySmall.copyWith(
+                        color: TriageColors.textSecondary,
                       ),
                     ),
                   ],
                 ),
               ),
-              const Icon(
-                Icons.chevron_right_rounded,
-                color: Color(0xFF9CA3AF),
+              const TriageIcon(
+                TriageIcons.chevronRight,
+                color: TriageColors.textTertiary,
                 size: 20,
               ),
             ],
