@@ -1,31 +1,20 @@
 import 'package:flutter/material.dart';
-import 'package:sistema_triage/core/constants/app_colors.dart';
-import 'package:sistema_triage/core/theme/app_theme.dart';
+import 'package:sistema_triage/core/theme/triage_tone.dart';
+import 'package:sistema_triage/shared/widgets/triage_toast_widget.dart';
 
-/// SnackBars alineados a [AppTextStyles] / paleta (ARCHITECTURE_GUIDE §7)
+/// Aviso breve de la app con el estilo del rediseño ([showTriageToast])
+///
+/// Se mantiene esta firma para no tocar las llamadas existentes: [isError]
+/// usa el tono de peligro y, si no, el informativo. El código nuevo puede
+/// llamar a [showTriageToast] para elegir otro tono o añadir una acción.
 void showAppSnackBar(
   BuildContext context,
   String message, {
   bool isError = false,
   Duration duration = const Duration(seconds: 4),
-}) {
-  final messenger = ScaffoldMessenger.maybeOf(context);
-  if (messenger == null) return;
-
-  final bg = isError ? AppColors.primaryParamedico : const Color(0xFF424242);
-
-  messenger.showSnackBar(
-    SnackBar(
-      duration: duration,
-      backgroundColor: bg,
-      content: Text(
-        message,
-        style: AppTextStyles.ESC_Regular_bodyMedium.copyWith(
-          fontSize: 14,
-          color: Colors.white,
-          height: 1.25,
-        ),
-      ),
-    ),
-  );
-}
+}) => showTriageToast(
+  context,
+  message,
+  tone: isError ? TriageTone.danger : TriageTone.info,
+  duration: duration,
+);
