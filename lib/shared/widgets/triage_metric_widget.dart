@@ -36,6 +36,10 @@ class TriageMetric extends StatelessWidget {
   final TriageLevel? level;
   final bool _role;
 
+  /// Alto de Figma; el contenido ya lo da con el texto al 100 %, esto lo
+  /// mantiene si el usuario reduce el texto
+  static const _minHeight = 74.0;
+
   @override
   Widget build(BuildContext context) {
     final level = this.level;
@@ -53,9 +57,9 @@ class TriageMetric extends StatelessWidget {
     return Semantics(
       label: '$label: $value',
       excludeSemantics: true,
-      // Sin alto mínimo: número + etiqueta + relleno dan los 74 de Figma y
-      // crece si el usuario agranda el texto
+      // Alto mínimo y no fijo: crece si el usuario agranda el texto
       child: Container(
+        constraints: const BoxConstraints(minHeight: _minHeight),
         padding: const EdgeInsets.symmetric(
           horizontal: TriageSpacing.md,
           vertical: TriageSpacing.lg,

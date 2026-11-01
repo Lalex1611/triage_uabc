@@ -95,6 +95,19 @@ void main() {
     },
   );
 
+  testWidgets('con el texto reducido no baja de 74', (tester) async {
+    await tester.pumpWidget(
+      MediaQuery(
+        data: const MediaQueryData(textScaler: TextScaler.linear(0.8)),
+        child: _wrap(const TriageMetric(value: '2', label: 'Críticos')),
+      ),
+    );
+    expect(
+      tester.getSize(find.byType(TriageMetric)).height,
+      greaterThanOrEqualTo(74),
+    );
+  });
+
   test('naranja y azul no tienen tono de métrica en Figma', () {
     expect(
       () => TriageMetric.level(TriageLevel.orange, value: '1', label: 'x'),
