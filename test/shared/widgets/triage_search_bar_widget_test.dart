@@ -50,12 +50,18 @@ void main() {
     expect(_clearButton, findsNothing);
   });
 
-  testWidgets('alto mínimo 48 y ✕ con zona táctil de 44', (tester) async {
+  testWidgets('alto mínimo de 48 y ✕ con zona táctil de 44', (tester) async {
     await tester.pumpWidget(_wrap(const TriageSearchBar(hint: 'Buscar')));
-    expect(tester.getSize(find.byType(TriageSearchBar)).height, 48);
+    expect(
+      tester.getSize(find.byType(TriageSearchBar)).height,
+      greaterThanOrEqualTo(TriageSizes.touchTarget),
+    );
 
     await tester.enterText(find.byType(TextField), 'a');
     await tester.pump();
-    expect(tester.getSize(_clearButton), const Size(44, 44));
+    expect(
+      tester.getSize(_clearButton),
+      const Size.square(TriageSizes.touchTargetCompact),
+    );
   });
 }

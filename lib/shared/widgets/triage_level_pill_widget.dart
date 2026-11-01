@@ -19,8 +19,8 @@ class TriageLevelPill extends StatelessWidget {
       label: 'Triage ${level.label}',
       excludeSemantics: true,
       child: Container(
-        constraints: const BoxConstraints(minHeight: 28),
-        padding: const EdgeInsets.symmetric(horizontal: 12),
+        constraints: const BoxConstraints(minHeight: TriageSizes.tag),
+        padding: const EdgeInsets.symmetric(horizontal: TriageSpacing.md),
         decoration: ShapeDecoration(
           color: level.color,
           shape: const StadiumBorder(),

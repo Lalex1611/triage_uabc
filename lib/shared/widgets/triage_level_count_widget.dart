@@ -19,6 +19,9 @@ class TriageLevelCount extends StatelessWidget {
   final Map<TriageLevel, int> counts;
   final List<TriageLevel> levels;
 
+  /// Ancho mínimo de cada cuadro (Figma)
+  static const double _minBoxWidth = 30;
+
   @override
   Widget build(BuildContext context) {
     return Semantics(
@@ -27,17 +30,20 @@ class TriageLevelCount extends StatelessWidget {
       ].join(', '),
       excludeSemantics: true,
       child: Wrap(
-        spacing: 6,
-        runSpacing: 6,
+        spacing: TriageSpacing.xs,
+        runSpacing: TriageSpacing.xs,
         children: [
           for (final level in levels)
             Container(
-              // Mínimos de Figma (30×26); crece con números de dos cifras
-              constraints: const BoxConstraints(minWidth: 30, minHeight: 26),
-              padding: const EdgeInsets.symmetric(horizontal: 6),
+              // Mínimos de Figma; crece con números de dos cifras
+              constraints: const BoxConstraints(
+                minWidth: _minBoxWidth,
+                minHeight: TriageSizes.tag,
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: TriageSpacing.xs),
               decoration: BoxDecoration(
                 color: level.color,
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(TriageRadii.sm),
               ),
               child: Center(
                 widthFactor: 1,

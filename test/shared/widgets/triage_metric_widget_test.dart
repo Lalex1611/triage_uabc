@@ -78,18 +78,22 @@ void main() {
     }
   });
 
-  testWidgets('alto mínimo de 74 y se anuncia "etiqueta: valor"', (
-    tester,
-  ) async {
-    await tester.pumpWidget(
-      _wrap(const TriageMetric(value: '2', label: 'Críticos')),
-    );
-    expect(tester.getSize(find.byType(TriageMetric)).height, 74);
-    expect(
-      tester.getSemantics(find.byType(TriageMetric)),
-      isSemantics(label: 'Críticos: 2'),
-    );
-  });
+  testWidgets(
+    'el contenido da al menos los 74 de Figma y se anuncia "etiqueta: valor"',
+    (tester) async {
+      await tester.pumpWidget(
+        _wrap(const TriageMetric(value: '2', label: 'Críticos')),
+      );
+      expect(
+        tester.getSize(find.byType(TriageMetric)).height,
+        greaterThanOrEqualTo(74),
+      );
+      expect(
+        tester.getSemantics(find.byType(TriageMetric)),
+        isSemantics(label: 'Críticos: 2'),
+      );
+    },
+  );
 
   test('naranja y azul no tienen tono de métrica en Figma', () {
     expect(

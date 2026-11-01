@@ -53,12 +53,16 @@ class TriageMetric extends StatelessWidget {
     return Semantics(
       label: '$label: $value',
       excludeSemantics: true,
+      // Sin alto mínimo: número + etiqueta + relleno dan los 74 de Figma y
+      // crece si el usuario agranda el texto
       child: Container(
-        constraints: const BoxConstraints(minHeight: 74),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        padding: const EdgeInsets.symmetric(
+          horizontal: TriageSpacing.md,
+          vertical: TriageSpacing.lg,
+        ),
         decoration: BoxDecoration(
           color: background,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(TriageRadii.lg),
         ),
         // heightFactor 1: centra en vertical sin estirarse al alto disponible
         child: Align(
@@ -72,7 +76,7 @@ class TriageMetric extends StatelessWidget {
                 value,
                 style: TriageTextStyles.dataLarge.copyWith(color: number),
               ),
-              const SizedBox(height: 1),
+              const SizedBox(height: TriageSpacing.xxs),
               Text(
                 label,
                 style: TriageTextStyles.labelSmall.copyWith(
