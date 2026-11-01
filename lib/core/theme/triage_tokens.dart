@@ -47,6 +47,11 @@ class TriageColors {
   static const Color infoText = Color(0xFF09769A);
   static const Color successText = Color(0xFF0C7F47);
 
+  // Señal sobre fondo oscuro ([inverse]), p. ej. el Aviso breve: ≥ 9:1
+  static const Color infoOnInverse = Color(0xFF93C5FD);
+  static const Color successOnInverse = Color(0xFF4ADE80);
+  static const Color dangerOnInverse = Color(0xFFFCA5A5);
+
   // TRIAGE (Figma no define fondo para naranja ni azul)
   static const Color triageRed = Color(0xFFC30508);
   static const Color triageRedBackground = Color(0xFFFDECEF);
@@ -134,6 +139,60 @@ class TriageTextStyles {
     height: 28 / 24,
     letterSpacing: -0.6,
   );
+}
+
+/// Espaciado: escala de 4 con medio paso de 2
+///
+/// Figma no define variables de espacio; sus medidas se redondean al paso más
+/// cercano para que márgenes y separaciones sean los mismos en toda la app.
+class TriageSpacing {
+  TriageSpacing._();
+
+  static const double xxs = 2;
+  static const double xs = 4;
+  static const double sm = 8;
+  static const double md = 12;
+  static const double lg = 16;
+  static const double xl = 20;
+  static const double xxl = 24;
+}
+
+/// Radios de esquina de Figma
+class TriageRadii {
+  TriageRadii._();
+
+  /// Insignias, conteos
+  static const double sm = 8;
+
+  /// Campos, avisos, pestañas
+  static const double md = 14;
+
+  /// Métricas, botón grande
+  static const double lg = 16;
+
+  /// Tarjetas, aviso breve
+  static const double xl = 18;
+
+  /// Encabezado
+  static const double xxl = 26;
+
+  /// Forma de píldora
+  static const double full = 999;
+}
+
+/// Tamaños de íconos, bordes y zonas táctiles
+class TriageSizes {
+  TriageSizes._();
+
+  static const double iconSmall = 18;
+  static const double icon = 20;
+
+  /// Zona táctil mínima de Material (48)
+  static const double touchTarget = kMinInteractiveDimension;
+
+  /// Borde normal y borde de elemento seleccionado o enfocado
+  static const double stroke = 1.25;
+  static const double strokeStrong = 1.75;
 }
 
 /// Sombras de Figma (`Sombra`, `Sombra/Tarjeta`, `Sombra/Barra`, `Sombra/Flotante`)
