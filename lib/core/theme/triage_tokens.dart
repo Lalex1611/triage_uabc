@@ -52,6 +52,9 @@ class TriageColors {
   static const Color successOnInverse = Color(0xFF4ADE80);
   static const Color dangerOnInverse = Color(0xFFFCA5A5);
 
+  // Círculos translúcidos sobre la banda del color del rol (avatar, campana)
+  static const Color overlayOnAccent = Color(0x33FFFFFF);
+
   // TRIAGE (Figma no define fondo para naranja ni azul)
   static const Color triageRed = Color(0xFFC30508);
   static const Color triageRedBackground = Color(0xFFFDECEF);
@@ -144,7 +147,8 @@ class TriageTextStyles {
 /// Espaciado: escala de 4 con medio paso de 2
 ///
 /// Figma no define variables de espacio; sus medidas se redondean al paso más
-/// cercano para que márgenes y separaciones sean los mismos en toda la app.
+/// cercano (en empate, al menor) para que márgenes y separaciones sean los
+/// mismos en toda la app.
 class TriageSpacing {
   TriageSpacing._();
 
@@ -180,19 +184,48 @@ class TriageRadii {
   static const double full = 999;
 }
 
-/// Tamaños de íconos, bordes y zonas táctiles
+/// Tamaños de íconos, controles, bordes y zonas táctiles
+///
+/// Los controles usan estos valores como alto mínimo, nunca fijo: crecen si
+/// el usuario agranda el texto.
 class TriageSizes {
   TriageSizes._();
 
+  static const double iconXSmall = 16;
   static const double iconSmall = 18;
   static const double icon = 20;
+  static const double iconLarge = 24;
 
   /// Zona táctil mínima de Material (48)
   static const double touchTarget = kMinInteractiveDimension;
 
+  /// Zona táctil mínima de Apple y WCAG 2.5.5 (44): botón mediano, chips
+  static const double touchTargetCompact = 44;
+
+  /// Botón grande
+  static const double controlLarge = 54;
+
+  /// Píldoras de chips y pestañas (su zona táctil es mayor)
+  static const double pill = 38;
+
+  /// Insignias, pastillas y cuadros de conteo
+  static const double tag = 26;
+
   /// Borde normal y borde de elemento seleccionado o enfocado
   static const double stroke = 1.25;
   static const double strokeStrong = 1.75;
+
+  /// Líneas divisorias
+  static const double hairline = 1;
+}
+
+/// Opacidades de estado (deshabilitado, presionado, encima)
+class TriageOpacity {
+  TriageOpacity._();
+
+  static const double disabled = 0.4;
+  static const double pressed = 0.12;
+  static const double hover = 0.08;
 }
 
 /// Sombras de Figma (`Sombra`, `Sombra/Tarjeta`, `Sombra/Barra`, `Sombra/Flotante`)
@@ -211,6 +244,11 @@ class TriageShadows {
       blurRadius: 16,
       spreadRadius: -4,
     ),
+  ];
+
+  /// Pestaña seleccionada
+  static const List<BoxShadow> subtle = [
+    BoxShadow(color: Color(0x1A0A121F), offset: Offset(0, 1), blurRadius: 1.5),
   ];
 
   static const List<BoxShadow> bar = [
