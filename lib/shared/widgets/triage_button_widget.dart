@@ -97,8 +97,12 @@ class TriageButton extends StatelessWidget {
               splashColor: foreground.withValues(alpha: TriageOpacity.pressed),
               highlightColor: foreground.withValues(alpha: TriageOpacity.hover),
               child: ConstrainedBox(
-                // minHeight y no height fija: crece si el usuario agranda el texto
+                // Mínimos y no medidas fijas: crece si el usuario agranda el
+                // texto y una etiqueta corta no baja de la zona táctil
                 constraints: BoxConstraints(
+                  minWidth: isLarge
+                      ? TriageSizes.touchTarget
+                      : TriageSizes.touchTargetCompact,
                   minHeight: isLarge
                       ? TriageSizes.controlLarge
                       : TriageSizes.touchTargetCompact,
