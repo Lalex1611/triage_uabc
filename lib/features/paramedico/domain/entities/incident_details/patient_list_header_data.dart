@@ -3,12 +3,12 @@ import 'package:sistema_triage/features/paramedico/domain/constants/patient_sort
 // Datos necesarios para renderizar el encabezado de la lista de pacientes
 class PatientListHeaderData {
   final int patientCount;
-  final PatientSortOption sortOption;
-  final void Function(PatientSortOption) onSortChanged;
+  final PatientSortOption? sortOption;
+  final void Function(PatientSortOption)? onSortChanged;
 
-  PatientListHeaderData({
+  const PatientListHeaderData({
     required this.patientCount,
-    required this.sortOption,
-    required this.onSortChanged,
+    this.sortOption,
+    this.onSortChanged,
   });
 }

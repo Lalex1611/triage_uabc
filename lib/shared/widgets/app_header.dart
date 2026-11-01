@@ -315,7 +315,7 @@ class AppHeader extends StatelessWidget implements PreferredSizeWidget {
       AppIcons.paramedicoHeaderArrowBack,
       height: AppDimensions.headerStatusIconSize,
       width: AppDimensions.headerStatusIconSize,
-      colorFilter: const ColorFilter.mode(Colors.white, BlendMode.srcIn),
+      colorFilter: const ColorFilter.mode(Colors.black, BlendMode.srcIn),
     );
   }
 
@@ -519,7 +519,7 @@ class AppHeader extends StatelessWidget implements PreferredSizeWidget {
               Text(
                 backLabel ?? '',
                 style: AppTextStyles.ESC_Medium_titleMedium.copyWith(
-                  color: Colors.white,
+                  color: Colors.black,
                 ),
                 overflow: TextOverflow.ellipsis,
                 maxLines: 1,
@@ -531,9 +531,9 @@ class AppHeader extends StatelessWidget implements PreferredSizeWidget {
             OutlinedButton(
               onPressed: onAction,
               style: OutlinedButton.styleFrom(
-                foregroundColor: Colors.white,
+                foregroundColor: Colors.black,
                 backgroundColor: Colors.transparent,
-                side: const BorderSide(color: Colors.white, width: 0.8),
+                side: const BorderSide(color: Colors.black, width: 0.8),
                 padding: const EdgeInsets.symmetric(
                   horizontal: 14,
                   vertical: 6,
@@ -547,7 +547,7 @@ class AppHeader extends StatelessWidget implements PreferredSizeWidget {
               child: Text(
                 actionLabel!,
                 style: AppTextStyles.ESC_Regular_bodyMedium.copyWith(
-                  color: Colors.white,
+                  color: Colors.black,
                 ),
               ),
             ),

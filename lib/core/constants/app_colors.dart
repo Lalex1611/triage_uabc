@@ -10,21 +10,21 @@ class AppColors {
 
   // Triage prehospitalario
   static const Color triagePre_rojo = Color(0xFFFF001B);
-  static const Color triagePre_amarillo = Color(0xFFCBBB0B);
+  static const Color triagePre_amarillo = Color(0xFFFFD600);
   static const Color triagePre_verde = Color(0xFF00AA00);
   static const Color triagePre_negro = Color(0xFF000000);
 
   /* Triage hospitalario (5 niveles del médico) */
   static const Color triageHosp_rojo = Color(0xFFFF001B);
   static const Color triageHosp_naranja = Color(0xFFF39223);
-  static const Color triageHosp_amarillo = Color(0xFFFDE400);
+  static const Color triageHosp_amarillo = Color(0xFFFFD600);
   static const Color triageHosp_verde = Color(0xFF2FA835);
   static const Color triageHosp_azul = Color(0xFF1D71B8);
   static const Color triageHosp_negro = Color(0xFF000000);
 
   /* Estados de paciente del médico */
   static const Color medicoStatus_recibido = Color(0xFF00C74A);
-  static const Color medicoStatus_enEspera = Color(0xFFD4AC0D);
+  static const Color medicoStatus_enEspera = Color(0xFFffc067);
   static const Color medicoStatus_enCamino = Color(0xFFE5E5E5);
   static const Color medicoStatus_altaMedica = Color(0xFFB0B0B0);
 
