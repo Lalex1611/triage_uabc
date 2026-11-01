@@ -78,16 +78,33 @@ void main() {
     }
   });
 
-  testWidgets('alto mínimo de 74 y se anuncia "etiqueta: valor"', (
-    tester,
-  ) async {
+  testWidgets(
+    'el contenido da al menos los 74 de Figma y se anuncia "etiqueta: valor"',
+    (tester) async {
+      await tester.pumpWidget(
+        _wrap(const TriageMetric(value: '2', label: 'Críticos')),
+      );
+      expect(
+        tester.getSize(find.byType(TriageMetric)).height,
+        greaterThanOrEqualTo(74),
+      );
+      expect(
+        tester.getSemantics(find.byType(TriageMetric)),
+        isSemantics(label: 'Críticos: 2'),
+      );
+    },
+  );
+
+  testWidgets('con el texto reducido no baja de 74', (tester) async {
     await tester.pumpWidget(
-      _wrap(const TriageMetric(value: '2', label: 'Críticos')),
+      MediaQuery(
+        data: const MediaQueryData(textScaler: TextScaler.linear(0.8)),
+        child: _wrap(const TriageMetric(value: '2', label: 'Críticos')),
+      ),
     );
-    expect(tester.getSize(find.byType(TriageMetric)).height, 74);
     expect(
-      tester.getSemantics(find.byType(TriageMetric)),
-      isSemantics(label: 'Críticos: 2'),
+      tester.getSize(find.byType(TriageMetric)).height,
+      greaterThanOrEqualTo(74),
     );
   });
 

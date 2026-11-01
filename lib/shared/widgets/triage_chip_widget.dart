@@ -4,9 +4,9 @@ import 'package:sistema_triage/core/theme/triage_tokens.dart';
 /// Chip de filtro del rediseño (Figma "TRIAGE/Chip")
 ///
 /// Seleccionado: fondo oscuro y texto blanco. No seleccionado: blanco con borde.
-/// La píldora mide 38 de alto como Figma, pero la zona táctil llega a 44
-/// (mínimo de accesibilidad). Para una fila de filtros, colocarlos en un
-/// `ListView` horizontal o un `Wrap`.
+/// La píldora mide [TriageSizes.pill] de alto como Figma, pero la zona táctil
+/// llega a [TriageSizes.touchTargetCompact]. Para una fila de filtros,
+/// colocarlos en un `ListView` horizontal o un `Wrap`.
 class TriageChip extends StatelessWidget {
   const TriageChip({
     super.key,
@@ -19,14 +19,15 @@ class TriageChip extends StatelessWidget {
   final bool selected;
   final VoidCallback? onTap;
 
-  static const double _minTouchTarget = 44;
-
   @override
   Widget build(BuildContext context) {
     final shape = StadiumBorder(
       side: selected
           ? BorderSide.none
-          : const BorderSide(color: TriageColors.borderMedium, width: 1.25),
+          : const BorderSide(
+              color: TriageColors.borderMedium,
+              width: TriageSizes.stroke,
+            ),
     );
     final foreground = selected
         ? TriageColors.textInverse
@@ -45,8 +46,8 @@ class TriageChip extends StatelessWidget {
           onTap: onTap,
           child: ConstrainedBox(
             constraints: const BoxConstraints(
-              minWidth: _minTouchTarget,
-              minHeight: _minTouchTarget,
+              minWidth: TriageSizes.touchTargetCompact,
+              minHeight: TriageSizes.touchTargetCompact,
             ),
             child: Center(
               widthFactor: 1,
@@ -58,9 +59,13 @@ class TriageChip extends StatelessWidget {
                   onTap: onTap,
                   customBorder: shape,
                   child: ConstrainedBox(
-                    constraints: const BoxConstraints(minHeight: 38),
+                    constraints: const BoxConstraints(
+                      minHeight: TriageSizes.pill,
+                    ),
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 15),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: TriageSpacing.lg,
+                      ),
                       child: Center(
                         widthFactor: 1,
                         heightFactor: 1,

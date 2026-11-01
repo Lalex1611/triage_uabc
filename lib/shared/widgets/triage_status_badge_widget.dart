@@ -43,24 +43,30 @@ class TriageStatusBadge extends StatelessWidget {
   final Color textColor;
   final Color background;
 
+  /// Diámetro del punto de color (Figma)
+  static const double _dot = 6;
+
   @override
   Widget build(BuildContext context) {
     return Container(
-      constraints: const BoxConstraints(minHeight: 26),
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      constraints: const BoxConstraints(minHeight: TriageSizes.tag),
+      padding: const EdgeInsets.symmetric(
+        horizontal: TriageSpacing.sm,
+        vertical: TriageSpacing.xs,
+      ),
       decoration: BoxDecoration(
         color: background,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(TriageRadii.sm),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            width: 6,
-            height: 6,
+            width: _dot,
+            height: _dot,
             decoration: BoxDecoration(color: dotColor, shape: BoxShape.circle),
           ),
-          const SizedBox(width: 6),
+          const SizedBox(width: TriageSpacing.xs),
           Flexible(
             child: Text(
               label.toUpperCase(),

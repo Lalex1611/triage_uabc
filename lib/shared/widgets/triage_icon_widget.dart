@@ -28,7 +28,7 @@ class TriageIcon extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final iconTheme = IconTheme.of(context);
-    final resolvedSize = size ?? iconTheme.size ?? 24;
+    final resolvedSize = size ?? iconTheme.size ?? TriageSizes.iconLarge;
     final opacity = iconTheme.opacity ?? 1.0;
     var resolvedColor = color ?? iconTheme.color ?? TriageColors.textPrimary;
     // Igual que Icon: la opacidad del IconTheme aplica también al color explícito

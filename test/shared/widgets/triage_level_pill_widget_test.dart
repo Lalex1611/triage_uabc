@@ -24,9 +24,14 @@ void main() {
     }
   });
 
-  testWidgets('alto mínimo de 28 y fondo del color del nivel', (tester) async {
+  testWidgets('alto mínimo de etiqueta y fondo del color del nivel', (
+    tester,
+  ) async {
     await tester.pumpWidget(_wrap(const TriageLevelPill(TriageLevel.red)));
-    expect(tester.getSize(find.byType(TriageLevelPill)).height, 28);
+    expect(
+      tester.getSize(find.byType(TriageLevelPill)).height,
+      TriageSizes.tag,
+    );
     final decoration =
         tester
                 .widget<Container>(

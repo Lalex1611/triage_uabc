@@ -34,7 +34,7 @@ class TriageIncidentCard extends StatelessWidget {
   final bool selected;
   final VoidCallback? onTap;
 
-  static const _radius = BorderRadius.all(Radius.circular(18));
+  static const _radius = BorderRadius.all(Radius.circular(TriageRadii.xl));
 
   @override
   Widget build(BuildContext context) {
@@ -53,8 +53,14 @@ class TriageIncidentCard extends StatelessWidget {
             color: TriageColors.surface,
             borderRadius: _radius,
             border: selected
-                ? Border.all(color: context.triageRole.accent, width: 1.75)
-                : Border.all(color: TriageColors.borderSubtle, width: 1.25),
+                ? Border.all(
+                    color: context.triageRole.accent,
+                    width: TriageSizes.strokeStrong,
+                  )
+                : Border.all(
+                    color: TriageColors.borderSubtle,
+                    width: TriageSizes.stroke,
+                  ),
             boxShadow: selected ? TriageShadows.card : TriageShadows.base,
           ),
           child: Material(
@@ -63,17 +69,14 @@ class TriageIncidentCard extends StatelessWidget {
               onTap: onTap,
               borderRadius: _radius,
               child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 15,
-                ),
+                padding: const EdgeInsets.all(TriageSpacing.lg),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Row(
                       children: [
                         Expanded(child: Text(folio, style: meta)),
-                        const SizedBox(width: 8),
+                        const SizedBox(width: TriageSpacing.sm),
                         Flexible(
                           child: Text(
                             timeAgo,
@@ -83,22 +86,22 @@ class TriageIncidentCard extends StatelessWidget {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 10),
+                    const SizedBox(height: TriageSpacing.sm),
                     Text(
                       title,
                       style: TriageTextStyles.titleSmall.copyWith(
                         color: TriageColors.textPrimary,
                       ),
                     ),
-                    const SizedBox(height: 10),
+                    const SizedBox(height: TriageSpacing.sm),
                     Row(
                       children: [
                         const TriageIcon(
                           TriageIcons.location,
-                          size: 15,
+                          size: TriageSizes.iconXSmall,
                           color: TriageColors.textTertiary,
                         ),
-                        const SizedBox(width: 6),
+                        const SizedBox(width: TriageSpacing.xs),
                         Expanded(
                           child: Text(
                             location,
@@ -109,20 +112,20 @@ class TriageIncidentCard extends StatelessWidget {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 10),
+                    const SizedBox(height: TriageSpacing.sm),
                     const Divider(
-                      height: 1,
-                      thickness: 1,
+                      height: TriageSizes.hairline,
+                      thickness: TriageSizes.hairline,
                       color: TriageColors.borderSubtle,
                     ),
-                    const SizedBox(height: 10),
+                    const SizedBox(height: TriageSpacing.sm),
                     // Conteo a la izquierda y total a la derecha; si no caben
                     // (texto grande) el total baja a otra línea
                     Wrap(
                       alignment: WrapAlignment.spaceBetween,
                       crossAxisAlignment: WrapCrossAlignment.center,
-                      spacing: 10,
-                      runSpacing: 8,
+                      spacing: TriageSpacing.sm,
+                      runSpacing: TriageSpacing.sm,
                       children: [
                         TriageLevelCount(counts: counts),
                         Row(
@@ -130,10 +133,10 @@ class TriageIncidentCard extends StatelessWidget {
                           children: [
                             const TriageIcon(
                               TriageIcons.users,
-                              size: 16,
+                              size: TriageSizes.iconXSmall,
                               color: TriageColors.textSecondary,
                             ),
-                            const SizedBox(width: 6),
+                            const SizedBox(width: TriageSpacing.xs),
                             Flexible(
                               child: Text(
                                 patientCount == 1

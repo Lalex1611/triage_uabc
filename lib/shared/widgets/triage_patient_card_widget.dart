@@ -44,12 +44,15 @@ class TriagePatientCard extends StatelessWidget {
   final VoidCallback? onTap;
   final bool _room;
 
-  static const _radius = BorderRadius.all(Radius.circular(18));
+  static const _radius = BorderRadius.all(Radius.circular(TriageRadii.xl));
   static const _chevron = TriageIcon(
     TriageIcons.chevronRight,
-    size: 20,
+    size: TriageSizes.icon,
     color: TriageColors.textTertiary,
   );
+
+  /// Ancho de la barra de color (Figma)
+  static const double _levelBarWidth = 19;
 
   @override
   Widget build(BuildContext context) {
@@ -83,7 +86,7 @@ class TriagePatientCard extends StatelessWidget {
                   children: [
                     Expanded(child: nameText),
                     if (badge != null) ...[
-                      const SizedBox(width: 8),
+                      const SizedBox(width: TriageSpacing.sm),
                       ConstrainedBox(
                         constraints: BoxConstraints(
                           maxWidth: constraints.maxWidth * 0.6,
@@ -94,7 +97,7 @@ class TriagePatientCard extends StatelessWidget {
                   ],
                 ),
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: TriageSpacing.xs),
               detailText,
             ],
           )
@@ -103,9 +106,12 @@ class TriagePatientCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               nameText,
-              const SizedBox(height: 6),
+              const SizedBox(height: TriageSpacing.xs),
               detailText,
-              if (badge != null) ...[const SizedBox(height: 8), badge],
+              if (badge != null) ...[
+                const SizedBox(height: TriageSpacing.sm),
+                badge,
+              ],
             ],
           );
 
@@ -117,7 +123,10 @@ class TriagePatientCard extends StatelessWidget {
           decoration: BoxDecoration(
             color: TriageColors.surface,
             borderRadius: _radius,
-            border: Border.all(color: TriageColors.borderSubtle, width: 1.25),
+            border: Border.all(
+              color: TriageColors.borderSubtle,
+              width: TriageSizes.stroke,
+            ),
             boxShadow: TriageShadows.card,
           ),
           child: Material(
@@ -126,14 +135,15 @@ class TriagePatientCard extends StatelessWidget {
               onTap: onTap,
               borderRadius: _radius,
               child: Padding(
-                padding: const EdgeInsets.all(14),
+                // Mismo relleno que la tarjeta de incidente
+                padding: const EdgeInsets.all(TriageSpacing.lg),
                 child: _room
                     ? Row(
                         children: [
                           _LevelTile(level),
-                          const SizedBox(width: 12),
+                          const SizedBox(width: TriageSpacing.md),
                           Expanded(child: content),
-                          const SizedBox(width: 12),
+                          const SizedBox(width: TriageSpacing.md),
                           _chevron,
                         ],
                       )
@@ -145,19 +155,21 @@ class TriagePatientCard extends StatelessWidget {
                             Semantics(
                               label: 'Triage ${level.label}',
                               child: Container(
-                                width: 19,
+                                width: _levelBarWidth,
                                 constraints: const BoxConstraints(
-                                  minHeight: 52,
+                                  minHeight: TriageSizes.touchTarget,
                                 ),
                                 decoration: BoxDecoration(
                                   color: level.color,
-                                  borderRadius: BorderRadius.circular(16),
+                                  borderRadius: BorderRadius.circular(
+                                    TriageRadii.full,
+                                  ),
                                 ),
                               ),
                             ),
-                            const SizedBox(width: 12),
+                            const SizedBox(width: TriageSpacing.md),
                             Expanded(child: content),
-                            const SizedBox(width: 12),
+                            const SizedBox(width: TriageSpacing.md),
                             const Center(child: _chevron),
                           ],
                         ),
@@ -184,22 +196,23 @@ class _LevelTile extends StatelessWidget {
       label: 'Nivel $number, ${level.label}',
       excludeSemantics: true,
       child: Container(
-        constraints: const BoxConstraints(minWidth: 44, minHeight: 52),
-        padding: const EdgeInsets.symmetric(horizontal: 4),
+        constraints: const BoxConstraints(
+          minWidth: TriageSizes.touchTargetCompact,
+          minHeight: TriageSizes.touchTarget,
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: TriageSpacing.xs),
         decoration: BoxDecoration(
           color: level.color,
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(TriageRadii.md),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
+            // Etiqueta/Chica sin reducir: los 8 px de Figma no son legibles
             Text(
               'NIVEL',
-              style: TriageTextStyles.labelSmall.copyWith(
-                fontSize: 8,
-                color: level.onColor,
-              ),
+              style: TriageTextStyles.labelSmall.copyWith(color: level.onColor),
             ),
             Text(
               '$number',

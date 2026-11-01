@@ -44,22 +44,28 @@ class _TriageSearchBarState extends State<TriageSearchBar> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      constraints: const BoxConstraints(minHeight: 48),
-      // 16 a la izquierda como Figma; a la derecha 2 + la zona de 44 de la ✕
-      padding: const EdgeInsets.only(left: 16, right: 2),
+      constraints: const BoxConstraints(minHeight: TriageSizes.touchTarget),
+      // A la derecha poco relleno: la zona táctil de la ✕ ya deja aire
+      padding: const EdgeInsets.only(
+        left: TriageSpacing.lg,
+        right: TriageSpacing.xxs,
+      ),
       decoration: BoxDecoration(
         color: TriageColors.surface,
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: TriageColors.borderSubtle, width: 1.25),
+        borderRadius: BorderRadius.circular(TriageRadii.full),
+        border: Border.all(
+          color: TriageColors.borderSubtle,
+          width: TriageSizes.stroke,
+        ),
       ),
       child: Row(
         children: [
           const TriageIcon(
             TriageIcons.search,
-            size: 20,
+            size: TriageSizes.icon,
             color: TriageColors.textTertiary,
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: TriageSpacing.sm),
           Expanded(
             child: TextField(
               controller: _controller,
@@ -71,11 +77,14 @@ class _TriageSearchBarState extends State<TriageSearchBar> {
               decoration: InputDecoration(
                 isDense: true,
                 border: InputBorder.none,
-                // 22 de línea + 22 + borde 2.5 = 46.5; el mínimo de 48 completa
-                contentPadding: const EdgeInsets.symmetric(vertical: 11),
+                // Línea de 22 + 2 × md + borde ≥ 48
+                contentPadding: const EdgeInsets.symmetric(
+                  vertical: TriageSpacing.md,
+                ),
                 hintText: widget.hint,
+                // Figma usa texto terciario (3.05:1); el secundario llega a 4.5:1
                 hintStyle: TriageTextStyles.bodyMedium.copyWith(
-                  color: TriageColors.textTertiary,
+                  color: TriageColors.textSecondary,
                 ),
               ),
             ),
@@ -83,18 +92,18 @@ class _TriageSearchBarState extends State<TriageSearchBar> {
           ValueListenableBuilder<TextEditingValue>(
             valueListenable: _controller,
             builder: (context, value, _) => value.text.isEmpty
-                ? const SizedBox(width: 14)
+                ? const SizedBox(width: TriageSpacing.md)
                 : IconButton(
                     onPressed: _clear,
                     tooltip: 'Borrar búsqueda',
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints.tightFor(
-                      width: 44,
-                      height: 44,
+                      width: TriageSizes.touchTargetCompact,
+                      height: TriageSizes.touchTargetCompact,
                     ),
                     icon: const TriageIcon(
                       TriageIcons.close,
-                      size: 18,
+                      size: TriageSizes.iconSmall,
                       color: TriageColors.textTertiary,
                     ),
                   ),

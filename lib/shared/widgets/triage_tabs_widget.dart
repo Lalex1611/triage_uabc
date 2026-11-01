@@ -6,7 +6,7 @@ import 'package:sistema_triage/core/theme/triage_tokens.dart';
 ///
 /// Las pestañas se reparten el ancho disponible a partes iguales; si una
 /// etiqueta no cabe se reduce en vez de cortarse. Cada celda responde al toque
-/// en todo su alto (46 con el relleno del contenedor), por encima del mínimo de 44.
+/// en todo su alto (píldora + relleno = 46), por encima del mínimo de 44.
 class TriageTabs extends StatelessWidget {
   const TriageTabs({
     super.key,
@@ -25,10 +25,10 @@ class TriageTabs extends StatelessWidget {
     return DecoratedBox(
       decoration: BoxDecoration(
         color: TriageColors.sunken,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(TriageRadii.md),
       ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 2),
+        padding: const EdgeInsets.symmetric(horizontal: TriageSpacing.xxs),
         child: Row(
           children: [
             for (var i = 0; i < labels.length; i++)
@@ -66,23 +66,22 @@ class _Tab extends StatelessWidget {
         child: GestureDetector(
           behavior: HitTestBehavior.opaque,
           onTap: onTap,
-          // El relleno queda dentro de la zona táctil: 38 visibles + 8 = 46
+          // El relleno queda dentro de la zona táctil: píldora + 2 × xs = 46
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
+            padding: const EdgeInsets.symmetric(
+              horizontal: TriageSpacing.xxs,
+              vertical: TriageSpacing.xs,
+            ),
             child: Container(
-              constraints: const BoxConstraints(minHeight: 38),
-              padding: const EdgeInsets.symmetric(horizontal: 8),
+              constraints: const BoxConstraints(minHeight: TriageSizes.pill),
+              padding: const EdgeInsets.symmetric(horizontal: TriageSpacing.sm),
               decoration: selected
                   ? const BoxDecoration(
                       color: TriageColors.surface,
-                      borderRadius: BorderRadius.all(Radius.circular(999)),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Color(0x1A0A121F),
-                          offset: Offset(0, 1),
-                          blurRadius: 1.5,
-                        ),
-                      ],
+                      borderRadius: BorderRadius.all(
+                        Radius.circular(TriageRadii.full),
+                      ),
+                      boxShadow: TriageShadows.subtle,
                     )
                   : null,
               child: Center(

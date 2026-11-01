@@ -35,7 +35,9 @@ class TriageButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final isLarge = size == TriageButtonSize.large;
     final isDisabled = onPressed == null && !isLoading;
-    final radius = BorderRadius.circular(isLarge ? 16 : 13);
+    final radius = BorderRadius.circular(
+      isLarge ? TriageRadii.lg : TriageRadii.md,
+    );
 
     final (
       Color? background,
@@ -68,19 +70,22 @@ class TriageButton extends StatelessWidget {
     final textStyle =
         (isLarge ? TriageTextStyles.labelLarge : TriageTextStyles.labelMedium)
             .copyWith(color: foreground);
-    final spinnerSize = isLarge ? 20.0 : 18.0;
+    final spinnerSize = isLarge ? TriageSizes.icon : TriageSizes.iconSmall;
 
     return Semantics(
       button: true,
       enabled: !isDisabled && !isLoading,
       child: Opacity(
-        opacity: isDisabled ? 0.4 : 1,
+        opacity: isDisabled ? TriageOpacity.disabled : 1,
         child: DecoratedBox(
           decoration: BoxDecoration(
             color: background,
             borderRadius: radius,
             border: variant == TriageButtonVariant.secondary
-                ? Border.all(color: TriageColors.borderMedium, width: 1.25)
+                ? Border.all(
+                    color: TriageColors.borderMedium,
+                    width: TriageSizes.stroke,
+                  )
                 : null,
             boxShadow: isDisabled ? null : shadow,
           ),
@@ -89,13 +94,23 @@ class TriageButton extends StatelessWidget {
             child: InkWell(
               onTap: isLoading ? null : onPressed,
               borderRadius: radius,
-              splashColor: foreground.withValues(alpha: 0.12),
-              highlightColor: foreground.withValues(alpha: 0.08),
+              splashColor: foreground.withValues(alpha: TriageOpacity.pressed),
+              highlightColor: foreground.withValues(alpha: TriageOpacity.hover),
               child: ConstrainedBox(
-                // minHeight y no height fija: crece si el usuario agranda el texto
-                constraints: BoxConstraints(minHeight: isLarge ? 54 : 44),
+                // Mínimos y no medidas fijas: crece si el usuario agranda el
+                // texto y una etiqueta corta no baja de la zona táctil
+                constraints: BoxConstraints(
+                  minWidth: isLarge
+                      ? TriageSizes.touchTarget
+                      : TriageSizes.touchTargetCompact,
+                  minHeight: isLarge
+                      ? TriageSizes.controlLarge
+                      : TriageSizes.touchTargetCompact,
+                ),
                 child: Padding(
-                  padding: EdgeInsets.symmetric(horizontal: isLarge ? 22 : 18),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: isLarge ? TriageSpacing.xl : TriageSpacing.lg,
+                  ),
                   child: Center(
                     widthFactor: 1,
                     heightFactor: 1,
@@ -114,7 +129,7 @@ class TriageButton extends StatelessWidget {
                           SizedBox.square(
                             dimension: spinnerSize,
                             child: CircularProgressIndicator(
-                              strokeWidth: 2,
+                              strokeWidth: TriageSizes.strokeStrong,
                               color: foreground,
                             ),
                           ),

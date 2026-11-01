@@ -103,4 +103,33 @@ void main() {
     expect(tester.getSize(find.byKey(const Key('l'))).height, 54);
     expect(tester.getSize(find.byKey(const Key('m'))).height, 44);
   });
+
+  testWidgets('ancho mínimo de zona táctil: grande 48, mediano 44', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _wrap(
+        Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TriageButton(key: const Key('l'), label: '', onPressed: () {}),
+            TriageButton(
+              key: const Key('m'),
+              label: '',
+              size: TriageButtonSize.medium,
+              onPressed: () {},
+            ),
+          ],
+        ),
+      ),
+    );
+    expect(
+      tester.getSize(find.byKey(const Key('l'))).width,
+      TriageSizes.touchTarget,
+    );
+    expect(
+      tester.getSize(find.byKey(const Key('m'))).width,
+      TriageSizes.touchTargetCompact,
+    );
+  });
 }
