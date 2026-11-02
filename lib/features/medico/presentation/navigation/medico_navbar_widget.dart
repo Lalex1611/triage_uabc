@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:sistema_triage/core/constants/app_colors.dart';
-import 'package:sistema_triage/core/constants/app_icons.dart';
+import 'package:sistema_triage/core/constants/triage_icons.dart';
+import 'package:sistema_triage/core/theme/triage_tokens.dart';
 import 'package:sistema_triage/shared/widgets/app_module_bottom_nav.dart';
 
 // Barra de navegación inferior del módulo médico
@@ -15,11 +15,8 @@ class MedicoNavbar extends StatelessWidget {
   });
 
   static const _tabs = [
-    AppModuleBottomNavTab(iconPath: AppIcons.medicoNavHome, label: 'Home'),
-    AppModuleBottomNavTab(
-      iconPath: AppIcons.medicoNavRegistrarPaciente,
-      label: 'Registro',
-    ),
+    AppModuleBottomNavTab(iconPath: TriageIcons.home, label: 'Home'),
+    AppModuleBottomNavTab(iconPath: TriageIcons.plus, label: 'Registro'),
   ];
 
   @override
@@ -28,8 +25,8 @@ class MedicoNavbar extends StatelessWidget {
       tabs: _tabs,
       currentIndex: currentIndex,
       onTap: onTap,
-      activeColor: AppColors.primaryMedico,
-      inactiveColor: AppColors.inactive,
+      activeColor: TriageColors.hospitalAccent,
+      inactiveColor: TriageColors.textSecondary,
     );
   }
 }

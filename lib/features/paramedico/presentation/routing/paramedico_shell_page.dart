@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:sistema_triage/core/theme/triage_tokens.dart';
 import 'package:sistema_triage/features/paramedico/presentation/navigation/paramedico_navbar_widget.dart';
 import 'package:sistema_triage/features/paramedico/presentation/patient_registration/quick_patient_registration_launcher.dart';
 
@@ -21,6 +22,8 @@ class ParamedicoShellPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      // Se ve alrededor de la píldora de navegación
+      backgroundColor: TriageColors.surface,
       resizeToAvoidBottomInset: false,
       body: navigationShell,
       bottomNavigationBar: ParamedicoNavbar(
