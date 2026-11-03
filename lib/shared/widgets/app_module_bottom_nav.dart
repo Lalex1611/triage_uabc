@@ -1,18 +1,19 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
-import 'package:sistema_triage/core/theme/app_theme.dart';
+import 'package:sistema_triage/core/theme/triage_tokens.dart';
+import 'package:sistema_triage/shared/widgets/triage_icon_widget.dart';
 
 class AppModuleBottomNavTab {
-  const AppModuleBottomNavTab({
-    required this.iconPath,
-    required this.label,
-  });
+  const AppModuleBottomNavTab({required this.iconPath, required this.label});
 
   final String iconPath;
   final String label;
 }
 
-/// Barra de navegación inferior reutilizable para los módulos del sistema
+/// Barra de navegación inferior de los módulos (Figma "TRIAGE/Navegación campo"
+/// y "TRIAGE/Navegación hospital")
+///
+/// Píldora con las pestañas repartidas a partes iguales en el ancho disponible;
+/// si una etiqueta no cabe se reduce en vez de cortarse.
 class AppModuleBottomNav extends StatelessWidget {
   const AppModuleBottomNav({
     super.key,
@@ -31,33 +32,41 @@ class AppModuleBottomNav extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.white,
-      elevation: 8,
-      shadowColor: Colors.black.withValues(alpha: 0.08),
-      child: SafeArea(
-        top: false,
-        child: Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.only(
-              topLeft: Radius.circular(20),
-              topRight: Radius.circular(20),
-            ),
+    return SafeArea(
+      top: false,
+      minimum: const EdgeInsets.fromLTRB(
+        TriageSpacing.xl,
+        TriageSpacing.sm,
+        TriageSpacing.xl,
+        TriageSpacing.sm,
+      ),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: TriageColors.surface,
+          borderRadius: BorderRadius.circular(TriageRadii.full),
+          border: Border.all(
+            color: TriageColors.borderSubtle,
+            width: TriageSizes.hairline,
           ),
-          padding: const EdgeInsets.symmetric(vertical: 6),
-          child: Row(
-            children: List.generate(tabs.length, (index) {
-              return Expanded(
-                child: _NavTab(
-                  tab: tabs[index],
-                  isActive: currentIndex == index,
-                  activeColor: activeColor,
-                  inactiveColor: inactiveColor,
-                  onTap: () => onTap(index),
-                ),
-              );
-            }),
+          boxShadow: TriageShadows.base,
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(TriageSpacing.xs),
+          child: Material(
+            type: MaterialType.transparency,
+            child: Row(
+              children: [
+                for (var i = 0; i < tabs.length; i++)
+                  Expanded(
+                    child: _NavTab(
+                      tab: tabs[i],
+                      color: i == currentIndex ? activeColor : inactiveColor,
+                      isActive: i == currentIndex,
+                      onTap: () => onTap(i),
+                    ),
+                  ),
+              ],
+            ),
           ),
         ),
       ),
@@ -68,49 +77,54 @@ class AppModuleBottomNav extends StatelessWidget {
 class _NavTab extends StatelessWidget {
   const _NavTab({
     required this.tab,
+    required this.color,
     required this.isActive,
-    required this.activeColor,
-    required this.inactiveColor,
     required this.onTap,
   });
 
   final AppModuleBottomNavTab tab;
+  final Color color;
   final bool isActive;
-  final Color activeColor;
-  final Color inactiveColor;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final color = isActive ? activeColor : inactiveColor;
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 4),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              SvgPicture.asset(
-                tab.iconPath,
-                width: 24,
-                height: 24,
-                colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
+    return MergeSemantics(
+      child: Semantics(
+        button: true,
+        selected: isActive,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(TriageRadii.full),
+          splashColor: color.withValues(alpha: TriageOpacity.pressed),
+          highlightColor: color.withValues(alpha: TriageOpacity.hover),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(
+              minHeight: TriageSizes.controlLarge,
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(TriageSpacing.xs),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  TriageIcon(
+                    tab.iconPath,
+                    size: TriageSizes.icon,
+                    color: color,
+                  ),
+                  const SizedBox(height: TriageSpacing.xs),
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      tab.label,
+                      maxLines: 1,
+                      style: TriageTextStyles.labelSmall.copyWith(color: color),
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 4),
-              Text(
-                tab.label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
-                style: AppTextStyles.ESC_Medium_bodyMedium.copyWith(
-                  fontSize: 10,
-                  color: color,
-                ),
-              ),
-            ],
+            ),
           ),
         ),
       ),

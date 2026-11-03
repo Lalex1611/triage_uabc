@@ -28,9 +28,11 @@ import 'package:sistema_triage/shared/widgets/triage_ui.dart';
 | Aviso | `TriageAlert` |
 | Aviso breve | `showTriageToast` (o `showAppSnackBar`, que ya lo usa) |
 | Íconos | `TriageIcon(TriageIcons.x)` |
+| Navegación campo / hospital | `ParamedicoNavbar` / `MedicoNavbar` (sobre `AppModuleBottomNav`) |
 
-Pendientes: navegación inferior, Paso, Opción grande, hoja inferior, Foto,
-botón de color START y marcadores de mapa.
+Pendientes: Paso, Opción grande, hoja inferior, Foto, botón de color START y
+marcadores de mapa. La navegación ya tiene el aspecto de Figma, pero sus pestañas
+y rutas cambian al migrar las pantallas B01, B02, B19, B20, C01, C05 y C13.
 
 ## Tokens: nada de valores sueltos
 
@@ -99,6 +101,7 @@ flutter run -t test/shared/widgets/triage_tabs_visual_test.dart
 flutter run -t test/shared/widgets/triage_header_visual_test.dart
 flutter run -t test/shared/widgets/triage_cards_visual_test.dart
 flutter run -t test/shared/widgets/triage_forms_visual_test.dart
+flutter run -t test/shared/widgets/app_module_bottom_nav_visual_test.dart
 ```
 
 Con la app corriendo, `r` recarga los cambios al instante.
