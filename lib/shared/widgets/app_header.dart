@@ -310,12 +310,21 @@ class AppHeader extends StatelessWidget implements PreferredSizeWidget {
     );
   }
 
+  /*
+  Color de flecha, textos y botón según el fondo: la misma cabecera se usa
+  sobre blanco, sobre el rojo del módulo y sobre el color de triage del paciente
+  */
+  Color get _foreground =>
+      ThemeData.estimateBrightnessForColor(color) == Brightness.dark
+      ? Colors.white
+      : Colors.black;
+
   Widget _arrowBackIcon() {
     return SvgPicture.asset(
       AppIcons.paramedicoHeaderArrowBack,
       height: AppDimensions.headerStatusIconSize,
       width: AppDimensions.headerStatusIconSize,
-      colorFilter: const ColorFilter.mode(Colors.black, BlendMode.srcIn),
+      colorFilter: ColorFilter.mode(_foreground, BlendMode.srcIn),
     );
   }
 
@@ -494,7 +503,7 @@ class AppHeader extends StatelessWidget implements PreferredSizeWidget {
               Text(
                 toolbarTitle ?? '',
                 style: AppTextStyles.ESC_Medium_titleMedium.copyWith(
-                  color: Colors.white,
+                  color: _foreground,
                 ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
@@ -519,7 +528,7 @@ class AppHeader extends StatelessWidget implements PreferredSizeWidget {
               Text(
                 backLabel ?? '',
                 style: AppTextStyles.ESC_Medium_titleMedium.copyWith(
-                  color: Colors.black,
+                  color: _foreground,
                 ),
                 overflow: TextOverflow.ellipsis,
                 maxLines: 1,
@@ -531,9 +540,9 @@ class AppHeader extends StatelessWidget implements PreferredSizeWidget {
             OutlinedButton(
               onPressed: onAction,
               style: OutlinedButton.styleFrom(
-                foregroundColor: Colors.black,
+                foregroundColor: _foreground,
                 backgroundColor: Colors.transparent,
-                side: const BorderSide(color: Colors.black, width: 0.8),
+                side: BorderSide(color: _foreground, width: 0.8),
                 padding: const EdgeInsets.symmetric(
                   horizontal: 14,
                   vertical: 6,
@@ -547,7 +556,7 @@ class AppHeader extends StatelessWidget implements PreferredSizeWidget {
               child: Text(
                 actionLabel!,
                 style: AppTextStyles.ESC_Regular_bodyMedium.copyWith(
-                  color: Colors.black,
+                  color: _foreground,
                 ),
               ),
             ),
