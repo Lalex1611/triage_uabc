@@ -12,6 +12,11 @@ Variantes visuales de la cabecera según el contexto de navegación
 */
 enum HeaderType { home, search, incident, paramedicoFlow }
 
+/*
+Luminancia del fondo en la que blanco y negro contrastan igual (WCAG)
+*/
+const double _equalContrastLuminance = 0.179;
+
 class AppHeader extends StatelessWidget implements PreferredSizeWidget {
   /*
   Color de fondo inyectado por cada pantalla para reflejar el contexto visual
@@ -312,12 +317,12 @@ class AppHeader extends StatelessWidget implements PreferredSizeWidget {
 
   /*
   Color de flecha, textos y botón según el fondo: la misma cabecera se usa
-  sobre blanco, sobre el rojo del módulo y sobre el color de triage del paciente
+  sobre blanco, sobre el rojo del módulo y sobre el color de triage del paciente.
+  Elige el de mayor contraste, que nunca baja de 4.5:1
   */
-  Color get _foreground =>
-      ThemeData.estimateBrightnessForColor(color) == Brightness.dark
-      ? Colors.white
-      : Colors.black;
+  Color get _foreground => color.computeLuminance() > _equalContrastLuminance
+      ? Colors.black
+      : Colors.white;
 
   Widget _arrowBackIcon() {
     return SvgPicture.asset(

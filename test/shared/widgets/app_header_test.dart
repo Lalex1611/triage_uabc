@@ -75,7 +75,7 @@ void main() {
       final color = tester.widget<Text>(find.text('Regresar')).style!.color!;
       expect(
         _contrast(color, background),
-        greaterThanOrEqualTo(3),
+        greaterThanOrEqualTo(4.5),
         reason: category.label,
       );
     }
