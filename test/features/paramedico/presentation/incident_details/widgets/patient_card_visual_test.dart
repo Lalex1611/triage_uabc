@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:sistema_triage/core/theme/app_theme.dart';
-import 'package:sistema_triage/features/paramedico/domain/constants/patient_status.dart';
-import 'package:sistema_triage/features/paramedico/domain/constants/triage_catalog.dart';
 import 'package:sistema_triage/features/paramedico/domain/entities/incident_details/patient_card_data.dart';
 import 'package:sistema_triage/features/paramedico/presentation/incident_details/widgets/patient_card_widget.dart';
+import 'package:sistema_triage/shared/widgets/triage_ui.dart';
 
 /*
   COMANDO PARA PROBAR:
@@ -74,11 +73,10 @@ class _PatientCardVisualTestState extends State<PatientCardVisualTest> {
               data: PatientCardData(
                 id: 'PAC-28320',
                 number: 1,
-                triageCategory: TriageCategory.rojo,
+                triageLevel: TriageLevel.red,
                 name: 'Paciente Numero 1 - 12-Mar-2026 14:32 - Blvd. 2000',
                 dateStr: '12/03/206 14:32:54',
-                coordinates: '19.4326, -99.1332',
-                status: PatientStatus.enEspera,
+                status: PatientLifecycleStatus.waiting,
                 onEditTap: () => _showEditMock(
                   context,
                   'Paciente Numero 1 - 12-Mar-2026 14:32 - Blvd. 2000',
@@ -90,11 +88,10 @@ class _PatientCardVisualTestState extends State<PatientCardVisualTest> {
               data: PatientCardData(
                 id: 'PAC-28321',
                 number: 2,
-                triageCategory: TriageCategory.amarillo,
+                triageLevel: TriageLevel.yellow,
                 name: 'Ramiro Hernández',
                 dateStr: '12/03/206 14:32:54',
-                coordinates: '19.4326, -99.1332',
-                status: PatientStatus.enEspera,
+                status: PatientLifecycleStatus.waiting,
                 onEditTap: () => _showEditMock(context, 'Ramiro Hernández'),
               ),
             ),
@@ -103,11 +100,10 @@ class _PatientCardVisualTestState extends State<PatientCardVisualTest> {
               data: PatientCardData(
                 id: 'PAC-28325',
                 number: 3,
-                triageCategory: TriageCategory.amarillo,
+                triageLevel: TriageLevel.yellow,
                 name: 'Sebastián González Pérez',
                 dateStr: '12/03/206 14:32:54',
-                coordinates: '19.4326, -99.1332',
-                status: PatientStatus.trasladando,
+                status: PatientLifecycleStatus.transferring,
                 onEditTap: () =>
                     _showEditMock(context, 'Sebastián González Pérez'),
               ),
@@ -117,11 +113,10 @@ class _PatientCardVisualTestState extends State<PatientCardVisualTest> {
               data: PatientCardData(
                 id: 'PAC-28329',
                 number: 4,
-                triageCategory: TriageCategory.verde,
+                triageLevel: TriageLevel.green,
                 name: 'Paciente Numero 4 - 12-Mar-2026 14:32 - Blvd. 2000',
                 dateStr: '12/03/206 14:32:54',
-                coordinates: '19.4326, -99.1332',
-                status: PatientStatus.recibido,
+                status: PatientLifecycleStatus.received,
                 onEditTap: () => _showEditMock(context, 'Paciente Numero 4'),
               ),
             ),
@@ -130,11 +125,10 @@ class _PatientCardVisualTestState extends State<PatientCardVisualTest> {
               data: PatientCardData(
                 id: 'PAC-28330',
                 number: 5,
-                triageCategory: TriageCategory.negro,
+                triageLevel: TriageLevel.black,
                 name: 'Paciente Numero 5 - 12-Mar-2026 14:32',
                 dateStr: '12/03/206 14:32:54',
-                coordinates: '19.4326, -99.1332',
-                status: PatientStatus.alta,
+                status: PatientLifecycleStatus.discharged,
                 onEditTap: () => _showEditMock(context, 'Paciente Numero 5'),
               ),
             ),
