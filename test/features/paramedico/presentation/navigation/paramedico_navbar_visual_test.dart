@@ -42,6 +42,7 @@ class _ParamedicoNavbarVisualTestState
         ),
         bottomNavigationBar: ParamedicoNavbar(
           currentIndex: _currentIndex,
+          onCreateIncident: () {},
           onTap: (index) {
             setState(() {
               _currentIndex = index;

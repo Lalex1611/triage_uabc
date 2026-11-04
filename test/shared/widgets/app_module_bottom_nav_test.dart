@@ -19,7 +19,7 @@ void main() {
   testWidgets('el toque avisa el índice de la pestaña', (tester) async {
     int? tapped;
     await tester.pumpWidget(
-      _wrap(ParamedicoNavbar(currentIndex: 0, onTap: (i) => tapped = i)),
+      _wrap(ParamedicoNavbar(currentIndex: 0, onTap: (i) => tapped = i, onCreateIncident: () {},)),
     );
     await tester.tap(find.text('Mapa'));
     expect(tapped, 2);
@@ -29,7 +29,7 @@ void main() {
     tester,
   ) async {
     await tester.pumpWidget(
-      _wrap(ParamedicoNavbar(currentIndex: 0, onTap: (_) {})),
+      _wrap(ParamedicoNavbar(currentIndex: 0, onTap: (_) {},onCreateIncident: () {})),
     );
     expect(_textColor(tester, 'Home'), TriageColors.paramedicAccent);
     expect(_textColor(tester, 'Mapa'), TriageColors.textSecondary);
@@ -53,7 +53,7 @@ void main() {
     tester,
   ) async {
     await tester.pumpWidget(
-      _wrap(ParamedicoNavbar(currentIndex: 2, onTap: (_) {})),
+      _wrap(ParamedicoNavbar(currentIndex: 2, onTap: (_) {},onCreateIncident: () {})),
     );
     expect(
       tester.getSemantics(find.text('Mapa')),
@@ -74,7 +74,7 @@ void main() {
     tester,
   ) async {
     await tester.pumpWidget(
-      _wrap(ParamedicoNavbar(currentIndex: 0, onTap: (_) {})),
+      _wrap(ParamedicoNavbar(currentIndex: 0, onTap: (_) {},onCreateIncident: () {})),
     );
     final sizes = tester
         .widgetList(find.byType(InkWell))
@@ -99,7 +99,7 @@ void main() {
           size: Size(320, 640),
           textScaler: TextScaler.linear(2),
         ),
-        child: _wrap(ParamedicoNavbar(currentIndex: 1, onTap: (_) {})),
+        child: _wrap(ParamedicoNavbar(currentIndex: 1, onTap: (_) {},onCreateIncident: () {})),
       ),
     );
     expect(tester.takeException(), isNull);

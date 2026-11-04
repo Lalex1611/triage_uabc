@@ -88,6 +88,7 @@ class _ParamedicoMapTabPageState extends State<ParamedicoMapTabPage> {
       },
       mineOnly: c.mineOnly,
       onMineOnlyChanged: c.setMineOnly,
+      countsByIncident: c.counts,
       coverageRings: c
           .visibleCoverageRings()
           .map((r) => (center: r.center, radiusMeters: r.radiusMeters))

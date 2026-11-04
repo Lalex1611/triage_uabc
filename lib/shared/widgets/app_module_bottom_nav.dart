@@ -14,6 +14,10 @@ class AppModuleBottomNavTab {
 ///
 /// Píldora con las pestañas repartidas a partes iguales en el ancho disponible;
 /// si una etiqueta no cabe se reduce en vez de cortarse.
+///
+/// Con [centerAction] se reserva un hueco en medio de las pestañas y el widget
+/// se dibuja sobresaliendo por arriba de la píldora (botón "+" del módulo campo).
+/// Sin [centerAction] la barra es igual que antes.
 class AppModuleBottomNav extends StatelessWidget {
   const AppModuleBottomNav({
     super.key,
@@ -22,16 +26,61 @@ class AppModuleBottomNav extends StatelessWidget {
     required this.onTap,
     required this.activeColor,
     required this.inactiveColor,
+    this.centerAction,
   });
 
   final List<AppModuleBottomNavTab> tabs;
+
+  /// Pestaña activa. Un valor fuera de rango (p. ej. -1) deja todas inactivas.
   final int currentIndex;
   final ValueChanged<int> onTap;
   final Color activeColor;
   final Color inactiveColor;
+  final Widget? centerAction;
+
+  // Medidas que solo tiene esta pieza
+  static const double _centerSlotWidth = 72;
+  static const double _centerLift = 14;
 
   @override
   Widget build(BuildContext context) {
+    final action = centerAction;
+    final middle = tabs.length ~/ 2;
+
+    final bar = DecoratedBox(
+      decoration: BoxDecoration(
+        color: TriageColors.surface,
+        borderRadius: BorderRadius.circular(TriageRadii.full),
+        border: Border.all(
+          color: TriageColors.borderSubtle,
+          width: TriageSizes.hairline,
+        ),
+        boxShadow: TriageShadows.base,
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(TriageSpacing.xs),
+        child: Material(
+          type: MaterialType.transparency,
+          child: Row(
+            children: [
+              for (var i = 0; i < tabs.length; i++) ...[
+                if (action != null && i == middle)
+                  const SizedBox(width: _centerSlotWidth),
+                Expanded(
+                  child: _NavTab(
+                    tab: tabs[i],
+                    color: i == currentIndex ? activeColor : inactiveColor,
+                    isActive: i == currentIndex,
+                    onTap: () => onTap(i),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+
     return SafeArea(
       top: false,
       minimum: const EdgeInsets.fromLTRB(
@@ -40,36 +89,26 @@ class AppModuleBottomNav extends StatelessWidget {
         TriageSpacing.xl,
         TriageSpacing.sm,
       ),
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: TriageColors.surface,
-          borderRadius: BorderRadius.circular(TriageRadii.full),
-          border: Border.all(
-            color: TriageColors.borderSubtle,
-            width: TriageSizes.hairline,
-          ),
-          boxShadow: TriageShadows.base,
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(TriageSpacing.xs),
-          child: Material(
-            type: MaterialType.transparency,
-            child: Row(
+      child: action == null
+          ? bar
+          // El botón queda dentro de los límites del Stack para que reciba toques
+          : Stack(
               children: [
-                for (var i = 0; i < tabs.length; i++)
-                  Expanded(
-                    child: _NavTab(
-                      tab: tabs[i],
-                      color: i == currentIndex ? activeColor : inactiveColor,
-                      isActive: i == currentIndex,
-                      onTap: () => onTap(i),
-                    ),
+                Padding(
+                  padding: const EdgeInsets.only(top: _centerLift),
+                  child: bar,
+                ),
+                Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [action],
                   ),
+                ),
               ],
             ),
-          ),
-        ),
-      ),
     );
   }
 }

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:sistema_triage/core/constants/app_colors.dart';
 import 'package:sistema_triage/core/layout/app_responsive.dart';
 import 'package:sistema_triage/features/paramedico/domain/constants/incident_sorting_options.dart';
 import 'package:sistema_triage/features/paramedico/domain/entities/home/home_user_stats.dart';
@@ -46,15 +45,6 @@ class ParamedicoHomePage extends StatelessWidget {
     return Scaffold(
       backgroundColor: Colors.white,
       resizeToAvoidBottomInset: false,
-      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
-      floatingActionButton: Padding(
-        padding: EdgeInsets.only(bottom: context.bottomNavExtent * 0.15),
-        child: FloatingActionButton(
-          backgroundColor: AppColors.primaryParamedico,
-          onPressed: onCreateIncident,
-          child: const Icon(Icons.add, color: Colors.white),
-        ),
-      ),
       body: HomeScreenBody(
         useSafeArea: false,
         isLoading: isLoading,
