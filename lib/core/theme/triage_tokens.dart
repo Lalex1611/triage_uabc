@@ -228,7 +228,8 @@ class TriageOpacity {
   static const double hover = 0.08;
 }
 
-/// Sombras de Figma (`Sombra`, `Sombra/Tarjeta`, `Sombra/Barra`, `Sombra/Flotante`)
+/// Sombras de Figma (`Sombra`, `Sombra/Tarjeta`, `Sombra/Barra`, `Sombra/Hoja`,
+/// `Sombra/Flotante`)
 class TriageShadows {
   TriageShadows._();
 
@@ -258,6 +259,15 @@ class TriageShadows {
       offset: Offset(0, -8),
       blurRadius: 24,
       spreadRadius: -8,
+    ),
+  ];
+
+  static const List<BoxShadow> sheet = [
+    BoxShadow(
+      color: Color(0x240A121F),
+      offset: Offset(0, -6),
+      blurRadius: 28,
+      spreadRadius: -4,
     ),
   ];
 
