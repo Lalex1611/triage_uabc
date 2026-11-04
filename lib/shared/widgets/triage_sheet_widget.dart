@@ -90,7 +90,7 @@ class TriageSheet extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const _SheetGrip(),
-              if (title != null)
+              if (title != null || subtitle != null || onClose != null)
                 Padding(
                   padding: EdgeInsetsDirectional.only(
                     start: TriageSpacing.xl,
@@ -104,15 +104,16 @@ class TriageSheet extends StatelessWidget {
                           mainAxisSize: MainAxisSize.min,
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Semantics(
-                              header: true,
-                              child: Text(
-                                title,
-                                style: TriageTextStyles.titleMedium.copyWith(
-                                  color: TriageColors.textPrimary,
+                            if (title != null)
+                              Semantics(
+                                header: true,
+                                child: Text(
+                                  title,
+                                  style: TriageTextStyles.titleMedium.copyWith(
+                                    color: TriageColors.textPrimary,
+                                  ),
                                 ),
                               ),
-                            ),
                             if (subtitle != null)
                               Text(
                                 subtitle,

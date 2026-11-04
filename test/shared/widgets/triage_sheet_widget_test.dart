@@ -147,6 +147,29 @@ void main() {
     expect(find.byType(Divider), findsNothing);
   });
 
+  testWidgets('sin título sigue mostrando la X y cierra', (tester) async {
+    await tester.pumpWidget(_opener(title: null, builder: _body));
+    await _open(tester);
+    expect(find.byType(Divider), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Cerrar'));
+    await tester.pumpAndSettle();
+    expect(find.byType(TriageSheet), findsNothing);
+  });
+
+  testWidgets('sin título ni X sigue mostrando el subtítulo', (tester) async {
+    await tester.pumpWidget(
+      _opener(
+        title: null,
+        subtitle: 'INC-729',
+        showClose: false,
+        builder: _body,
+      ),
+    );
+    await _open(tester);
+    expect(find.text('INC-729'), findsOneWidget);
+  });
+
   testWidgets('con X hay línea bajo la cabecera', (tester) async {
     await tester.pumpWidget(_opener(builder: _body));
     await _open(tester);
