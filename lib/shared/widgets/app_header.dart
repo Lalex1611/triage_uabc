@@ -12,6 +12,11 @@ Variantes visuales de la cabecera según el contexto de navegación
 */
 enum HeaderType { home, search, incident, paramedicoFlow }
 
+/*
+Luminancia del fondo en la que blanco y negro contrastan igual (WCAG)
+*/
+const double _equalContrastLuminance = 0.179;
+
 class AppHeader extends StatelessWidget implements PreferredSizeWidget {
   /*
   Color de fondo inyectado por cada pantalla para reflejar el contexto visual
@@ -310,12 +315,21 @@ class AppHeader extends StatelessWidget implements PreferredSizeWidget {
     );
   }
 
+  /*
+  Color de flecha, textos y botón según el fondo: la misma cabecera se usa
+  sobre blanco, sobre el rojo del módulo y sobre el color de triage del paciente.
+  Elige el de mayor contraste, que nunca baja de 4.5:1
+  */
+  Color get _foreground => color.computeLuminance() > _equalContrastLuminance
+      ? Colors.black
+      : Colors.white;
+
   Widget _arrowBackIcon() {
     return SvgPicture.asset(
       AppIcons.paramedicoHeaderArrowBack,
       height: AppDimensions.headerStatusIconSize,
       width: AppDimensions.headerStatusIconSize,
-      colorFilter: const ColorFilter.mode(Colors.black, BlendMode.srcIn),
+      colorFilter: ColorFilter.mode(_foreground, BlendMode.srcIn),
     );
   }
 
@@ -494,7 +508,7 @@ class AppHeader extends StatelessWidget implements PreferredSizeWidget {
               Text(
                 toolbarTitle ?? '',
                 style: AppTextStyles.ESC_Medium_titleMedium.copyWith(
-                  color: Colors.white,
+                  color: _foreground,
                 ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
@@ -519,7 +533,7 @@ class AppHeader extends StatelessWidget implements PreferredSizeWidget {
               Text(
                 backLabel ?? '',
                 style: AppTextStyles.ESC_Medium_titleMedium.copyWith(
-                  color: Colors.black,
+                  color: _foreground,
                 ),
                 overflow: TextOverflow.ellipsis,
                 maxLines: 1,
@@ -531,9 +545,9 @@ class AppHeader extends StatelessWidget implements PreferredSizeWidget {
             OutlinedButton(
               onPressed: onAction,
               style: OutlinedButton.styleFrom(
-                foregroundColor: Colors.black,
+                foregroundColor: _foreground,
                 backgroundColor: Colors.transparent,
-                side: const BorderSide(color: Colors.black, width: 0.8),
+                side: BorderSide(color: _foreground, width: 0.8),
                 padding: const EdgeInsets.symmetric(
                   horizontal: 14,
                   vertical: 6,
@@ -547,7 +561,7 @@ class AppHeader extends StatelessWidget implements PreferredSizeWidget {
               child: Text(
                 actionLabel!,
                 style: AppTextStyles.ESC_Regular_bodyMedium.copyWith(
-                  color: Colors.black,
+                  color: _foreground,
                 ),
               ),
             ),

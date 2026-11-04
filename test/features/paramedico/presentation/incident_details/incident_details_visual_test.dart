@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:sistema_triage/core/theme/app_theme.dart';
 import 'package:sistema_triage/features/paramedico/domain/constants/patient_sorting_options.dart';
-import 'package:sistema_triage/features/paramedico/domain/constants/patient_status.dart';
-import 'package:sistema_triage/features/paramedico/domain/constants/triage_catalog.dart';
 import 'package:sistema_triage/features/paramedico/domain/entities/incident_details/incident_header_data.dart';
 import 'package:sistema_triage/features/paramedico/domain/entities/incident_details/incident_metadata_data.dart';
 import 'package:sistema_triage/features/paramedico/domain/entities/incident_details/incident_tab_data.dart';
@@ -14,6 +12,7 @@ import 'package:sistema_triage/features/paramedico/presentation/incident_details
 import 'package:sistema_triage/features/paramedico/presentation/incident_details/incident_details_page.dart';
 import 'package:sistema_triage/features/paramedico/presentation/incident_details/widgets/incident_details_list_tab_widget.dart';
 import 'package:sistema_triage/features/paramedico/presentation/incident_details/widgets/incident_details_stats_tab_widget.dart';
+import 'package:sistema_triage/shared/widgets/triage_ui.dart';
 
 /*
   COMANDO PARA PROBAR EL ENSAMBLE COMPLETO (SANDBOX):
@@ -76,13 +75,34 @@ class _IncidentDetailsVisualTestState extends State<IncidentDetailsVisualTest> {
 
   @override
   Widget build(BuildContext context) {
+    final patients = [
+      PatientCardData(
+        id: 'PAC-28320',
+        number: 1,
+        triageLevel: TriageLevel.red,
+        name: 'Paciente Numero 1 - 12-Mar-2026 14:32 - Blvd. 2000',
+        dateStr: '12/03/206 14:32:54',
+        status: PatientLifecycleStatus.waiting,
+        onEditTap: () => _showEditMock(context, 'Paciente Numero 1'),
+      ),
+      PatientCardData(
+        id: 'PAC-28321',
+        number: 2,
+        triageLevel: TriageLevel.yellow,
+        name: 'Ramiro Hernández',
+        dateStr: '12/03/206 14:32:54',
+        status: PatientLifecycleStatus.waiting,
+        onEditTap: () => _showEditMock(context, 'Ramiro Hernández'),
+      ),
+    ];
+
     final listTab = _activeTab == IncidentTabType.lista
         ? IncidentDetailsListTab(
             searchController: _searchCtrl,
             onSearchChanged: (_) {},
             onRefresh: () async {},
             listHeaderData: PatientListHeaderData(
-              patientCount: 8,
+              patientCount: patients.length,
               sortOption: PatientSortOption.recent,
               onSortChanged: (_) {},
             ),
@@ -92,30 +112,9 @@ class _IncidentDetailsVisualTestState extends State<IncidentDetailsVisualTest> {
                   setState(() => _activeFilter = filter),
             ),
             emptyMessage: '',
-            patientCards: [
-              PatientCardData(
-                id: 'PAC-28320',
-                number: 1,
-                triageCategory: TriageCategory.rojo,
-                name: 'Paciente Numero 1 - 12-Mar-2026 14:32 - Blvd. 2000',
-                dateStr: '12/03/206 14:32:54',
-                coordinates: '19.4326, -99.1332',
-                status: PatientStatus.enEspera,
-                onEditTap: () => _showEditMock(context, 'Paciente Numero 1'),
-              ),
-              PatientCardData(
-                id: 'PAC-28321',
-                number: 2,
-                triageCategory: TriageCategory.amarillo,
-                name: 'Ramiro Hernández',
-                dateStr: '12/03/206 14:32:54',
-                coordinates: '19.4326, -99.1332',
-                status: PatientStatus.enEspera,
-                onEditTap: () => _showEditMock(context, 'Ramiro Hernández'),
-              ),
-            ],
+            patientCards: patients,
           )
-        : const IncidentDetailsStatsTab();
+        : IncidentDetailsStatsTab(patients: patients);
 
     return Theme(
       data: appTheme,
@@ -131,10 +130,10 @@ class _IncidentDetailsVisualTestState extends State<IncidentDetailsVisualTest> {
           hasGps: true,
           isEditable: true,
           redCount: 1,
-          yellowCount: 2,
-          greenCount: 50,
+          yellowCount: 1,
+          greenCount: 0,
           blackCount: 0,
-          totalPatients: 8,
+          totalPatients: patients.length,
         ),
         metadataData: IncidentMetadataData(
           creatorName: 'Carlos Huerta',
