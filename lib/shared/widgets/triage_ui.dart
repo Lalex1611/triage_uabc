@@ -34,3 +34,4 @@ export 'package:sistema_triage/shared/widgets/triage_search_bar_widget.dart';
 export 'package:sistema_triage/shared/widgets/triage_status_badge_widget.dart';
 export 'package:sistema_triage/shared/widgets/triage_tabs_widget.dart';
 export 'package:sistema_triage/shared/widgets/triage_toast_widget.dart';
+export 'package:sistema_triage/shared/widgets/triage_incident_marker_widget.dart';
