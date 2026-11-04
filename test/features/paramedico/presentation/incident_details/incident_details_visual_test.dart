@@ -102,7 +102,7 @@ class _IncidentDetailsVisualTestState extends State<IncidentDetailsVisualTest> {
             onSearchChanged: (_) {},
             onRefresh: () async {},
             listHeaderData: PatientListHeaderData(
-              patientCount: 8,
+              patientCount: patients.length,
               sortOption: PatientSortOption.recent,
               onSortChanged: (_) {},
             ),
@@ -130,10 +130,10 @@ class _IncidentDetailsVisualTestState extends State<IncidentDetailsVisualTest> {
           hasGps: true,
           isEditable: true,
           redCount: 1,
-          yellowCount: 2,
-          greenCount: 50,
+          yellowCount: 1,
+          greenCount: 0,
           blackCount: 0,
-          totalPatients: 8,
+          totalPatients: patients.length,
         ),
         metadataData: IncidentMetadataData(
           creatorName: 'Carlos Huerta',
