@@ -103,6 +103,8 @@ class _ParamedicoInteractiveMapFlowPageState
           },
           mineOnly: c.mineOnly,
           onMineOnlyChanged: c.setMineOnly,
+          countsByIncident: c.counts,
+          showBackButton: true,
           coverageRings: c
               .visibleCoverageRings()
               .map((r) => (center: r.center, radiusMeters: r.radiusMeters))

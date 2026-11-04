@@ -59,6 +59,7 @@ class _NavSandboxState extends State<_NavSandbox> {
             : ParamedicoNavbar(
                 currentIndex: _index,
                 onTap: (i) => setState(() => _index = i),
+                onCreateIncident: () {}
               ),
       ),
     );

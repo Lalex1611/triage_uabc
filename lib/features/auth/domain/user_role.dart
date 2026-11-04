@@ -33,7 +33,7 @@ enum AppUserRole {
   String get homePath {
     switch (this) {
       case AppUserRole.paramedico:
-        return '/paramedico/home';
+        return '/paramedico/mapa';
       case AppUserRole.medico:
         return '/medico';
       case AppUserRole.consultaExterna:

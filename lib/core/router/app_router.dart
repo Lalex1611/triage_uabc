@@ -39,7 +39,7 @@ final GoRouter appRouter = GoRouter(
         // sigue siendo `/paramedico` y este redirect devolvía siempre a home
         final p = state.uri.path;
         if (p == '/paramedico' || p == '/paramedico/') {
-          return '/paramedico/home';
+          return '/paramedico/mapa';
         }
         return null;
       },
@@ -52,8 +52,15 @@ final GoRouter appRouter = GoRouter(
             StatefulShellBranch(
               routes: [
                 GoRoute(
-                  path: 'home',
-                  builder: (context, state) => const ParamedicoHomeTabPage(),
+                  path: 'mapa',
+                  builder: (context, state) {
+                    final focus = state.uri.queryParameters['focus'];
+                    return ParamedicoMapTabPage(
+                      initialFocusIncidentId: focus?.isNotEmpty == true
+                          ? focus
+                          : null,
+                    );
+                  },
                 ),
               ],
             ),
@@ -69,15 +76,8 @@ final GoRouter appRouter = GoRouter(
             StatefulShellBranch(
               routes: [
                 GoRoute(
-                  path: 'mapa',
-                  builder: (context, state) {
-                    final focus = state.uri.queryParameters['focus'];
-                    return ParamedicoMapTabPage(
-                      initialFocusIncidentId: focus?.isNotEmpty == true
-                          ? focus
-                          : null,
-                    );
-                  },
+                  path: 'home',
+                  builder: (context, state) => const ParamedicoHomeTabPage(),
                 ),
               ],
             ),
