@@ -47,4 +47,42 @@ extension TriageLevelStyle on TriageLevel {
     TriageLevel.blue => 'Azul',
     TriageLevel.black => 'Negro',
   };
+
+  /// Nombre en el protocolo START; `null` si el color no pertenece a él
+  String? get startName => switch (this) {
+    TriageLevel.red => 'Inmediato',
+    TriageLevel.yellow => 'Urgente',
+    TriageLevel.green => 'Leve',
+    TriageLevel.black => 'Fallecido',
+    TriageLevel.orange || TriageLevel.blue => null,
+  };
+
+  /// Cuándo se asigna en el protocolo START; `null` si no pertenece a él
+  String? get startDetail => switch (this) {
+    TriageLevel.red => 'No camina · no responde',
+    TriageLevel.yellow => 'Puede esperar atención',
+    TriageLevel.green => 'Camina por sí mismo',
+    TriageLevel.black => 'Sin signos vitales',
+    TriageLevel.orange || TriageLevel.blue => null,
+  };
+
+  /// Nombre en el triage hospitalario; `null` si el color no pertenece a él
+  String? get hospitalName => switch (this) {
+    TriageLevel.red => 'Resucitación',
+    TriageLevel.orange => 'Emergencia',
+    TriageLevel.yellow => 'Urgente',
+    TriageLevel.green => 'Poco urgente',
+    TriageLevel.blue => 'No urgente',
+    TriageLevel.black => null,
+  };
+
+  /// Plazo de atención en el triage hospitalario; `null` si no pertenece a él
+  String? get hospitalDetail => switch (this) {
+    TriageLevel.red => 'Atención inmediata',
+    TriageLevel.orange => 'Atender antes de 10 min',
+    TriageLevel.yellow => 'Atender antes de 60 min',
+    TriageLevel.green => 'Atender antes de 2 h',
+    TriageLevel.blue => 'Consulta general',
+    TriageLevel.black => null,
+  };
 }
