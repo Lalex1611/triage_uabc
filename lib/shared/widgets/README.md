@@ -33,10 +33,10 @@ import 'package:sistema_triage/shared/widgets/triage_ui.dart';
 | Opción grande | `TriageLargeOption` (`neutral`, `highlighted`) |
 | Foto | `TriagePhoto` |
 | Hoja inferior con Agarre | `showTriageSheet`; `TriageSheet` solo en hojas fijas (mapa) |
+| Botón de color | `TriageLevelButton.start`, `.hospital` o con textos propios |
+| Marcadores de mapa | `TriageIncidentMarker`, `TriagePatientMarker`, `TriageHospitalMarker`, `TriageUnitMarker`, `TriageUserMarker` |
 
-Pendientes: botón de color START y marcadores de mapa. La navegación ya tiene el
-aspecto de Figma, pero sus pestañas
-y rutas cambian al migrar las pantallas B01, B02, B19, B20, C01, C05 y C13.
+La navegación ya tiene el aspecto de Figma, pero sus pestañas y rutas cambian al migrar las pantallas B01, B02, B19, B20, C01, C05 y C13.
 
 ## Tokens: nada de valores sueltos
 
@@ -49,6 +49,7 @@ pantalla.
 | Colores | `TriageColors` (texto, fondo, borde, señal, triage) |
 | Color del rol (rojo campo / azul hospital) | `context.triageRole.accent` y `.soft` |
 | Color de un nivel de triage | `level.color`, `level.background`, `level.onColor`, `level.label` |
+| Nombre clínico de un nivel | `level.startName`, `level.startDetail`, `level.hospitalName`, `level.hospitalDetail` |
 | Tono de un mensaje | `TriageTone` (`tone.color`, `tone.background`, `tone.icon`) |
 | Texto | `TriageTextStyles` + `.copyWith(color: …)` |
 | Márgenes y separaciones | `TriageSpacing` (`xxs` 2 · `xs` 4 · `sm` 8 · `md` 12 · `lg` 16 · `xl` 20 · `xxl` 24) |
@@ -107,6 +108,7 @@ flutter run -t test/shared/widgets/triage_cards_visual_test.dart
 flutter run -t test/shared/widgets/triage_forms_visual_test.dart
 flutter run -t test/shared/widgets/app_module_bottom_nav_visual_test.dart
 flutter run -t test/shared/widgets/triage_sheet_visual_test.dart
+flutter run -t test/shared/widgets/triage_level_button_visual_test.dart
 ```
 
 Con la app corriendo, `r` recarga los cambios al instante.
