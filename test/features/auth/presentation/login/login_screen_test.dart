@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:sistema_triage/core/config/supabase_env.dart';
+import 'package:sistema_triage/features/auth/presentation/login/forgot_password_screen.dart';
 import 'package:sistema_triage/features/auth/presentation/login/login_screen.dart';
 import 'package:sistema_triage/features/auth/presentation/login/widgets/auth_text_field.dart';
 import 'package:sistema_triage/shared/widgets/triage_ui.dart';
@@ -122,7 +123,10 @@ void main() {
     expect(tester.widget<TextField>(fields.first).controller!.text.length, 60);
     await tester.ensureVisible(find.text('¿Olvidaste tu contraseña?'));
     await tester.tap(find.text('¿Olvidaste tu contraseña?'));
-    await tester.pump();
+    await tester.pumpAndSettle();
+    expect(find.byType(ForgotPasswordScreen), findsOneWidget);
+    await tester.tap(find.byTooltip('Regresar'));
+    await tester.pumpAndSettle();
     expect(find.byType(LoginScreen), findsOneWidget);
     expect(
       tester.widget<TextField>(fields.last).controller!.text,

@@ -7,6 +7,7 @@ import 'package:sistema_triage/core/session/auth_gate.dart';
 import 'package:sistema_triage/core/ui/app_snackbar.dart';
 import 'package:sistema_triage/features/auth/domain/constants/auth_role_type.dart';
 import 'package:sistema_triage/features/auth/domain/user_role.dart';
+import 'package:sistema_triage/features/auth/presentation/login/forgot_password_screen.dart';
 import 'package:sistema_triage/features/auth/presentation/login/widgets/auth_text_field.dart';
 import 'package:sistema_triage/shared/widgets/triage_ui.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -185,7 +186,12 @@ class _LoginScreenState extends State<LoginScreen> {
                         controller: _passwordController,
                         hasError: _hasCredentialError,
                         onChanged: (_) {},
-                        onForgotPassword: () {},
+                        onForgotPassword: () =>
+                            Navigator.of(context).push<void>(
+                              MaterialPageRoute(
+                                builder: (_) => const ForgotPasswordScreen(),
+                              ),
+                            ),
                       ),
                       const SizedBox(height: TriageSpacing.sm),
                       TriageButton(
