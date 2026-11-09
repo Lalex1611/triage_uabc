@@ -146,6 +146,12 @@ class _SectionSandboxState extends State<_SectionSandbox> {
                         tooltip: 'Filtrar',
                         onPressed: null,
                       ),
+                      TriageIconButton(
+                        icon: TriageIcons.close,
+                        tooltip: 'Sin fondo',
+                        variant: TriageIconButtonVariant.plain,
+                        onPressed: () {},
+                      ),
                     ],
                   ),
                 ],
