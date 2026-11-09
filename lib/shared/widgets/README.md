@@ -37,6 +37,9 @@ import 'package:sistema_triage/shared/widgets/triage_ui.dart';
 | Marcadores de mapa | `TriageIncidentMarker`, `TriagePatientMarker`, `TriageHospitalMarker`, `TriageUnitMarker`, `TriageUserMarker` |
 | Diálogo | `showTriageConfirm`; `showDialog` con `TriageDialog` para más opciones |
 | Mensaje de resultado a pantalla completa | `TriageResultMessage` |
+| Tarjeta de sección | `TriageSectionCard`, con `TriageSectionAction` para "Editar" o "Añadir" |
+| Barra de acciones inferior | `TriageActionBar` |
+| Botón de solo ícono | `TriageIconButton` |
 
 La navegación ya tiene el aspecto de Figma, pero sus pestañas y rutas cambian al migrar las pantallas B01, B02, B19, B20, C01, C05 y C13.
 
@@ -121,6 +124,7 @@ flutter run -t test/shared/widgets/app_module_bottom_nav_visual_test.dart
 flutter run -t test/shared/widgets/triage_sheet_visual_test.dart
 flutter run -t test/shared/widgets/triage_level_button_visual_test.dart
 flutter run -t test/shared/widgets/triage_message_visual_test.dart
+flutter run -t test/shared/widgets/triage_section_visual_test.dart
 ```
 
 Con la app corriendo, `r` recarga los cambios al instante.
