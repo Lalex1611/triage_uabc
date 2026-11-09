@@ -45,6 +45,9 @@ class IncidentDetailsController extends ChangeNotifier {
   ParamedicoIncidentSummary? incident;
   List<ParamedicoPatientRow> patients = [];
   List<MapPatientPin> mapPatients = [];
+  Map<String, String> photoUrls = {};
+  bool uploadingPhoto = false;
+  bool _disposed = false;
   bool loading = true;
   String? error;
   String? creatorName;
@@ -70,14 +73,33 @@ class IncidentDetailsController extends ChangeNotifier {
 
   String get routeBase => '/paramedico/incident/$incidentId';
 
-  Future<void> load() async {
+  List<ImageProvider> get incidentPhotos =>
+      IncidentDetailsViewMapper.photoImages(
+        paths: incident?.photoPaths ?? const [],
+        signedUrls: photoUrls,
+      );
+
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
+  }
+
+  // Una subida lenta puede terminar cuando el usuario ya salió de la pantalla
+  @override
+  void notifyListeners() {
+    if (!_disposed) super.notifyListeners();
+  }
+
+  /// Con [showLoader] en `false` actualiza sin sustituir la pantalla por el cargador
+  Future<void> load({bool showLoader = true}) async {
     if (!SupabaseEnv.isConfigured) {
       loading = false;
       error = 'Supabase no configurado.';
       notifyListeners();
       return;
     }
-    loading = true;
+    if (showLoader) loading = true;
     error = null;
     notifyListeners();
 
@@ -89,6 +111,10 @@ class IncidentDetailsController extends ChangeNotifier {
       final pins = lat != null && lng != null
           ? await _loadMapPatients(LatLng(lat, lng))
           : <MapPatientPin>[];
+      final urls = await _signPhotos(
+        inc?.photoPaths ?? const [],
+        known: showLoader ? const {} : photoUrls,
+      );
       String? creator;
       if (inc != null && inc.createdBy.isNotEmpty) {
         creator = await _repo.getProfileFullName(inc.createdBy);
@@ -96,6 +122,7 @@ class IncidentDetailsController extends ChangeNotifier {
       incident = inc;
       patients = pts;
       mapPatients = pins;
+      photoUrls = urls;
       creatorName = creator;
       loading = false;
       notifyListeners();
@@ -116,6 +143,34 @@ class IncidentDetailsController extends ChangeNotifier {
     } catch (e) {
       debugPrint('No se pudieron cargar los pacientes del mapa: $e');
       return [];
+    }
+  }
+
+  /// Conserva los enlaces [known] para que las fotos ya visibles no parpadeen.
+  /// Si falla, las fotos muestran su ícono y el resto de la pantalla sigue visible
+  Future<Map<String, String>> _signPhotos(
+    List<String> paths, {
+    required Map<String, String> known,
+  }) async {
+    try {
+      return {
+        ...known,
+        ...await _repo.signIncidentPhotos(
+          paths.where((path) => !known.containsKey(path)),
+        ),
+      };
+    } catch (e) {
+      debugPrint('No se pudieron firmar las fotos del incidente: $e');
+      return known;
+    }
+  }
+
+  /// Quitarla de Storage no debe impedir el resultado: la foto ya no está en el incidente
+  Future<void> _discardStoredPhoto(String path) async {
+    try {
+      await _repo.deleteIncidentPhoto(path);
+    } catch (e) {
+      debugPrint('No se pudo borrar la foto $path: $e');
     }
   }
 
@@ -394,7 +449,7 @@ class IncidentDetailsController extends ChangeNotifier {
         incidentId: incidentId,
         description: trimmed.isEmpty ? null : trimmed,
       );
-      await load();
+      await load(showLoader: false);
       if (!context.mounted) return;
       showAppSnackBar(context, 'Descripción del incidente actualizada.');
     } catch (e) {
@@ -411,37 +466,34 @@ class IncidentDetailsController extends ChangeNotifier {
       );
       return;
     }
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(15)),
-      ),
-      builder: (ctx) => SafeArea(
-        child: Wrap(
+    showTriageSheet<void>(
+      context,
+      title: 'Añadir fotografía',
+      showClose: false,
+      builder: (sheetContext) {
+        void pick(ImageSource source) {
+          Navigator.pop(sheetContext);
+          unawaited(addIncidentPhoto(context, source));
+        }
+
+        return Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            ListTile(
-              leading: const Icon(Icons.camera_alt, color: Color(0xFFCE1125)),
-              title: const Text('Tomar foto con la cámara'),
-              onTap: () {
-                Navigator.pop(ctx);
-                unawaited(addIncidentPhoto(context, ImageSource.camera));
-              },
+            TriageOptionRow(
+              icon: TriageIcons.camera,
+              title: 'Tomar foto',
+              detail: 'Usa la cámara del teléfono',
+              onTap: () => pick(ImageSource.camera),
             ),
-            ListTile(
-              leading: const Icon(
-                Icons.photo_library,
-                color: Color(0xFFCE1125),
-              ),
-              title: const Text('Elegir de la galería'),
-              onTap: () {
-                Navigator.pop(ctx);
-                unawaited(addIncidentPhoto(context, ImageSource.gallery));
-              },
+            TriageOptionRow(
+              icon: TriageIcons.image,
+              title: 'Elegir de la galería',
+              detail: 'Selecciona una foto guardada',
+              onTap: () => pick(ImageSource.gallery),
             ),
           ],
-        ),
-      ),
+        );
+      },
     );
   }
 
@@ -458,45 +510,89 @@ class IncidentDetailsController extends ChangeNotifier {
       return;
     }
     final inc = incident;
-    if (inc == null) return;
+    if (inc == null || uploadingPhoto) return;
+    String? storedPath;
     try {
-      final image = await _picker.pickImage(source: source, imageQuality: 80);
+      final image = await _picker.pickImage(
+        source: source,
+        imageQuality: 80,
+        maxWidth: 1920,
+      );
       if (image == null) return;
-      final nextPhotos = List<String>.from(inc.photoPaths)..add(image.path);
+      uploadingPhoto = true;
+      notifyListeners();
+      storedPath = await _repo.uploadIncidentPhoto(
+        incidentId: incidentId,
+        localPath: image.path,
+      );
       await _repo.updateIncidentPhotoPaths(
         incidentId: incidentId,
-        photoPaths: nextPhotos,
+        photoPaths: [...inc.photoPaths, storedPath],
       );
-      if (!context.mounted) return;
-      showAppSnackBar(context, 'Foto agregada al incidente.');
-      await load();
+      await load(showLoader: false);
+      if (context.mounted) {
+        showAppSnackBar(context, 'Foto agregada al incidente.');
+      }
     } catch (e) {
-      if (context.mounted) showAppSnackBar(context, '$e', isError: true);
+      debugPrint('No se pudo subir la foto del incidente: $e');
+      if (storedPath != null) unawaited(_discardStoredPhoto(storedPath));
+      if (context.mounted) {
+        showAppSnackBar(
+          context,
+          'No se pudo subir la foto. Revisa la conexión e inténtalo de nuevo.',
+          isError: true,
+        );
+      }
+    } finally {
+      uploadingPhoto = false;
+      notifyListeners();
     }
   }
 
-  Future<void> removeIncidentPhotoAt(BuildContext context, int index) async {
+  /// Pide confirmación y devuelve si la foto se eliminó
+  Future<bool> confirmRemoveIncidentPhoto(
+    BuildContext context,
+    int index,
+  ) async {
     if (!canEditIncident) {
       showAppSnackBar(
         context,
         'Solo puedes editar incidentes asignados a tu cuenta.',
         isError: true,
       );
-      return;
+      return false;
     }
     final inc = incident;
-    if (inc == null || index < 0 || index >= inc.photoPaths.length) return;
+    if (inc == null || index < 0 || index >= inc.photoPaths.length) {
+      return false;
+    }
+    final confirmed = await showTriageConfirm(
+      context,
+      icon: const TriageMessageIcon(TriageIcons.trash, tone: TriageTone.danger),
+      title: '¿Eliminar esta fotografía?',
+      message:
+          'No se puede recuperar. El resto de la información del incidente no cambia.',
+      confirmLabel: 'Eliminar',
+      confirmVariant: TriageButtonVariant.danger,
+    );
+    if (!confirmed) return false;
+
+    final removed = inc.photoPaths[index];
     final nextPhotos = List<String>.from(inc.photoPaths)..removeAt(index);
     try {
       await _repo.updateIncidentPhotoPaths(
         incidentId: incidentId,
         photoPaths: nextPhotos,
       );
-      if (!context.mounted) return;
-      showAppSnackBar(context, 'Foto eliminada del incidente.');
-      await load();
+      unawaited(_discardStoredPhoto(removed));
+      await load(showLoader: false);
+      if (context.mounted) {
+        showAppSnackBar(context, 'Foto eliminada del incidente.');
+      }
+      return true;
     } catch (e) {
       if (context.mounted) showAppSnackBar(context, '$e', isError: true);
+      return false;
     }
   }
 }

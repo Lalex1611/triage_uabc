@@ -329,14 +329,34 @@ class CreateIncidentController extends ChangeNotifier {
           description: desc,
         );
       }
+      // El incidente ya existe: si fallan las fotos no se debe volver a crear
+      var photosUploaded = true;
       if (photos.isNotEmpty) {
-        await _repo.updateIncidentPhotoPaths(
-          incidentId: id,
-          photoPaths: List<String>.from(photos),
-        );
+        try {
+          await _repo.updateIncidentPhotoPaths(
+            incidentId: id,
+            photoPaths: [
+              for (final photo in photos)
+                await _repo.uploadIncidentPhoto(
+                  incidentId: id,
+                  localPath: photo,
+                ),
+            ],
+          );
+        } catch (e) {
+          debugPrint('No se pudieron subir las fotos del incidente: $e');
+          photosUploaded = false;
+        }
       }
       if (!context.mounted) return;
-      showAppSnackBar(context, 'Incidente creado.');
+      showAppSnackBar(
+        context,
+        photosUploaded
+            ? 'Incidente creado.'
+            : 'Incidente creado, pero no se pudieron subir las fotos. '
+                  'Añádelas desde el incidente.',
+        isError: !photosUploaded,
+      );
       context.go('/paramedico/incidentes');
     } catch (e) {
       if (context.mounted) showAppSnackBar(context, '$e', isError: true);
