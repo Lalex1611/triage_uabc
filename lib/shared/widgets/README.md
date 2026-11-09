@@ -60,8 +60,10 @@ pantalla.
 | Opacidades | `TriageOpacity` |
 | Sombras | `TriageShadows` |
 
-Las medidas que solo tiene una pieza (p. ej. el ancho de la barra de color)
-van como constante con nombre dentro del componente, nunca como número suelto.
+Dar nombre a un número no lo hace adaptable. Las medidas decorativas que solo
+tiene una pieza (íconos destacados, símbolos, márgenes) se reducen con
+`context.rDim` de `AppResponsive`, nunca se escriben para un solo tamaño de
+pantalla.
 
 ## Reglas de diseño
 
@@ -69,6 +71,13 @@ van como constante con nombre dentro del componente, nunca como número suelto.
   en algo con texto. Todo debe verse bien con el texto al 200 %.
 - **Ancho adaptable.** `Expanded`, `Flexible` o `Wrap` en vez de anchos fijos.
   Para una fila de métricas, `Expanded` en cada una.
+- **`rDim` solo para lo decorativo.** Zonas táctiles y texto nunca se escalan
+  con él: son mínimos de accesibilidad y preferencias del usuario.
+- **El texto no se encoge ni se corta.** Nombres y datos clínicos pasan a otra
+  línea; `FittedBox` solo como último recurso para una palabra que no cabe.
+  La app se usa en vertical: se prueba de 280 a 800 de ancho y con texto al 200 %.
+- **Sin posiciones fijas.** Alineaciones relativas en lugar de `Positioned` con
+  valores.
 - **Zona táctil.** Mínimo 48 (`TriageSizes.touchTarget`); 44 solo en chips y
   botón mediano.
 - **Contraste.** Texto ≥ 4.5:1 e íconos ≥ 3:1. Por eso algunos colores difieren
