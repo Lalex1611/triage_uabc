@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:sistema_triage/core/constants/triage_icons.dart';
+import 'package:sistema_triage/core/layout/app_responsive.dart';
 import 'package:sistema_triage/core/theme/triage_tokens.dart';
 import 'package:sistema_triage/shared/widgets/app_module_bottom_nav.dart';
+import 'package:sistema_triage/shared/widgets/triage_icon_widget.dart';
 
 // Barra de navegación inferior del módulo paramédico:
 // Mapa · Incidentes · (+) · Guía START · Perfil
@@ -51,12 +53,13 @@ class _CreateIncidentButton extends StatelessWidget {
 
   final VoidCallback onTap;
 
-  // Medidas que solo tiene esta pieza
+  // Medidas de Figma; rDim las reduce en pantallas estrechas, sin bajar de 48
   static const double _size = 64;
-  static const double _iconSize = 32;
 
   @override
   Widget build(BuildContext context) {
+    final size = context.rDim(_size);
+
     return Semantics(
       button: true,
       label: 'Crear incidente',
@@ -67,14 +70,14 @@ class _CreateIncidentButton extends StatelessWidget {
         child: InkWell(
           onTap: onTap,
           customBorder: const CircleBorder(),
-          child: const SizedBox(
-            width: _size,
-            height: _size,
-            // Si existe un TriageIcons de "más", cámbialo aquí
-            child: Icon(
-              Icons.add,
-              size: _iconSize,
-              color: TriageColors.textInverse,
+          child: SizedBox.square(
+            dimension: size,
+            child: Center(
+              child: TriageIcon(
+                TriageIcons.plus,
+                size: size / 2,
+                color: TriageColors.textInverse,
+              ),
             ),
           ),
         ),
