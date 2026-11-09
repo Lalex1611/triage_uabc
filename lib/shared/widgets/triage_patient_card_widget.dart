@@ -4,6 +4,7 @@ import 'package:sistema_triage/core/theme/triage_level_style.dart';
 import 'package:sistema_triage/core/theme/triage_tokens.dart';
 import 'package:sistema_triage/shared/domain/triage_level.dart';
 import 'package:sistema_triage/shared/widgets/triage_icon_widget.dart';
+import 'package:sistema_triage/shared/widgets/triage_level_bar_widget.dart';
 import 'package:sistema_triage/shared/widgets/triage_status_badge_widget.dart';
 import 'package:sistema_triage/shared/widgets/triage_tap_card_widget.dart';
 
@@ -131,18 +132,10 @@ class TriagePatientCard extends StatelessWidget {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Semantics(
-                    label: 'Triage ${level.label}',
-                    child: Container(
-                      width: _levelBarWidth,
-                      constraints: const BoxConstraints(
-                        minHeight: TriageSizes.touchTarget,
-                      ),
-                      decoration: BoxDecoration(
-                        color: level.color,
-                        borderRadius: BorderRadius.circular(TriageRadii.full),
-                      ),
-                    ),
+                  TriageLevelBar(
+                    level,
+                    width: _levelBarWidth,
+                    minHeight: TriageSizes.touchTarget,
                   ),
                   const SizedBox(width: TriageSpacing.md),
                   Expanded(child: content),
