@@ -8,6 +8,7 @@ Widget _opener({
   String? subtitle,
   TriageSteps? steps,
   bool showClose = true,
+  bool dismissible = true,
   ValueChanged<String?>? onResult,
   double textScale = 1,
 }) => MaterialApp(
@@ -27,6 +28,7 @@ Widget _opener({
             subtitle: subtitle,
             steps: steps,
             showClose: showClose,
+            dismissible: dismissible,
             builder: builder,
           );
           onResult?.call(result);
@@ -138,6 +140,70 @@ void main() {
     await tester.drag(find.text('Asignar traslado'), const Offset(0, 500));
     await tester.pumpAndSettle();
     expect(find.byType(TriageSheet), findsNothing);
+  });
+
+  group('dismissible: false', () {
+    testWidgets('no se cierra tocando fuera, arrastrando ni con atrás', (
+      tester,
+    ) async {
+      await tester.pumpWidget(_opener(dismissible: false, builder: _body));
+      await _open(tester);
+
+      await tester.tapAt(const Offset(10, 10));
+      await tester.pumpAndSettle();
+      expect(find.byType(TriageSheet), findsOneWidget);
+
+      await tester.drag(find.text('Asignar traslado'), const Offset(0, 500));
+      await tester.pumpAndSettle();
+      expect(find.byType(TriageSheet), findsOneWidget);
+
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.byType(TriageSheet), findsOneWidget);
+    });
+
+    testWidgets('la X sigue cerrando', (tester) async {
+      await tester.pumpWidget(_opener(dismissible: false, builder: _body));
+      await _open(tester);
+      await tester.tap(find.byTooltip('Cerrar'));
+      await tester.pumpAndSettle();
+      expect(find.byType(TriageSheet), findsNothing);
+    });
+
+    testWidgets('Navigator.pop devuelve el resultado', (tester) async {
+      String? result;
+      await tester.pumpWidget(
+        _opener(
+          dismissible: false,
+          showClose: false,
+          builder: (context) => TextButton(
+            onPressed: () => Navigator.pop(context, 'Guardado'),
+            child: const Text('Guardar'),
+          ),
+          onResult: (value) => result = value,
+        ),
+      );
+      await _open(tester);
+      await tester.tap(find.text('Guardar'));
+      await tester.pumpAndSettle();
+      expect(result, 'Guardado');
+    });
+
+    testWidgets('oculta el agarre, que invita a arrastrar', (tester) async {
+      await tester.pumpWidget(_opener(dismissible: false, builder: _body));
+      await _open(tester);
+      expect(
+        tester
+            .widget<Visibility>(
+              find.descendant(
+                of: find.byType(TriageSheet),
+                matching: find.byType(Visibility),
+              ),
+            )
+            .visible,
+        isFalse,
+      );
+    });
   });
 
   testWidgets('sin X no hay botón ni línea bajo la cabecera', (tester) async {

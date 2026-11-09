@@ -57,6 +57,77 @@ void main() {
     expect(decoration.boxShadow, TriageShadows.base);
   });
 
+  testWidgets('sin fondo: no pinta círculo y mantiene la zona táctil', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _wrap(_button(variant: TriageIconButtonVariant.plain)),
+    );
+    expect(_visual, findsNothing);
+    expect(tester.getSize(find.byTooltip('Ordenar')), const Size(48, 48));
+  });
+
+  testWidgets('pequeño: zona táctil de 44 e ícono de 18', (tester) async {
+    await tester.pumpWidget(
+      _wrap(
+        _button(
+          variant: TriageIconButtonVariant.plain,
+          size: TriageIconButtonSize.small,
+        ),
+      ),
+    );
+    expect(
+      tester.getSize(find.byTooltip('Ordenar')),
+      const Size.square(TriageSizes.touchTargetCompact),
+    );
+    expect(
+      tester.widget<TriageIcon>(find.byType(TriageIcon)).size,
+      TriageSizes.iconSmall,
+    );
+  });
+
+  testWidgets('sobre la banda: fondo translúcido, color y círculo propios', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _wrap(
+        TriageIconButton(
+          icon: TriageIcons.user,
+          tooltip: 'Perfil',
+          variant: TriageIconButtonVariant.onAccent,
+          color: TriageColors.textInverse,
+          diameter: 44,
+          iconSize: TriageSizes.iconLarge,
+          onPressed: () {},
+        ),
+        width: 320,
+      ),
+    );
+    expect(_decoration(tester).color, TriageColors.overlayOnAccent);
+    expect(tester.getSize(_visual), const Size(44, 44));
+    final icon = tester.widget<TriageIcon>(find.byType(TriageIcon));
+    expect(icon.color, TriageColors.textInverse);
+    expect(icon.size, TriageSizes.iconLarge);
+  });
+
+  testWidgets('el punto de avisos solo aparece con showDot', (tester) async {
+    const dot = ValueKey('triage-header-dot');
+    await tester.pumpWidget(_wrap(_button()));
+    expect(find.byKey(dot), findsNothing);
+
+    await tester.pumpWidget(
+      _wrap(
+        TriageIconButton(
+          icon: TriageIcons.bell,
+          tooltip: 'Avisos',
+          showDot: true,
+          onPressed: () {},
+        ),
+      ),
+    );
+    expect(find.byKey(dot), findsOneWidget);
+  });
+
   testWidgets('grande: recuadro a la altura de un botón grande', (
     tester,
   ) async {

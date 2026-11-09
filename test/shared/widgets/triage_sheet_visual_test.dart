@@ -1,5 +1,5 @@
-// Sandbox visual de hoja inferior, pasos, opción grande y foto (showTriageSheet,
-// TriageSteps, TriageLargeOption, TriagePhoto):
+// Sandbox visual de hoja inferior, pasos, opciones y foto (showTriageSheet,
+// TriageSteps, TriageLargeOption, TriageRadioOption, TriageOptionRow, TriagePhoto):
 // flutter run -t test/shared/widgets/triage_sheet_visual_test.dart
 import 'dart:convert';
 
@@ -25,6 +25,48 @@ class _SheetSandboxState extends State<_SheetSandbox> {
   bool _hospital = false;
   bool _bigText = false;
   int _step = 1;
+  int _reason = 0;
+
+  static const _reasons = [
+    ('Sin camas disponibles', 'Urgencias al límite de capacidad'),
+    ('Otro motivo', 'Lo explico abajo'),
+  ];
+
+  /// Las filas viven en la hoja: guardan su estado con un StatefulBuilder
+  Widget _rowsSheet() {
+    var order = 0;
+    var traffic = false;
+    return StatefulBuilder(
+      builder: (context, setSheetState) => Column(
+        children: [
+          TriageOptionRow(
+            icon: TriageIcons.pencil,
+            title: 'Editar incidente',
+            detail: 'Cambiar tipo, ubicación o descripción',
+            onTap: () {},
+          ),
+          for (final (i, label) in const [
+            'Más recientes',
+            'Mayor gravedad',
+          ].indexed)
+            TriageOptionRow.check(
+              icon: TriageIcons.clock,
+              title: label,
+              detail: 'Criterio para ordenar la lista',
+              selected: order == i,
+              onTap: () => setSheetState(() => order = i),
+            ),
+          TriageOptionRow.toggle(
+            icon: TriageIcons.map,
+            title: 'Tráfico en tiempo real',
+            detail: 'Útil para estimar la ruta',
+            value: traffic,
+            onChanged: (v) => setSheetState(() => traffic = v),
+          ),
+        ],
+      ),
+    );
+  }
 
   List<Widget> _options() => [
     TriageLargeOption(
@@ -110,6 +152,29 @@ class _SheetSandboxState extends State<_SheetSandbox> {
                       ),
                     ),
                     TriageButton(
+                      label: 'Filas de opción',
+                      onPressed: () => showTriageSheet<void>(
+                        context,
+                        title: 'Capas del mapa',
+                        subtitle: 'Decide qué se dibuja encima.',
+                        showClose: false,
+                        builder: (_) => _rowsSheet(),
+                      ),
+                    ),
+                    TriageButton(
+                      label: 'Sin cierre accidental',
+                      onPressed: () => showTriageSheet<void>(
+                        context,
+                        title: 'Asignar traslado',
+                        subtitle: 'Solo se cierra con la X',
+                        dismissible: false,
+                        builder: (_) => const Padding(
+                          padding: EdgeInsets.all(TriageSpacing.xl),
+                          child: TriageField(label: 'Institución'),
+                        ),
+                      ),
+                    ),
+                    TriageButton(
                       label: 'Sin X, muy larga',
                       onPressed: () => showTriageSheet<void>(
                         context,
@@ -143,6 +208,20 @@ class _SheetSandboxState extends State<_SheetSandbox> {
                 ),
                 const SizedBox(height: TriageSpacing.md),
                 ..._options(),
+                const _Label('Selección única (la segunda con tono de éxito)'),
+                Column(
+                  spacing: TriageSpacing.md,
+                  children: [
+                    for (final (i, (title, detail)) in _reasons.indexed)
+                      TriageRadioOption(
+                        title: title,
+                        detail: detail,
+                        selected: _reason == i,
+                        tone: i == 1 ? TriageTone.success : null,
+                        onTap: () => setState(() => _reason = i),
+                      ),
+                  ],
+                ),
                 const _Label('Foto (vacía, con imagen y sin toque)'),
                 Row(
                   spacing: TriageSpacing.sm,

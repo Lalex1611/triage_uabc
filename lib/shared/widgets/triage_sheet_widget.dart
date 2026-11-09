@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:sistema_triage/core/constants/triage_icons.dart';
 import 'package:sistema_triage/core/theme/triage_tokens.dart';
-import 'package:sistema_triage/shared/widgets/triage_icon_widget.dart';
+import 'package:sistema_triage/shared/widgets/triage_icon_button_widget.dart';
 import 'package:sistema_triage/shared/widgets/triage_steps_widget.dart';
 
 /// Muestra una hoja inferior modal del rediseño con [TriageSheet]
@@ -10,6 +10,9 @@ import 'package:sistema_triage/shared/widgets/triage_steps_widget.dart';
 /// teclado. El contenido de [builder] se desplaza si no cabe, así que debe ser
 /// de alto ajustado (una `Column`, no un `ListView`). Con `Navigator.pop(context, valor)`
 /// devuelve un resultado.
+///
+/// Con [dismissible] en `false` (formularios a medias) no se cierra tocando fuera,
+/// arrastrando ni con el botón atrás del sistema: solo con la X o `Navigator.pop`.
 Future<T?> showTriageSheet<T>(
   BuildContext context, {
   required WidgetBuilder builder,
@@ -17,6 +20,7 @@ Future<T?> showTriageSheet<T>(
   String? subtitle,
   TriageSteps? steps,
   bool showClose = true,
+  bool dismissible = true,
 }) {
   return showModalBottomSheet<T>(
     context: context,
@@ -24,16 +28,22 @@ Future<T?> showTriageSheet<T>(
     useSafeArea: true,
     backgroundColor: Colors.transparent,
     elevation: 0,
-    builder: (sheetContext) => Padding(
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.viewInsetsOf(sheetContext).bottom,
-      ),
-      child: TriageSheet(
-        title: title,
-        subtitle: subtitle,
-        steps: steps,
-        onClose: showClose ? () => Navigator.pop(sheetContext) : null,
-        child: SingleChildScrollView(child: builder(sheetContext)),
+    isDismissible: dismissible,
+    enableDrag: dismissible,
+    builder: (sheetContext) => PopScope(
+      canPop: dismissible,
+      child: Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.viewInsetsOf(sheetContext).bottom,
+        ),
+        child: TriageSheet(
+          title: title,
+          subtitle: subtitle,
+          steps: steps,
+          onClose: showClose ? () => Navigator.pop(sheetContext) : null,
+          showGrip: dismissible,
+          child: SingleChildScrollView(child: builder(sheetContext)),
+        ),
       ),
     ),
   );
@@ -44,6 +54,7 @@ Future<T?> showTriageSheet<T>(
 /// Fondo con esquinas superiores redondeadas, agarre y cabecera opcional: [title],
 /// [subtitle], [steps] y una X con [onClose], que añade una línea bajo la cabecera.
 /// [child] pone sus propios márgenes y puede ser una lista: recibe el alto restante.
+/// Con [showGrip] en `false` el agarre no se ve, pero conserva su espacio.
 ///
 /// Para una hoja modal usar [showTriageSheet]. Directamente solo en hojas fijas
 /// sobre la pantalla (p. ej. la del mapa en B02), que controlan su propio arrastre.
@@ -55,6 +66,7 @@ class TriageSheet extends StatelessWidget {
     this.subtitle,
     this.steps,
     this.onClose,
+    this.showGrip = true,
   });
 
   final Widget child;
@@ -62,6 +74,7 @@ class TriageSheet extends StatelessWidget {
   final String? subtitle;
   final TriageSteps? steps;
   final VoidCallback? onClose;
+  final bool showGrip;
 
   static const _radius = BorderRadius.vertical(
     top: Radius.circular(TriageRadii.xxl),
@@ -89,7 +102,7 @@ class TriageSheet extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const _SheetGrip(),
+              Visibility.maintain(visible: showGrip, child: const _SheetGrip()),
               if (title != null || subtitle != null || onClose != null)
                 Padding(
                   padding: EdgeInsetsDirectional.only(
@@ -125,19 +138,12 @@ class TriageSheet extends StatelessWidget {
                         ),
                       ),
                       if (onClose != null)
-                        IconButton(
-                          onPressed: onClose,
+                        TriageIconButton(
+                          icon: TriageIcons.close,
                           tooltip: 'Cerrar',
-                          style: IconButton.styleFrom(
-                            minimumSize: const Size.square(
-                              TriageSizes.touchTarget,
-                            ),
-                          ),
-                          icon: const TriageIcon(
-                            TriageIcons.close,
-                            size: TriageSizes.iconLarge,
-                            color: TriageColors.textPrimary,
-                          ),
+                          onPressed: onClose,
+                          variant: TriageIconButtonVariant.plain,
+                          iconSize: TriageSizes.iconLarge,
                         ),
                     ],
                   ),

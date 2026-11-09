@@ -4,6 +4,7 @@ import 'package:sistema_triage/core/theme/triage_level_style.dart';
 import 'package:sistema_triage/core/theme/triage_tokens.dart';
 import 'package:sistema_triage/shared/domain/triage_level.dart';
 import 'package:sistema_triage/shared/widgets/triage_icon_widget.dart';
+import 'package:sistema_triage/shared/widgets/triage_tap_card_widget.dart';
 
 /// Botón de color del rediseño (Figma "TRIAGE/Botón de color", B11, B12 y C07)
 ///
@@ -59,7 +60,6 @@ class TriageLevelButton extends StatelessWidget {
   final bool selected;
   final VoidCallback onTap;
 
-  static const _radius = BorderRadius.all(Radius.circular(TriageRadii.xl));
   static const _minHeight = 96.0;
   static const _selectedBorder = 3.0;
   static const _idleOpacity = 0.94;
@@ -68,84 +68,62 @@ class TriageLevelButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final foreground = level.onColor;
 
-    return MergeSemantics(
-      child: Semantics(
-        button: true,
-        selected: selected,
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: selected
-                ? level.color
-                : level.color.withValues(alpha: _idleOpacity),
-            borderRadius: _radius,
-            border: selected
-                ? Border.all(
-                    color: TriageColors.textPrimary,
-                    width: _selectedBorder,
-                  )
-                : null,
-            boxShadow: selected ? TriageShadows.floating : null,
+    return TriageTapCard(
+      onTap: onTap,
+      selected: selected,
+      color: selected
+          ? level.color
+          : level.color.withValues(alpha: _idleOpacity),
+      borderColor: selected ? TriageColors.textPrimary : null,
+      borderWidth: _selectedBorder,
+      shadow: selected ? TriageShadows.floating : null,
+      inkColor: foreground,
+      padding: EdgeInsets.zero,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: _minHeight),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: TriageSpacing.lg,
+            vertical: TriageSpacing.md,
           ),
-          child: Material(
-            type: MaterialType.transparency,
-            child: InkWell(
-              onTap: onTap,
-              borderRadius: _radius,
-              splashColor: foreground.withValues(alpha: TriageOpacity.pressed),
-              highlightColor: foreground.withValues(alpha: TriageOpacity.hover),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(minHeight: _minHeight),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: TriageSpacing.lg,
-                    vertical: TriageSpacing.md,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      tag,
+                      style: TriageTextStyles.labelSmall.copyWith(
+                        color: foreground,
+                      ),
+                    ),
                   ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              tag,
-                              style: TriageTextStyles.labelSmall.copyWith(
-                                color: foreground,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: TriageSpacing.xs),
-                          // Espacio reservado: seleccionar no mueve la cuadrícula
-                          SizedBox.square(
-                            dimension: TriageSizes.iconSmall,
-                            child: selected
-                                ? TriageIcon(
-                                    TriageIcons.checkCircle,
-                                    size: TriageSizes.iconSmall,
-                                    color: foreground,
-                                  )
-                                : null,
-                          ),
-                        ],
-                      ),
-                      Text(
-                        title,
-                        style: TriageTextStyles.titleMedium.copyWith(
-                          color: foreground,
-                        ),
-                      ),
-                      Text(
-                        detail,
-                        style: TriageTextStyles.bodySmall.copyWith(
-                          color: foreground,
-                        ),
-                      ),
-                    ],
+                  const SizedBox(width: TriageSpacing.xs),
+                  // Espacio reservado: seleccionar no mueve la cuadrícula
+                  SizedBox.square(
+                    dimension: TriageSizes.iconSmall,
+                    child: selected
+                        ? TriageIcon(
+                            TriageIcons.checkCircle,
+                            size: TriageSizes.iconSmall,
+                            color: foreground,
+                          )
+                        : null,
                   ),
-                ),
+                ],
               ),
-            ),
+              Text(
+                title,
+                style: TriageTextStyles.titleMedium.copyWith(color: foreground),
+              ),
+              Text(
+                detail,
+                style: TriageTextStyles.bodySmall.copyWith(color: foreground),
+              ),
+            ],
           ),
         ),
       ),

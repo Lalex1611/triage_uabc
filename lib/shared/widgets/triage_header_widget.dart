@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:sistema_triage/core/constants/triage_icons.dart';
 import 'package:sistema_triage/core/theme/triage_role_theme.dart';
 import 'package:sistema_triage/core/theme/triage_tokens.dart';
-import 'package:sistema_triage/shared/widgets/triage_icon_widget.dart';
+import 'package:sistema_triage/shared/widgets/triage_icon_button_widget.dart';
 
 /// Relleno horizontal de la banda y del encabezado de detalle
 const double _gutter = TriageSpacing.xl;
@@ -87,14 +87,14 @@ class TriageHomeHeader extends StatelessWidget {
                   child: Row(
                     children: [
                       if (onProfileTap != null) ...[
-                        _HeaderButton(
+                        TriageIconButton(
                           icon: TriageIcons.user,
                           tooltip: 'Perfil',
                           onPressed: onProfileTap,
+                          variant: TriageIconButtonVariant.onAccent,
+                          color: onBand,
                           diameter: _avatarDiameter,
                           iconSize: TriageSizes.iconLarge,
-                          iconColor: onBand,
-                          background: TriageColors.overlayOnAccent,
                         ),
                         const SizedBox(width: TriageSpacing.sm),
                       ],
@@ -135,16 +135,15 @@ class TriageHomeHeader extends StatelessWidget {
                       ),
                       if (onNotificationsTap != null) ...[
                         const SizedBox(width: TriageSpacing.sm),
-                        _HeaderButton(
+                        TriageIconButton(
                           icon: TriageIcons.bell,
                           tooltip: hasNotifications
                               ? 'Notificaciones, hay avisos nuevos'
                               : 'Notificaciones',
                           onPressed: onNotificationsTap,
+                          variant: TriageIconButtonVariant.onAccent,
+                          color: onBand,
                           diameter: _bellDiameter,
-                          iconSize: TriageSizes.icon,
-                          iconColor: onBand,
-                          background: TriageColors.overlayOnAccent,
                           showDot: hasNotifications,
                         ),
                       ],
@@ -231,13 +230,14 @@ class TriageDetailHeader extends StatelessWidget {
                   child: Row(
                     children: [
                       if (back != null) ...[
-                        _HeaderButton(
+                        TriageIconButton(
                           icon: useCloseIcon
                               ? TriageIcons.close
                               : TriageIcons.arrowLeft,
                           tooltip: useCloseIcon ? 'Cerrar' : 'Regresar',
                           onPressed: back,
-                          iconColor: TriageColors.textPrimary,
+                          variant: TriageIconButtonVariant.plain,
+                          iconSize: TriageSizes.iconLarge,
                         ),
                         const SizedBox(width: TriageSpacing.xs),
                       ],
@@ -266,11 +266,13 @@ class TriageDetailHeader extends StatelessWidget {
                       ),
                       if (onMore != null) ...[
                         const SizedBox(width: TriageSpacing.xs),
-                        _HeaderButton(
+                        TriageIconButton(
                           icon: TriageIcons.more,
                           tooltip: 'Más opciones',
                           onPressed: onMore,
-                          iconColor: TriageColors.textSecondary,
+                          variant: TriageIconButtonVariant.plain,
+                          color: TriageColors.textSecondary,
+                          iconSize: TriageSizes.iconLarge,
                         ),
                       ],
                     ],
@@ -291,78 +293,4 @@ class TriageDetailHeader extends StatelessWidget {
 
   /// Línea superior del color del rol (Figma)
   static const double _accentLine = 3;
-}
-
-/// Botón redondo del encabezado: círculo visible de [diameter] dentro de una
-/// zona táctil de [TriageSizes.touchTarget]; [showDot] añade el punto de
-/// avisos con anillo blanco (rojo sobre la banda no llega a 3:1 sin él).
-class _HeaderButton extends StatelessWidget {
-  const _HeaderButton({
-    required this.icon,
-    required this.tooltip,
-    required this.onPressed,
-    required this.iconColor,
-    this.iconSize = TriageSizes.iconLarge,
-    this.diameter = _bellDiameter,
-    this.background,
-    this.showDot = false,
-  });
-
-  // Punto de avisos de Figma: diámetro, anillo y posición relativa al círculo
-  static const double _dot = 12;
-  static const double _dotRing = 2;
-  static const _dotAlignment = Alignment(0.5, -0.5);
-
-  final String icon;
-  final String tooltip;
-  final VoidCallback? onPressed;
-  final Color iconColor;
-  final double iconSize;
-  final double diameter;
-  final Color? background;
-  final bool showDot;
-
-  @override
-  Widget build(BuildContext context) {
-    final circle = Container(
-      width: diameter,
-      height: diameter,
-      alignment: Alignment.center,
-      decoration: background == null
-          ? null
-          : BoxDecoration(color: background, shape: BoxShape.circle),
-      child: TriageIcon(icon, size: iconSize, color: iconColor),
-    );
-
-    return IconButton(
-      onPressed: onPressed,
-      tooltip: tooltip,
-      padding: EdgeInsets.zero,
-      constraints: const BoxConstraints.tightFor(
-        width: TriageSizes.touchTarget,
-        height: TriageSizes.touchTarget,
-      ),
-      icon: !showDot
-          ? circle
-          : Stack(
-              alignment: _dotAlignment,
-              children: [
-                circle,
-                Container(
-                  key: const ValueKey('triage-header-dot'),
-                  width: _dot,
-                  height: _dot,
-                  decoration: BoxDecoration(
-                    color: TriageColors.danger,
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: TriageColors.textInverse,
-                      width: _dotRing,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-    );
-  }
 }
