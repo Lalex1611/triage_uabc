@@ -331,6 +331,35 @@ void main() {
       expect(tester.getSize(find.text(title)).height, greaterThan(24));
     });
 
+    testWidgets('useCloseIcon muestra una X que llama a onBack', (
+      tester,
+    ) async {
+      var back = 0;
+      await tester.pumpWidget(
+        _app(
+          TriageDetailHeader(
+            title: 'Confirmar recepción',
+            useCloseIcon: true,
+            onBack: () => back++,
+          ),
+        ),
+      );
+      expect(find.byTooltip('Regresar'), findsNothing);
+      expect(
+        tester
+            .widget<TriageIcon>(
+              find.descendant(
+                of: find.byTooltip('Cerrar'),
+                matching: find.byType(TriageIcon),
+              ),
+            )
+            .asset,
+        TriageIcons.close,
+      );
+      await tester.tap(find.byTooltip('Cerrar'));
+      expect(back, 1);
+    });
+
     testWidgets('sin onMore no muestra "más opciones"', (tester) async {
       await tester.pumpWidget(_app(const TriageDetailHeader(title: 'PAC')));
       expect(find.byTooltip('Más opciones'), findsNothing);

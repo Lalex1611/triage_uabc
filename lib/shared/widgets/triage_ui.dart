@@ -18,12 +18,14 @@ export 'package:sistema_triage/shared/domain/patient_lifecycle_status.dart';
 export 'package:sistema_triage/shared/domain/triage_level.dart';
 
 // Componentes
+export 'package:sistema_triage/shared/widgets/triage_action_bar_widget.dart';
 export 'package:sistema_triage/shared/widgets/triage_alert_widget.dart';
 export 'package:sistema_triage/shared/widgets/triage_button_widget.dart';
 export 'package:sistema_triage/shared/widgets/triage_chip_widget.dart';
 export 'package:sistema_triage/shared/widgets/triage_data_row_widget.dart';
 export 'package:sistema_triage/shared/widgets/triage_field_widget.dart';
 export 'package:sistema_triage/shared/widgets/triage_header_widget.dart';
+export 'package:sistema_triage/shared/widgets/triage_icon_button_widget.dart';
 export 'package:sistema_triage/shared/widgets/triage_icon_widget.dart';
 export 'package:sistema_triage/shared/widgets/triage_incident_card_widget.dart';
 export 'package:sistema_triage/shared/widgets/triage_large_option_widget.dart';
@@ -36,6 +38,7 @@ export 'package:sistema_triage/shared/widgets/triage_metric_widget.dart';
 export 'package:sistema_triage/shared/widgets/triage_patient_card_widget.dart';
 export 'package:sistema_triage/shared/widgets/triage_photo_widget.dart';
 export 'package:sistema_triage/shared/widgets/triage_search_bar_widget.dart';
+export 'package:sistema_triage/shared/widgets/triage_section_card_widget.dart';
 export 'package:sistema_triage/shared/widgets/triage_sheet_widget.dart';
 export 'package:sistema_triage/shared/widgets/triage_status_badge_widget.dart';
 export 'package:sistema_triage/shared/widgets/triage_steps_widget.dart';
