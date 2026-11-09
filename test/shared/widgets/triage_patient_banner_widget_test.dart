@@ -246,6 +246,15 @@ void main() {
       );
     });
 
+    testWidgets('el nivel se anuncia una sola vez', (tester) async {
+      await tester.pumpWidget(_wrap(_incoming()));
+      final card = tester
+          .getSemantics(find.byType(TriageTapCard))
+          .getSemanticsData()
+          .label;
+      expect('Triage Rojo'.allMatches(card), hasLength(1));
+    });
+
     for (final role in [TriageRoleTheme.paramedic, TriageRoleTheme.hospital]) {
       testWidgets('la llegada usa el rol y llega a 4.5:1', (tester) async {
         await tester.pumpWidget(_wrap(_incoming(), role: role));

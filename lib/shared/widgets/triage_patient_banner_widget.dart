@@ -229,7 +229,8 @@ class TriageIncomingCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     spacing: TriageSpacing.md,
                     children: [
-                      TriageLevelBar(level),
+                      // La pastilla ya anuncia el nivel
+                      ExcludeSemantics(child: TriageLevelBar(level)),
                       // Si nombre y pastilla no caben, la pastilla baja de línea
                       Expanded(
                         child: Wrap(
