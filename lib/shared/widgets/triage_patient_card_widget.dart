@@ -5,6 +5,7 @@ import 'package:sistema_triage/core/theme/triage_tokens.dart';
 import 'package:sistema_triage/shared/domain/triage_level.dart';
 import 'package:sistema_triage/shared/widgets/triage_icon_widget.dart';
 import 'package:sistema_triage/shared/widgets/triage_status_badge_widget.dart';
+import 'package:sistema_triage/shared/widgets/triage_tap_card_widget.dart';
 
 /// Tarjeta de paciente del rediseño (Figma "TRIAGE/Tarjeta de paciente")
 ///
@@ -44,7 +45,6 @@ class TriagePatientCard extends StatelessWidget {
   final VoidCallback? onTap;
   final bool _room;
 
-  static const _radius = BorderRadius.all(Radius.circular(TriageRadii.xl));
   static const _chevron = TriageIcon(
     TriageIcons.chevronRight,
     size: TriageSizes.icon,
@@ -112,70 +112,45 @@ class TriagePatientCard extends StatelessWidget {
             ],
           );
 
-    return MergeSemantics(
-      child: Semantics(
-        button: true,
-        enabled: onTap != null,
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: TriageColors.surface,
-            borderRadius: _radius,
-            border: Border.all(
-              color: TriageColors.borderSubtle,
-              width: TriageSizes.stroke,
-            ),
-            boxShadow: TriageShadows.card,
-          ),
-          child: Material(
-            type: MaterialType.transparency,
-            child: InkWell(
-              onTap: onTap,
-              borderRadius: _radius,
-              child: Padding(
-                // Mismo relleno que la tarjeta de incidente
-                padding: const EdgeInsets.all(TriageSpacing.lg),
-                child: _room
-                    ? Row(
-                        children: [
-                          _LevelTile(level),
-                          const SizedBox(width: TriageSpacing.md),
-                          Expanded(child: content),
-                          const SizedBox(width: TriageSpacing.md),
-                          _chevron,
-                        ],
-                      )
-                    // IntrinsicHeight: la barra de color mide lo mismo que el contenido
-                    : IntrinsicHeight(
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            Semantics(
-                              label: 'Triage ${level.label}',
-                              child: Container(
-                                width: _levelBarWidth,
-                                constraints: const BoxConstraints(
-                                  minHeight: TriageSizes.touchTarget,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: level.color,
-                                  borderRadius: BorderRadius.circular(
-                                    TriageRadii.full,
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: TriageSpacing.md),
-                            Expanded(child: content),
-                            const SizedBox(width: TriageSpacing.md),
-                            const Center(child: _chevron),
-                          ],
-                        ),
+    return TriageTapCard(
+      onTap: onTap,
+      borderColor: TriageColors.borderSubtle,
+      shadow: TriageShadows.card,
+      child: _room
+          ? Row(
+              children: [
+                _LevelTile(level),
+                const SizedBox(width: TriageSpacing.md),
+                Expanded(child: content),
+                const SizedBox(width: TriageSpacing.md),
+                _chevron,
+              ],
+            )
+          // IntrinsicHeight: la barra de color mide lo mismo que el contenido
+          : IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Semantics(
+                    label: 'Triage ${level.label}',
+                    child: Container(
+                      width: _levelBarWidth,
+                      constraints: const BoxConstraints(
+                        minHeight: TriageSizes.touchTarget,
                       ),
+                      decoration: BoxDecoration(
+                        color: level.color,
+                        borderRadius: BorderRadius.circular(TriageRadii.full),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: TriageSpacing.md),
+                  Expanded(child: content),
+                  const SizedBox(width: TriageSpacing.md),
+                  const Center(child: _chevron),
+                ],
               ),
             ),
-          ),
-        ),
-      ),
     );
   }
 }
