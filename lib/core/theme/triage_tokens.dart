@@ -74,6 +74,24 @@ class TriageTextStyles {
 
   static const String fontFamily = 'Inter';
 
+  /// Pantalla/Título
+  static const TextStyle screenTitle = TextStyle(
+    fontFamily: fontFamily,
+    fontSize: 28,
+    fontWeight: FontWeight.w700,
+    height: 34 / 28,
+    letterSpacing: -0.6,
+  );
+
+  /// Título/Grande
+  static const TextStyle titleLarge = TextStyle(
+    fontFamily: fontFamily,
+    fontSize: 22,
+    fontWeight: FontWeight.w700,
+    height: 28 / 22,
+    letterSpacing: -0.4,
+  );
+
   /// Título/Medio
   static const TextStyle titleMedium = TextStyle(
     fontFamily: fontFamily,
