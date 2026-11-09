@@ -1,6 +1,11 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
+import 'package:sistema_triage/core/theme/triage_tokens.dart';
 
 /// Tokens y helpers para adaptar layouts Figma a distintos tamaños de pantalla
+///
+/// [dim] es solo para medidas decorativas: nunca para zonas táctiles ni texto.
 class AppResponsive {
   AppResponsive._();
 
@@ -21,6 +26,19 @@ class AppResponsive {
   static bool isShortScreen(BuildContext context) =>
       sizeOf(context).height < shortHeight;
 
+  /// Ancho que ocupa [text] en una línea, con el tamaño de texto del usuario
+  static double textWidth(BuildContext context, String text, TextStyle style) {
+    final painter = TextPainter(
+      text: TextSpan(text: text, style: style),
+      textDirection: Directionality.of(context),
+      textScaler: MediaQuery.textScalerOf(context),
+      maxLines: 1,
+    )..layout();
+    final width = painter.width.ceilToDouble();
+    painter.dispose();
+    return width;
+  }
+
   /// Escala horizontal suave (no agranda en tablets; solo reduce en pantallas chicas)
   static double scaleW(BuildContext context) {
     final w = sizeOf(context).width;
@@ -29,14 +47,17 @@ class AppResponsive {
 
   static double horizontalPadding(BuildContext context) {
     final w = sizeOf(context).width;
-    if (w < 340) return 12;
-    if (w < compactWidth) return 16;
-    return 24;
+    if (w < 340) return TriageSpacing.md;
+    if (w < compactWidth) return TriageSpacing.lg;
+    return TriageSpacing.xxl;
   }
 
-  /// Altura útil de la barra inferior (iconos + safe area del sistema)
+  /// Altura de la píldora de navegación con sus márgenes y la zona segura
   static double bottomNavExtent(BuildContext context) {
-    return kBottomNavigationBarHeight + MediaQuery.paddingOf(context).bottom;
+    return TriageSizes.controlLarge +
+        2 * TriageSpacing.xs +
+        TriageSpacing.sm +
+        math.max(MediaQuery.paddingOf(context).bottom, TriageSpacing.sm);
   }
 
   /// Escala un valor de diseño Figma al ancho actual
