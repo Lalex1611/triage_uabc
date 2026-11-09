@@ -1,5 +1,6 @@
 // Sandbox visual de tarjetas y datos (TriagePatientCard, TriageIncidentCard,
-// TriageMetric, TriageLevelCount, TriageLevelPill):
+// TriageMetric, TriageLevelCount, TriageLevelPill, TriagePatientBanner,
+// TriagePatientStrip, TriageIncomingCard, TriageNotificationCard):
 // flutter run -t test/shared/widgets/triage_cards_visual_test.dart
 import 'package:flutter/material.dart';
 import 'package:sistema_triage/shared/widgets/triage_ui.dart';
@@ -196,6 +197,75 @@ class _CardsSandboxState extends State<_CardsSandbox> {
                 ),
                 const SizedBox(height: 12),
               ],
+              const _Label('Atajos de insignia'),
+              const Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  TriageStatusBadge.registered(),
+                  TriageStatusBadge.deceased(),
+                  TriageStatusBadge.active(),
+                  TriageStatusBadge.closed(),
+                ],
+              ),
+              const _Label('Banner del paciente (B13, C02)'),
+              TriagePatientBanner(
+                level: TriageLevel.red,
+                tag: 'ROJO · INMEDIATO',
+                title: 'Bruce Cervantes',
+                detail: 'Clasificado por START guiado a las 14:34',
+                onEdit: () {},
+              ),
+              const SizedBox(height: 12),
+              const TriagePatientBanner(
+                level: TriageLevel.yellow,
+                tag: 'AMARILLO · URGENTE',
+                title: 'Alberto Pérez, 34 años',
+                arrival: 'Llega en 6 minutos · Unidad A-12',
+              ),
+              const _Label('Franja del paciente (B14)'),
+              const TriagePatientStrip(
+                level: TriageLevel.red,
+                name: 'Bruce Cervantes · PAC-2031',
+                detail: 'Rojo · inmediato · hemorragia en muslo',
+              ),
+              const _Label('Tarjeta de entrante (C01)'),
+              TriageIncomingCard(
+                level: TriageLevel.red,
+                name: 'Alberto Pérez',
+                detail: 'PAC-2031 · INC-729 · Carlos Huerta',
+                arrival: 'Unidad A-12 · llega en 6 min',
+                onOpen: () {},
+                onReject: () {},
+                onAccept: () {},
+              ),
+              const _Label('Notificación (C12: sin leer y leída)'),
+              TriageNotificationCard(
+                icon: TriageIcons.ambulance,
+                tone: TriageTone.danger,
+                title: 'Paciente rojo en camino',
+                message: 'Alberto Pérez (PAC-2031) llega en 6 min.',
+                timeAgo: 'hace 1 min',
+                unread: true,
+                onTap: () {},
+              ),
+              const SizedBox(height: 12),
+              TriageNotificationCard(
+                icon: TriageIcons.checkCircle,
+                tone: TriageTone.success,
+                title: 'Alta registrada',
+                message: 'PAC-2018 salió con alta a domicilio.',
+                timeAgo: 'hace 40 min',
+                onTap: () {},
+              ),
+              const _Label('Opción grande tenue (B11)'),
+              TriageLargeOption(
+                icon: TriageIcons.alert,
+                title: 'Emergencias',
+                detail: 'Registro de pacientes de manera directa.',
+                tinted: true,
+                onTap: () {},
+              ),
             ],
           ),
         ),
