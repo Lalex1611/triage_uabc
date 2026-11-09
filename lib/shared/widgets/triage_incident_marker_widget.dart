@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:sistema_triage/core/constants/triage_icons.dart';
 import 'package:sistema_triage/core/theme/triage_tokens.dart';
+import 'package:sistema_triage/shared/widgets/triage_icon_widget.dart';
 
-/// Marcador de incidente en el mapa (Figma: píldora con alerta y conteo)
+/// Marcador de incidente en el mapa (Figma "TRIAGE/Marcador de incidente")
 ///
 /// Muestra el número de pacientes en rojo del incidente. Siempre es rojo
 /// (color de rol paramédico). Seleccionado: relleno rojo y texto blanco.
@@ -21,16 +23,15 @@ class TriageIncidentMarker extends StatelessWidget {
   final VoidCallback? onTap;
 
   // Medidas que solo tiene esta pieza
-  static const double _badgeSize = 24;
-  static const double _alertIconSize = 14;
+  static const double _height = 42;
+  static const double _selectedHeight = 48;
+  static const double _badgeSize = 28;
+  static const double _selectedBadgeSize = 34;
 
   @override
   Widget build(BuildContext context) {
     const accent = TriageColors.paramedicAccent;
-    final background = selected ? accent : TriageColors.surface;
-    final badgeColor = selected ? TriageColors.surface : accent;
-    final badgeIconColor = selected ? accent : TriageColors.textInverse;
-    final countColor = selected ? TriageColors.textInverse : accent;
+    final badgeSize = selected ? _selectedBadgeSize : _badgeSize;
 
     return Semantics(
       button: true,
@@ -46,38 +47,52 @@ class TriageIncidentMarker extends StatelessWidget {
           child: FittedBox(
             fit: BoxFit.scaleDown,
             child: Container(
-              constraints: const BoxConstraints(minHeight: _badgeSize),
-              padding: const EdgeInsets.all(TriageSpacing.xs),
+              constraints: BoxConstraints(
+                minHeight: selected ? _selectedHeight : _height,
+              ),
+              padding: const EdgeInsets.only(
+                left: TriageSpacing.sm,
+                right: TriageSpacing.md,
+              ),
               decoration: BoxDecoration(
-                color: background,
+                color: selected ? accent : TriageColors.surface,
                 borderRadius: BorderRadius.circular(TriageRadii.full),
-                border: Border.all(color: accent, width: TriageSizes.stroke),
+                border: selected
+                    ? null
+                    : Border.all(
+                        color: accent,
+                        width: TriageSizes.strokeStrong,
+                      ),
+                boxShadow: TriageShadows.floating,
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Container(
-                    width: _badgeSize,
-                    height: _badgeSize,
+                    width: badgeSize,
+                    height: badgeSize,
                     decoration: BoxDecoration(
-                      color: badgeColor,
+                      color: selected ? TriageColors.surface : accent,
                       shape: BoxShape.circle,
                     ),
-                    // Si existe un TriageIcons de alerta, cámbialo aquí
-                    child: Icon(
-                      Icons.warning_amber_rounded,
-                      size: _alertIconSize,
-                      color: badgeIconColor,
+                    alignment: Alignment.center,
+                    child: TriageIcon(
+                      TriageIcons.alert,
+                      size: selected
+                          ? TriageSizes.iconSmall
+                          : TriageSizes.iconXSmall,
+                      color: selected ? accent : TriageColors.textInverse,
                     ),
                   ),
                   const SizedBox(width: TriageSpacing.sm),
                   Text(
                     '$redCount',
-                    style: TriageTextStyles.labelMedium.copyWith(
-                      color: countColor,
+                    style: TriageTextStyles.labelLarge.copyWith(
+                      color: selected
+                          ? TriageColors.textInverse
+                          : TriageColors.textPrimary,
                     ),
                   ),
-                  const SizedBox(width: TriageSpacing.sm),
                 ],
               ),
             ),

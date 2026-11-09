@@ -229,7 +229,7 @@ class TriageOpacity {
 }
 
 /// Sombras de Figma (`Sombra`, `Sombra/Tarjeta`, `Sombra/Barra`, `Sombra/Hoja`,
-/// `Sombra/Flotante`)
+/// `Sombra/Marcador`, `Sombra/Flotante`)
 class TriageShadows {
   TriageShadows._();
 
@@ -269,6 +269,10 @@ class TriageShadows {
       blurRadius: 28,
       spreadRadius: -4,
     ),
+  ];
+
+  static const List<BoxShadow> marker = [
+    BoxShadow(color: Color(0x4D0A121F), offset: Offset(0, 2), blurRadius: 6),
   ];
 
   static const List<BoxShadow> floating = [
