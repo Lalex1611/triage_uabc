@@ -69,6 +69,49 @@ void main() {
     expect(box('12').width, greaterThan(30));
   });
 
+  group('TriageLevelTotals', () {
+    testWidgets('conteo a la izquierda y total a la derecha', (tester) async {
+      await tester.pumpWidget(
+        _wrap(
+          const TriageLevelTotals(
+            counts: {TriageLevel.red: 3},
+            patientCount: 8,
+          ),
+        ),
+      );
+      expect(find.text('8 pacientes'), findsOneWidget);
+      expect(
+        tester.getTopRight(find.text('8 pacientes')).dx,
+        tester.getTopRight(find.byType(TriageLevelTotals)).dx,
+      );
+      expect(
+        tester.getTopLeft(find.byType(TriageLevelCount)).dx,
+        tester.getTopLeft(find.byType(TriageLevelTotals)).dx,
+      );
+    });
+
+    testWidgets('usa singular con un paciente', (tester) async {
+      await tester.pumpWidget(
+        _wrap(const TriageLevelTotals(counts: {}, patientCount: 1)),
+      );
+      expect(find.text('1 paciente'), findsOneWidget);
+    });
+
+    testWidgets('si no caben, el total baja sin desbordarse', (tester) async {
+      await tester.pumpWidget(
+        _wrap(
+          const TriageLevelTotals(counts: {}, patientCount: 12),
+          width: 170,
+        ),
+      );
+      expect(tester.takeException(), isNull);
+      expect(
+        tester.getTopLeft(find.text('12 pacientes')).dy,
+        greaterThan(tester.getBottomLeft(find.byType(TriageLevelCount)).dy - 1),
+      );
+    });
+  });
+
   testWidgets('en un ancho angosto pasa a otra línea sin desbordarse', (
     tester,
   ) async {

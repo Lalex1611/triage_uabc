@@ -20,7 +20,7 @@ import 'package:sistema_triage/shared/widgets/triage_ui.dart';
 | Tarjeta de paciente (B07) / de sala (C05) | `TriagePatientCard` / `TriagePatientCard.room` |
 | Tarjeta de incidente | `TriageIncidentCard` |
 | Métrica | `TriageMetric`, `.level(level)`, `.role()` |
-| Conteo | `TriageLevelCount` |
+| Conteo | `TriageLevelCount`; con el total de pacientes, `TriageLevelTotals` |
 | Pastilla de color | `TriageLevelPill` |
 | Barra de color | `TriageLevelBar` |
 | Punto de color | Un `Container` con `level.color` |

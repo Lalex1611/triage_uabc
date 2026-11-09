@@ -1,7 +1,55 @@
 import 'package:flutter/material.dart';
+import 'package:sistema_triage/core/constants/triage_icons.dart';
 import 'package:sistema_triage/core/theme/triage_level_style.dart';
 import 'package:sistema_triage/core/theme/triage_tokens.dart';
 import 'package:sistema_triage/shared/domain/triage_level.dart';
+import 'package:sistema_triage/shared/widgets/triage_icon_widget.dart';
+
+/// Conteo por nivel a la izquierda y total de pacientes a la derecha (B02 y B07)
+///
+/// Necesita el ancho completo; si no caben (texto grande), el total baja de línea.
+class TriageLevelTotals extends StatelessWidget {
+  const TriageLevelTotals({
+    super.key,
+    required this.counts,
+    required this.patientCount,
+  });
+
+  final Map<TriageLevel, int> counts;
+  final int patientCount;
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      alignment: WrapAlignment.spaceBetween,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      spacing: TriageSpacing.sm,
+      runSpacing: TriageSpacing.sm,
+      children: [
+        TriageLevelCount(counts: counts),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const TriageIcon(
+              TriageIcons.users,
+              size: TriageSizes.iconXSmall,
+              color: TriageColors.textSecondary,
+            ),
+            const SizedBox(width: TriageSpacing.xs),
+            Flexible(
+              child: Text(
+                patientCount == 1 ? '1 paciente' : '$patientCount pacientes',
+                style: TriageTextStyles.labelMedium.copyWith(
+                  color: TriageColors.textSecondary,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
 
 /// Conteo de pacientes por nivel del rediseño (Figma "TRIAGE/Conteo")
 ///
