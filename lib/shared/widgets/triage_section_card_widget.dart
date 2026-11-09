@@ -53,7 +53,9 @@ class TriageSectionCard extends StatelessWidget {
               SizedBox(
                 width: double.infinity,
                 child: Wrap(
-                  alignment: WrapAlignment.spaceBetween,
+                  alignment: title == null
+                      ? WrapAlignment.end
+                      : WrapAlignment.spaceBetween,
                   crossAxisAlignment: WrapCrossAlignment.center,
                   spacing: TriageSpacing.sm,
                   runSpacing: TriageSpacing.xs,

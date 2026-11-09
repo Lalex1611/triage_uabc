@@ -95,6 +95,24 @@ void main() {
       );
     });
 
+    testWidgets('sin título, trailing también queda a la derecha', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _wrap(
+          TriageSectionCard(
+            trailing: TriageSectionAction(label: 'Añadir', onTap: () {}),
+            child: const Text('x'),
+          ),
+        ),
+      );
+      expect(
+        tester.getTopRight(find.byType(TriageSectionAction)).dx,
+        tester.getTopRight(find.byType(TriageSectionCard)).dx -
+            TriageSpacing.lg,
+      );
+    });
+
     testWidgets('si no caben en una línea, trailing baja sin desbordarse', (
       tester,
     ) async {
