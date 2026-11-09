@@ -67,12 +67,13 @@ class TriageStatusBadge extends StatelessWidget {
         background: TriageColors.paramedicSoft,
       );
 
-  /// El texto terciario de Figma no llega a 4.5:1 sobre gris: se usa el secundario
+  /// El terciario de Figma no llega a 4.5:1 en el texto ni a 3:1 en el punto
+  /// sobre gris: se usa el secundario
   const TriageStatusBadge.closed({Key? key})
     : this(
         key: key,
         label: 'Cerrado',
-        dotColor: TriageColors.textTertiary,
+        dotColor: TriageColors.textSecondary,
         textColor: TriageColors.textSecondary,
         background: TriageColors.sunken,
       );

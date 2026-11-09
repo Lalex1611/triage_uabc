@@ -71,6 +71,34 @@ void main() {
     });
   }
 
+  testWidgets('cerrado: punto y texto legibles sobre gris', (tester) async {
+    await tester.pumpWidget(_wrap(const TriageStatusBadge.closed()));
+    double contrast(Color a) {
+      final la = a.computeLuminance();
+      final lb = TriageColors.sunken.computeLuminance();
+      return (la > lb ? la + 0.05 : lb + 0.05) /
+          (la > lb ? lb + 0.05 : la + 0.05);
+    }
+
+    final dot =
+        tester
+                .widget<Container>(
+                  find
+                      .descendant(
+                        of: find.byType(TriageStatusBadge),
+                        matching: find.byType(Container),
+                      )
+                      .last,
+                )
+                .decoration!
+            as BoxDecoration;
+    expect(contrast(dot.color!), greaterThanOrEqualTo(3));
+    expect(
+      contrast(tester.widget<Text>(find.text('CERRADO')).style!.color!),
+      greaterThanOrEqualTo(4.5),
+    );
+  });
+
   testWidgets('altura mínima 26 y se ajusta al contenido', (tester) async {
     await tester.pumpWidget(
       _wrap(TriageStatusBadge.patient(PatientLifecycleStatus.waiting)),
