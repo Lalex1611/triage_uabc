@@ -12,7 +12,9 @@ import 'package:sistema_triage/shared/widgets/triage_tap_card_widget.dart';
 ///
 /// El ícono toma el color del rol activo; con [neutral], gris (tono "Neutro").
 /// [highlighted] marca con un borde del color del rol la opción que se sugiere
-/// (START guiado en B11). Toda la tarjeta responde a [onTap] y crece con el texto.
+/// (START guiado en B11). [tinted] da fondo tenue, borde y símbolo del color del
+/// rol a una opción que debe destacar sin ser la sugerida (Emergencias en B11).
+/// Toda la tarjeta responde a [onTap] y crece con el texto.
 class TriageLargeOption extends StatelessWidget {
   const TriageLargeOption({
     super.key,
@@ -22,7 +24,8 @@ class TriageLargeOption extends StatelessWidget {
     required this.onTap,
     this.neutral = false,
     this.highlighted = false,
-  });
+    this.tinted = false,
+  }) : assert(!(neutral && tinted));
 
   /// Ruta de [TriageIcons]
   final String icon;
@@ -31,16 +34,25 @@ class TriageLargeOption extends StatelessWidget {
   final VoidCallback onTap;
   final bool neutral;
   final bool highlighted;
+  final bool tinted;
 
   static const _symbolSize = 50.0;
 
   @override
   Widget build(BuildContext context) {
     final role = context.triageRole;
+    final (Color symbolColor, Color iconColor) = tinted
+        ? (role.accent, TriageColors.textInverse)
+        : neutral
+        ? (TriageColors.sunken, TriageColors.textPrimary)
+        : (role.soft, role.accent);
 
     return TriageTapCard(
       onTap: onTap,
-      borderColor: highlighted ? role.accent : TriageColors.borderMedium,
+      color: tinted ? role.soft : TriageColors.surface,
+      borderColor: highlighted || tinted
+          ? role.accent
+          : TriageColors.borderMedium,
       borderWidth: highlighted ? TriageSizes.strokeStrong : TriageSizes.stroke,
       shadow: TriageShadows.card,
       child: Row(
@@ -49,14 +61,14 @@ class TriageLargeOption extends StatelessWidget {
             dimension: context.rDim(_symbolSize),
             child: DecoratedBox(
               decoration: BoxDecoration(
-                color: neutral ? TriageColors.sunken : role.soft,
+                color: symbolColor,
                 borderRadius: BorderRadius.circular(TriageRadii.lg),
               ),
               child: Center(
                 child: TriageIcon(
                   icon,
                   size: TriageSizes.iconLarge,
-                  color: neutral ? TriageColors.textPrimary : role.accent,
+                  color: iconColor,
                 ),
               ),
             ),
@@ -70,10 +82,13 @@ class TriageLargeOption extends StatelessWidget {
             ),
           ),
           const SizedBox(width: TriageSpacing.md),
-          const TriageIcon(
+          TriageIcon(
             TriageIcons.chevronRight,
             size: TriageSizes.icon,
-            color: TriageColors.textTertiary,
+            // El terciario no llega a 3:1 sobre el fondo tenue del rol
+            color: tinted
+                ? TriageColors.textSecondary
+                : TriageColors.textTertiary,
           ),
         ],
       ),

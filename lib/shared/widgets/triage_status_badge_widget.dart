@@ -9,6 +9,8 @@ import 'package:sistema_triage/shared/domain/patient_lifecycle_status.dart';
 /// del incidente o derivados. Atajos:
 /// - [TriageStatusBadge.patient] para [PatientLifecycleStatus].
 /// - [TriageStatusBadge.rejected] para un traslado rechazado por el hospital.
+/// - [TriageStatusBadge.registered] y [TriageStatusBadge.deceased] para pacientes.
+/// - [TriageStatusBadge.active] y [TriageStatusBadge.closed] para incidentes.
 ///
 /// La etiqueta se muestra en mayúsculas; si no cabe, pasa a otra línea.
 class TriageStatusBadge extends StatelessWidget {
@@ -36,6 +38,44 @@ class TriageStatusBadge extends StatelessWidget {
         dotColor: TriageColors.danger,
         textColor: TriageColors.danger,
         background: TriageColors.dangerBackground,
+      );
+
+  const TriageStatusBadge.registered({Key? key})
+    : this(
+        key: key,
+        label: 'Registrado',
+        dotColor: TriageColors.textSecondary,
+        textColor: TriageColors.textSecondary,
+        background: TriageColors.sunken,
+      );
+
+  const TriageStatusBadge.deceased({Key? key})
+    : this(
+        key: key,
+        label: 'Defunción',
+        dotColor: TriageColors.triageBlack,
+        textColor: TriageColors.triageBlack,
+        background: TriageColors.triageBlackBackground,
+      );
+
+  const TriageStatusBadge.active({Key? key})
+    : this(
+        key: key,
+        label: 'Activo',
+        dotColor: TriageColors.paramedicAccent,
+        textColor: TriageColors.paramedicAccent,
+        background: TriageColors.paramedicSoft,
+      );
+
+  /// El terciario de Figma no llega a 4.5:1 en el texto ni a 3:1 en el punto
+  /// sobre gris: se usa el secundario
+  const TriageStatusBadge.closed({Key? key})
+    : this(
+        key: key,
+        label: 'Cerrado',
+        dotColor: TriageColors.textSecondary,
+        textColor: TriageColors.textSecondary,
+        background: TriageColors.sunken,
       );
 
   final String label;

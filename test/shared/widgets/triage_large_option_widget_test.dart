@@ -85,6 +85,41 @@ void main() {
     });
   }
 
+  for (final (name, role) in [
+    ('campo', TriageRoleTheme.paramedic),
+    ('hospital', TriageRoleTheme.hospital),
+  ]) {
+    testWidgets('tenue: fondo, borde y símbolo del rol $name', (tester) async {
+      await tester.pumpWidget(
+        _wrap(
+          TriageLargeOption(
+            icon: TriageIcons.alert,
+            title: 'Emergencias',
+            detail: 'Registro directo',
+            tinted: true,
+            onTap: () {},
+          ),
+          role: role,
+        ),
+      );
+      expect(_card(tester).color, role.soft);
+      expect((_card(tester).border! as Border).top.color, role.accent);
+      expect(_symbol(tester).color, role.accent);
+      expect(
+        _iconFilter(tester),
+        const ColorFilter.mode(TriageColors.textInverse, BlendMode.srcIn),
+      );
+      expect(
+        _contrast(TriageColors.textInverse, role.accent),
+        greaterThanOrEqualTo(3),
+      );
+      final chevron = tester
+          .widget<TriageIcon>(find.byType(TriageIcon).last)
+          .color!;
+      expect(_contrast(chevron, role.soft), greaterThanOrEqualTo(3));
+    });
+  }
+
   testWidgets('neutral: ícono oscuro sobre gris', (tester) async {
     await tester.pumpWidget(_wrap(_option(neutral: true)));
     expect(_symbol(tester).color, TriageColors.sunken);

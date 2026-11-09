@@ -15,14 +15,19 @@ import 'package:sistema_triage/shared/widgets/triage_ui.dart';
 | Chip | `TriageChip` |
 | Pestañas | `TriageTabs` |
 | Buscador | `TriageSearchBar` |
-| Insignia de estado | `TriageStatusBadge`, `.patient(status)`, `.rejected()` |
+| Insignia de estado | `TriageStatusBadge`, `.patient(status)`, `.rejected()`, `.registered()`, `.deceased()`, `.active()`, `.closed()` |
 | Encabezado de inicio / de detalle | `TriageHomeHeader` / `TriageDetailHeader` |
 | Tarjeta de paciente (B07) / de sala (C05) | `TriagePatientCard` / `TriagePatientCard.room` |
 | Tarjeta de incidente | `TriageIncidentCard` |
 | Métrica | `TriageMetric`, `.level(level)`, `.role()` |
 | Conteo | `TriageLevelCount` |
 | Pastilla de color | `TriageLevelPill` |
-| Barra y Punto de color | Un `Container` con `level.color` |
+| Barra de color | `TriageLevelBar` |
+| Punto de color | Un `Container` con `level.color` |
+| Banner del paciente (B13, C02, C06) | `TriagePatientBanner` |
+| Franja del paciente en curso (B14 a B16) | `TriagePatientStrip` |
+| Tarjeta de entrante (C01) | `TriageIncomingCard` |
+| Notificación (C12) | `TriageNotificationCard` |
 | Fila de dato | `TriageDataRow` |
 | Campo (texto, área, selección) | `TriageField`, `TriageField.area`, `TriageSelectField` |
 | Aviso | `TriageAlert` |
@@ -30,7 +35,7 @@ import 'package:sistema_triage/shared/widgets/triage_ui.dart';
 | Íconos | `TriageIcon(TriageIcons.x)` |
 | Navegación campo / hospital | `ParamedicoNavbar` / `MedicoNavbar` (sobre `AppModuleBottomNav`) |
 | Paso | `TriageSteps` |
-| Opción grande | `TriageLargeOption` (`neutral`, `highlighted`) |
+| Opción grande | `TriageLargeOption` (`neutral`, `highlighted`, `tinted`) |
 | Foto | `TriagePhoto` |
 | Hoja inferior con Agarre | `showTriageSheet` (`dismissible: false` en formularios a medias); `TriageSheet` solo en hojas fijas (mapa) |
 | Selección única (C04, B14) | `TriageRadioOption` |
