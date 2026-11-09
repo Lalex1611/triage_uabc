@@ -11,7 +11,6 @@ import 'package:sistema_triage/features/paramedico/presentation/incident_details
 import 'package:sistema_triage/features/paramedico/presentation/incident_details/widgets/incident_details_photos_tab_widget.dart';
 import 'package:sistema_triage/features/paramedico/presentation/incident_details/widgets/incident_details_stats_tab_widget.dart';
 import 'package:sistema_triage/features/paramedico/presentation/incident_details/widgets/incident_more_actions_sheet_widget.dart';
-import 'package:sistema_triage/features/paramedico/domain/services/incident_presentation_formatters.dart';
 
 // Ruta de detalle de incidente: enlaza IncidentDetailsController con IncidentDetailsPage
 class IncidentDetailsFlowPage extends StatefulWidget {
@@ -85,10 +84,10 @@ class _IncidentDetailsFlowPageState extends State<IncidentDetailsFlowPage> {
         );
       case IncidentTabType.mapa:
         return IncidentDetailsMapTab(
-          hasLocation: IncidentPresentationFormatters.hasIncidentLocation(inc),
           latitude: inc.latitude,
           longitude: inc.longitude,
-          onOpenInteractiveMap: () => _controller.openInteractiveMap(context),
+          patients: _controller.mapPatients,
+          onPatientTap: (id) => _controller.openPatient(context, id),
         );
       case IncidentTabType.fotos:
         return IncidentDetailsPhotosTab(

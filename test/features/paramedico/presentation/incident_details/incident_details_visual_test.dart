@@ -3,11 +3,13 @@ import 'package:sistema_triage/core/theme/app_theme.dart';
 import 'package:sistema_triage/features/paramedico/domain/entities/incident_details/incident_header_data.dart';
 import 'package:sistema_triage/features/paramedico/domain/entities/incident_details/incident_tab_data.dart';
 import 'package:sistema_triage/features/paramedico/domain/entities/incident_details/patient_card_data.dart';
+import 'package:sistema_triage/features/paramedico/domain/entities/map/map_patient_pin.dart';
 import 'package:sistema_triage/features/paramedico/domain/constants/patient_triage_filter.dart';
 import 'package:sistema_triage/features/paramedico/domain/entities/incident_details/patient_triage_filters_data.dart';
 import 'package:sistema_triage/features/paramedico/presentation/incident_details/incident_details_controller.dart';
 import 'package:sistema_triage/features/paramedico/presentation/incident_details/incident_details_page.dart';
 import 'package:sistema_triage/features/paramedico/presentation/incident_details/widgets/incident_details_list_tab_widget.dart';
+import 'package:sistema_triage/features/paramedico/presentation/incident_details/widgets/incident_details_map_tab_widget.dart';
 import 'package:sistema_triage/features/paramedico/presentation/incident_details/widgets/incident_details_stats_tab_widget.dart';
 import 'package:sistema_triage/shared/widgets/triage_ui.dart';
 
@@ -86,18 +88,38 @@ class _IncidentDetailsVisualTestState extends State<IncidentDetailsVisualTest> {
       ),
     ];
 
-    final listTab = _activeTab == IncidentTabType.lista
-        ? IncidentDetailsListTab(
-            onRefresh: () async {},
-            triageFiltersData: PatientTriageFiltersData(
-              activeFilter: _activeFilter,
-              onFilterChanged: (filter) =>
-                  setState(() => _activeFilter = filter),
+    final listTab = switch (_activeTab) {
+      IncidentTabType.lista => IncidentDetailsListTab(
+        onRefresh: () async {},
+        triageFiltersData: PatientTriageFiltersData(
+          activeFilter: _activeFilter,
+          onFilterChanged: (filter) => setState(() => _activeFilter = filter),
+        ),
+        emptyMessage: '',
+        patientCards: patients,
+      ),
+      IncidentTabType.mapa => IncidentDetailsMapTab(
+        latitude: 32.5149,
+        longitude: -117.0382,
+        patients: [
+          for (final (i, color) in const [
+            'rojo',
+            'rojo',
+            'amarillo',
+            'verde',
+            'negro',
+          ].indexed)
+            MapPatientPin(
+              id: 'p$i',
+              incidentId: 'i',
+              latitude: 32.5149 + i * 0.0001,
+              longitude: -117.0382 + (i.isEven ? 0.0002 : -0.0002),
+              triageColor: color,
             ),
-            emptyMessage: '',
-            patientCards: patients,
-          )
-        : IncidentDetailsStatsTab(patients: patients);
+        ],
+      ),
+      _ => IncidentDetailsStatsTab(patients: patients),
+    };
 
     return Theme(
       data: appTheme,

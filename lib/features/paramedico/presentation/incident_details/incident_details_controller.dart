@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:sistema_triage/core/config/supabase_env.dart';
 import 'package:sistema_triage/core/router/paramedico_stack_nav.dart';
 import 'package:sistema_triage/core/ui/app_snackbar.dart';
@@ -12,6 +13,7 @@ import 'package:sistema_triage/features/paramedico/domain/constants/patient_tria
 import 'package:sistema_triage/features/paramedico/domain/entities/incident_details/incident_header_data.dart';
 import 'package:sistema_triage/features/paramedico/domain/entities/incident_details/incident_tab_data.dart';
 import 'package:sistema_triage/features/paramedico/domain/entities/incident_details/patient_card_data.dart';
+import 'package:sistema_triage/features/paramedico/domain/entities/map/map_patient_pin.dart';
 import 'package:sistema_triage/features/paramedico/domain/services/incident_presentation_formatters.dart';
 import 'package:sistema_triage/features/paramedico/domain/services/paramedico_catalog_mappers.dart';
 import 'package:sistema_triage/features/paramedico/presentation/create_incident/widgets/incident_location_map_dialog_widget.dart';
@@ -42,6 +44,7 @@ class IncidentDetailsController extends ChangeNotifier {
 
   ParamedicoIncidentSummary? incident;
   List<ParamedicoPatientRow> patients = [];
+  List<MapPatientPin> mapPatients = [];
   bool loading = true;
   String? error;
   String? creatorName;
@@ -81,12 +84,18 @@ class IncidentDetailsController extends ChangeNotifier {
     try {
       final inc = await _repo.getIncident(incidentId);
       final pts = await _repo.listPatientsForIncident(incidentId);
+      final lat = inc?.latitude;
+      final lng = inc?.longitude;
+      final pins = lat != null && lng != null
+          ? await _loadMapPatients(LatLng(lat, lng))
+          : <MapPatientPin>[];
       String? creator;
       if (inc != null && inc.createdBy.isNotEmpty) {
         creator = await _repo.getProfileFullName(inc.createdBy);
       }
       incident = inc;
       patients = pts;
+      mapPatients = pins;
       creatorName = creator;
       loading = false;
       notifyListeners();
@@ -94,6 +103,19 @@ class IncidentDetailsController extends ChangeNotifier {
       loading = false;
       error = e.toString();
       notifyListeners();
+    }
+  }
+
+  /// Si falla, el mapa marca solo el punto del incidente y el resto sigue visible
+  Future<List<MapPatientPin>> _loadMapPatients(LatLng center) async {
+    try {
+      return await _repo.listMapPatientPinsForIncidents(
+        [incidentId],
+        incidentCentersById: {incidentId: center},
+      );
+    } catch (e) {
+      debugPrint('No se pudieron cargar los pacientes del mapa: $e');
+      return [];
     }
   }
 
@@ -140,9 +162,12 @@ class IncidentDetailsController extends ChangeNotifier {
   List<PatientCardData> patientCards(BuildContext context) {
     return IncidentDetailsViewMapper.patientCards(
       filtered: filteredPatients,
-      onPatientTap: (id) =>
-          pushParamedicoFullScreen(context, '/paramedico/patient/$id'),
+      onPatientTap: (id) => openPatient(context, id),
     );
+  }
+
+  void openPatient(BuildContext context, String patientId) {
+    pushParamedicoFullScreen(context, '/paramedico/patient/$patientId');
   }
 
   void leave(BuildContext context) {
@@ -473,15 +498,5 @@ class IncidentDetailsController extends ChangeNotifier {
     } catch (e) {
       if (context.mounted) showAppSnackBar(context, '$e', isError: true);
     }
-  }
-
-  void openInteractiveMap(BuildContext context) {
-    final inc = incident;
-    if (inc == null) return;
-    final returnTo = Uri.encodeComponent('/paramedico/incident/$incidentId');
-    pushParamedicoFullScreen(
-      context,
-      '/paramedico/mapa-interactivo?focus=${inc.id}&returnTo=$returnTo',
-    );
   }
 }
