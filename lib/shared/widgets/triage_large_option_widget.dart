@@ -82,10 +82,13 @@ class TriageLargeOption extends StatelessWidget {
             ),
           ),
           const SizedBox(width: TriageSpacing.md),
-          const TriageIcon(
+          TriageIcon(
             TriageIcons.chevronRight,
             size: TriageSizes.icon,
-            color: TriageColors.textTertiary,
+            // El terciario no llega a 3:1 sobre el fondo tenue del rol
+            color: tinted
+                ? TriageColors.textSecondary
+                : TriageColors.textTertiary,
           ),
         ],
       ),

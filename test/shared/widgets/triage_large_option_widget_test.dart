@@ -113,6 +113,10 @@ void main() {
         _contrast(TriageColors.textInverse, role.accent),
         greaterThanOrEqualTo(3),
       );
+      final chevron = tester
+          .widget<TriageIcon>(find.byType(TriageIcon).last)
+          .color!;
+      expect(_contrast(chevron, role.soft), greaterThanOrEqualTo(3));
     });
   }
 
