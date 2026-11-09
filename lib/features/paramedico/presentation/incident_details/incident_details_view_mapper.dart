@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:sistema_triage/features/paramedico/data/repositories/paramedico_incidents_repository.dart';
 import 'package:sistema_triage/features/paramedico/domain/constants/emergency_catalog.dart';
@@ -38,6 +40,21 @@ class IncidentDetailsViewMapper {
       blackCount: counts.black,
       totalPatients: counts.total,
     );
+  }
+
+  /// Sin enlace se intenta como archivo local (fotos antiguas); si no existe,
+  /// `TriagePhoto` muestra su ícono
+  static List<ImageProvider> photoImages({
+    required List<String> paths,
+    required Map<String, String> signedUrls,
+  }) {
+    return [
+      for (final path in paths)
+        if (signedUrls[path] case final url?)
+          NetworkImage(url)
+        else
+          FileImage(File(path)),
+    ];
   }
 
   static PatientTriageFiltersData triageFiltersData({

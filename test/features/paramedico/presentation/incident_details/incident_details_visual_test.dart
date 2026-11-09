@@ -10,6 +10,7 @@ import 'package:sistema_triage/features/paramedico/presentation/incident_details
 import 'package:sistema_triage/features/paramedico/presentation/incident_details/incident_details_page.dart';
 import 'package:sistema_triage/features/paramedico/presentation/incident_details/widgets/incident_details_list_tab_widget.dart';
 import 'package:sistema_triage/features/paramedico/presentation/incident_details/widgets/incident_details_map_tab_widget.dart';
+import 'package:sistema_triage/features/paramedico/presentation/incident_details/widgets/incident_details_photos_tab_widget.dart';
 import 'package:sistema_triage/features/paramedico/presentation/incident_details/widgets/incident_details_stats_tab_widget.dart';
 import 'package:sistema_triage/shared/widgets/triage_ui.dart';
 
@@ -117,6 +118,17 @@ class _IncidentDetailsVisualTestState extends State<IncidentDetailsVisualTest> {
               triageColor: color,
             ),
         ],
+      ),
+      IncidentTabType.fotos => IncidentDetailsPhotosTab(
+        description: 'Accidente en el libramiento Rosas Magallón.',
+        photos: [
+          for (var i = 0; i < 3; i++)
+            NetworkImage('https://picsum.photos/seed/$i/900'),
+        ],
+        isEditable: true,
+        onAddPhotoTap: () {},
+        onRemovePhoto: (_) async => true,
+        onSaveDescription: (_) async {},
       ),
       _ => IncidentDetailsStatsTab(patients: patients),
     };

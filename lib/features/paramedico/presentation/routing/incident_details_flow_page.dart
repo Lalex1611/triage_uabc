@@ -92,14 +92,15 @@ class _IncidentDetailsFlowPageState extends State<IncidentDetailsFlowPage> {
       case IncidentTabType.fotos:
         return IncidentDetailsPhotosTab(
           description: inc.description,
-          photos: inc.photoPaths,
+          photos: _controller.incidentPhotos,
           isEditable: _controller.canEditIncident,
+          isUploading: _controller.uploadingPhoto,
           onSaveDescription: (description) =>
               _controller.saveIncidentDescription(context, description),
           onAddPhotoTap: () =>
               _controller.showIncidentImageSourceDialog(context),
-          onRemovePhotoTap: (index) =>
-              unawaited(_controller.removeIncidentPhotoAt(context, index)),
+          onRemovePhoto: (index) =>
+              _controller.confirmRemoveIncidentPhoto(context, index),
         );
       case IncidentTabType.estadisticas:
         return IncidentDetailsStatsTab(

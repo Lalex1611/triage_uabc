@@ -1,24 +1,28 @@
 import 'package:flutter/material.dart';
-import 'package:sistema_triage/core/constants/app_colors.dart';
-import 'package:sistema_triage/core/theme/app_theme.dart';
-import 'package:sistema_triage/features/paramedico/presentation/create_incident/widgets/photo_upload_section_widget.dart';
+import 'package:sistema_triage/core/layout/app_responsive.dart';
+import 'package:sistema_triage/shared/widgets/triage_ui.dart';
 
+/// Pestaña Detalles del incidente (B9): fotografías y descripción
 class IncidentDetailsPhotosTab extends StatefulWidget {
   final String? description;
-  final List<String> photos;
+  final List<ImageProvider> photos;
   final bool isEditable;
+  final bool isUploading;
   final Future<void> Function(String description)? onSaveDescription;
   final VoidCallback? onAddPhotoTap;
-  final ValueChanged<int>? onRemovePhotoTap;
+
+  /// Confirma y elimina; devuelve si la foto se eliminó
+  final Future<bool> Function(int index)? onRemovePhoto;
 
   const IncidentDetailsPhotosTab({
     super.key,
     required this.description,
     required this.photos,
     required this.isEditable,
+    this.isUploading = false,
     this.onSaveDescription,
     this.onAddPhotoTap,
-    this.onRemovePhotoTap,
+    this.onRemovePhoto,
   });
 
   @override
@@ -27,225 +31,163 @@ class IncidentDetailsPhotosTab extends StatefulWidget {
 }
 
 class _IncidentDetailsPhotosTabState extends State<IncidentDetailsPhotosTab> {
-  late final TextEditingController _descriptionController;
-  bool _editingPhotos = false;
-  bool _editingDescription = false;
-  bool _savingDescription = false;
+  static const double _maxPhotoSize = 140;
+  static const double _removeButtonSize = 30;
 
-  @override
-  void initState() {
-    super.initState();
-    _descriptionController = TextEditingController(
-      text: widget.description ?? '',
+  bool _editingPhotos = false;
+
+  void _openViewer(int index) {
+    showTriagePhotoViewer(
+      context,
+      photos: widget.photos,
+      initialIndex: index,
+      onDelete: widget.isEditable ? widget.onRemovePhoto : null,
     );
   }
 
-  @override
-  void didUpdateWidget(covariant IncidentDetailsPhotosTab oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (!_editingDescription && widget.description != oldWidget.description) {
-      _descriptionController.text = widget.description ?? '';
-    }
+  Future<void> _editDescription() async {
+    var text = widget.description ?? '';
+    final result = await showTriageSheet<String>(
+      context,
+      title: 'Editar descripción',
+      dismissible: false,
+      builder: (sheetContext) => Padding(
+        padding: const EdgeInsets.all(TriageSpacing.xl),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          spacing: TriageSpacing.lg,
+          children: [
+            TriageField.area(
+              label: 'Descripción del incidente',
+              initialValue: text,
+              onChanged: (value) => text = value,
+            ),
+            TriageButton(
+              label: 'Guardar',
+              onPressed: () => Navigator.pop(sheetContext, text),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (result != null) await widget.onSaveDescription?.call(result);
   }
 
-  @override
-  void dispose() {
-    _descriptionController.dispose();
-    super.dispose();
-  }
-
-  void _startDescriptionEdit() {
-    _descriptionController.text = widget.description ?? '';
-    setState(() => _editingDescription = true);
-  }
-
-  void _cancelDescriptionEdit() {
-    _descriptionController.text = widget.description ?? '';
-    setState(() => _editingDescription = false);
-  }
-
-  Future<void> _saveDescription() async {
-    final save = widget.onSaveDescription;
-    if (save == null || _savingDescription) return;
-    setState(() => _savingDescription = true);
-    try {
-      await save(_descriptionController.text);
-      if (!mounted) return;
-      setState(() => _editingDescription = false);
-    } finally {
-      if (mounted) setState(() => _savingDescription = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final canEditPhotos = widget.isEditable && _editingPhotos;
-
-    return ListView(
-      physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(0, 14, 0, 120),
+  Widget _photoTile(int index) {
+    final remove = widget.onRemovePhoto;
+    return Stack(
+      fit: StackFit.expand,
       children: [
-        PhotoUploadSection(
-          photos: widget.photos,
-          isReadOnly: !canEditPhotos,
-          onAddPhotoTap: canEditPhotos ? widget.onAddPhotoTap : null,
-          onRemovePhotoTap: canEditPhotos ? widget.onRemovePhotoTap : null,
-          title: 'Fotos generales:',
-          titleTrailing: widget.isEditable
-              ? _EditToggleButton(
-                  isEditing: _editingPhotos,
-                  onTap: () => setState(() => _editingPhotos = !_editingPhotos),
-                )
-              : null,
+        TriagePhoto(
+          image: widget.photos[index],
+          semanticLabel: 'Fotografía ${index + 1}',
+          onTap: () => _openViewer(index),
         ),
-        const SizedBox(height: 18),
-        _IncidentDescriptionCard(
-          description: widget.description,
-          controller: _descriptionController,
-          isEditable: widget.isEditable,
-          isEditing: _editingDescription,
-          isSaving: _savingDescription,
-          onStartEdit: _startDescriptionEdit,
-          onCancel: _cancelDescriptionEdit,
-          onSave: _saveDescription,
-        ),
+        if (_editingPhotos && remove != null)
+          Align(
+            alignment: Alignment.topRight,
+            child: TriageIconButton(
+              icon: TriageIcons.trash,
+              tooltip: 'Eliminar fotografía ${index + 1}',
+              variant: TriageIconButtonVariant.surface,
+              size: TriageIconButtonSize.small,
+              diameter: _removeButtonSize,
+              color: TriageColors.danger,
+              onPressed: () => remove(index),
+            ),
+          ),
       ],
     );
   }
-}
 
-class _EditToggleButton extends StatelessWidget {
-  final bool isEditing;
-  final VoidCallback onTap;
-
-  const _EditToggleButton({required this.isEditing, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return TextButton.icon(
-      onPressed: onTap,
-      icon: Icon(
-        isEditing ? Icons.check_rounded : Icons.edit_rounded,
-        size: 16,
-      ),
-      label: Text(isEditing ? 'Listo' : 'Editar'),
-      style: TextButton.styleFrom(
-        foregroundColor: AppColors.primaryParamedico,
-        padding: const EdgeInsets.symmetric(horizontal: 8),
-        minimumSize: Size.zero,
-        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+  Widget _addTile() {
+    if (!widget.isUploading) return TriagePhoto(onTap: widget.onAddPhotoTap);
+    return Semantics(
+      label: 'Subiendo fotografía',
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: TriageColors.sunken,
+          borderRadius: BorderRadius.circular(TriageRadii.lg),
+        ),
+        child: Center(
+          child: CircularProgressIndicator(color: context.triageRole.accent),
+        ),
       ),
     );
   }
-}
-
-class _IncidentDescriptionCard extends StatelessWidget {
-  final String? description;
-  final TextEditingController controller;
-  final bool isEditable;
-  final bool isEditing;
-  final bool isSaving;
-  final VoidCallback onStartEdit;
-  final VoidCallback onCancel;
-  final VoidCallback onSave;
-
-  const _IncidentDescriptionCard({
-    required this.description,
-    required this.controller,
-    required this.isEditable,
-    required this.isEditing,
-    required this.isSaving,
-    required this.onStartEdit,
-    required this.onCancel,
-    required this.onSave,
-  });
 
   @override
   Widget build(BuildContext context) {
-    final value = description?.trim();
-    final hasDescription = value != null && value.isNotEmpty;
+    final description = widget.description?.trim();
+    final hasDescription = description != null && description.isNotEmpty;
+    final hasPhotos = widget.photos.isNotEmpty;
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 35),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: EdgeInsets.symmetric(
+        horizontal: context.horizontalPadding,
+        vertical: TriageSpacing.lg,
+      ),
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Semantics(
+                header: true,
                 child: Text(
-                  'Descripción del incidente:',
-                  style: AppTextStyles.ESC_SemiBold_displayLarge.copyWith(
-                    fontSize: 15,
-                    color: Colors.black,
+                  'Fotografías del evento',
+                  style: TriageTextStyles.titleSmall.copyWith(
+                    color: TriageColors.textPrimary,
                   ),
                 ),
               ),
-              if (isEditable && !isEditing)
-                _EditToggleButton(isEditing: false, onTap: onStartEdit),
-              if (isEditable && isEditing) ...[
-                TextButton(
-                  onPressed: isSaving ? null : onCancel,
-                  style: TextButton.styleFrom(
-                    foregroundColor: Colors.black54,
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                    minimumSize: Size.zero,
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  ),
-                  child: const Text('Cancelar'),
-                ),
-                TextButton(
-                  onPressed: isSaving ? null : onSave,
-                  style: TextButton.styleFrom(
-                    foregroundColor: AppColors.primaryParamedico,
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                    minimumSize: Size.zero,
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  ),
-                  child: Text(isSaving ? 'Guardando' : 'Guardar'),
-                ),
-              ],
+            ),
+            if (widget.isEditable && hasPhotos)
+              TriageSectionAction(
+                label: _editingPhotos ? 'Listo' : 'Editar',
+                onTap: () => setState(() => _editingPhotos = !_editingPhotos),
+              ),
+          ],
+        ),
+        const SizedBox(height: TriageSpacing.md),
+        if (!hasPhotos && !widget.isEditable)
+          Text(
+            'Sin fotografías registradas.',
+            style: TriageTextStyles.bodyMedium.copyWith(
+              color: TriageColors.textSecondary,
+            ),
+          )
+        else
+          GridView.extent(
+            maxCrossAxisExtent: _maxPhotoSize,
+            mainAxisSpacing: TriageSpacing.sm,
+            crossAxisSpacing: TriageSpacing.sm,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            children: [
+              for (var i = 0; i < widget.photos.length; i++) _photoTile(i),
+              if (widget.isEditable) _addTile(),
             ],
           ),
-          const SizedBox(height: 6),
-          Container(
-            width: double.infinity,
-            constraints: const BoxConstraints(minHeight: 92),
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: const Color(0xFFD9D9D9)),
+        const SizedBox(height: TriageSpacing.lg),
+        TriageSectionCard(
+          title: 'Descripción',
+          trailing: widget.isEditable
+              ? TriageSectionAction(
+                  label: 'Editar',
+                  icon: TriageIcons.pencil,
+                  onTap: _editDescription,
+                )
+              : null,
+          child: Text(
+            hasDescription ? description : 'Sin descripción registrada.',
+            style: TriageTextStyles.bodyMedium.copyWith(
+              color: TriageColors.textSecondary,
             ),
-            child: isEditing
-                ? TextField(
-                    controller: controller,
-                    minLines: 4,
-                    maxLines: 6,
-                    keyboardType: TextInputType.multiline,
-                    style: AppTextStyles.ESC_Regular_bodyMedium.copyWith(
-                      fontSize: 14,
-                      color: Colors.black,
-                    ),
-                    decoration: const InputDecoration(
-                      border: InputBorder.none,
-                      isDense: true,
-                      contentPadding: EdgeInsets.zero,
-                    ),
-                  )
-                : Text(
-                    hasDescription ? value : 'Sin descripción registrada.',
-                    style: AppTextStyles.ESC_Regular_bodyMedium.copyWith(
-                      fontSize: 14,
-                      color: hasDescription
-                          ? Colors.black
-                          : const Color(0xFF999A9D),
-                      height: 1.25,
-                    ),
-                  ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
