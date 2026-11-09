@@ -178,6 +178,8 @@ class TriageHomeHeader extends StatelessWidget {
 ///
 /// - Sin [onBack], la flecha aparece sola si la ruta se puede cerrar y llama a
 ///   `Navigator.maybePop`, igual que `AppBar` y el botón atrás de Android.
+/// - [useCloseIcon] muestra una X en vez de la flecha, para pantallas que se
+///   abandonan sin volver atrás (C03, C09 y C11).
 /// - "Más opciones" solo con [onMore].
 class TriageDetailHeader extends StatelessWidget {
   const TriageDetailHeader({
@@ -186,12 +188,14 @@ class TriageDetailHeader extends StatelessWidget {
     this.subtitle,
     this.onBack,
     this.onMore,
+    this.useCloseIcon = false,
   });
 
   final String title;
   final String? subtitle;
   final VoidCallback? onBack;
   final VoidCallback? onMore;
+  final bool useCloseIcon;
 
   @override
   Widget build(BuildContext context) {
@@ -228,8 +232,10 @@ class TriageDetailHeader extends StatelessWidget {
                     children: [
                       if (back != null) ...[
                         _HeaderButton(
-                          icon: TriageIcons.arrowLeft,
-                          tooltip: 'Regresar',
+                          icon: useCloseIcon
+                              ? TriageIcons.close
+                              : TriageIcons.arrowLeft,
+                          tooltip: useCloseIcon ? 'Cerrar' : 'Regresar',
                           onPressed: back,
                           iconColor: TriageColors.textPrimary,
                         ),
