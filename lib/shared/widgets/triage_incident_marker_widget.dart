@@ -3,9 +3,9 @@ import 'package:sistema_triage/core/constants/triage_icons.dart';
 import 'package:sistema_triage/core/theme/triage_tokens.dart';
 import 'package:sistema_triage/shared/widgets/triage_icon_widget.dart';
 
-/// Marcador de incidente en el mapa (Figma "TRIAGE/Marcador de incidente")
+/// Marcador de incidente en el mapa (Figma: píldora con alerta y conteo)
 ///
-/// Muestra el total de pacientes del incidente. Siempre es rojo
+/// Muestra el número de pacientes en rojo del incidente. Siempre es rojo
 /// (color de rol paramédico). Seleccionado: relleno rojo y texto blanco.
 /// Pensado para ir dentro de un `Marker` de flutter_map, que tiene tamaño fijo,
 /// por eso el contenido se reduce (FittedBox) en vez de desbordarse con
@@ -13,33 +13,34 @@ import 'package:sistema_triage/shared/widgets/triage_icon_widget.dart';
 class TriageIncidentMarker extends StatelessWidget {
   const TriageIncidentMarker({
     super.key,
-    required this.patientCount,
+    required this.redCount,
     required this.onTap,
     this.selected = false,
   });
 
-  final int patientCount;
+  final int redCount;
   final bool selected;
   final VoidCallback? onTap;
 
   // Medidas que solo tiene esta pieza
-  static const double _height = 42;
-  static const double _selectedHeight = 48;
-  static const double _badgeSize = 28;
-  static const double _selectedBadgeSize = 34;
+  static const double _badgeSize = 24;
+  static const double _alertIconSize = 14;
 
   @override
   Widget build(BuildContext context) {
     const accent = TriageColors.paramedicAccent;
-    final badgeSize = selected ? _selectedBadgeSize : _badgeSize;
+    final background = selected ? accent : TriageColors.surface;
+    final badgeColor = selected ? TriageColors.surface : accent;
+    final badgeIconColor = selected ? accent : TriageColors.textInverse;
+    final countColor = selected ? TriageColors.textInverse : accent;
 
     return Semantics(
       button: true,
       enabled: onTap != null,
       selected: selected,
-      label: patientCount == 1
-          ? 'Incidente con 1 paciente'
-          : 'Incidente con $patientCount pacientes',
+      label: redCount == 1
+          ? 'Incidente con 1 paciente en rojo'
+          : 'Incidente con $redCount pacientes en rojo',
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: onTap,
@@ -47,52 +48,39 @@ class TriageIncidentMarker extends StatelessWidget {
           child: FittedBox(
             fit: BoxFit.scaleDown,
             child: Container(
-              constraints: BoxConstraints(
-                minHeight: selected ? _selectedHeight : _height,
-              ),
-              padding: const EdgeInsets.only(
-                left: TriageSpacing.sm,
-                right: TriageSpacing.md,
-              ),
+              constraints: const BoxConstraints(minHeight: _badgeSize),
+              padding: const EdgeInsets.all(TriageSpacing.xs),
               decoration: BoxDecoration(
-                color: selected ? accent : TriageColors.surface,
+                color: background,
                 borderRadius: BorderRadius.circular(TriageRadii.full),
-                border: selected
-                    ? null
-                    : Border.all(
-                        color: accent,
-                        width: TriageSizes.strokeStrong,
-                      ),
-                boxShadow: TriageShadows.floating,
+                border: Border.all(color: accent, width: TriageSizes.stroke),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Container(
-                    width: badgeSize,
-                    height: badgeSize,
+                    width: _badgeSize,
+                    height: _badgeSize,
                     decoration: BoxDecoration(
-                      color: selected ? TriageColors.surface : accent,
+                      color: badgeColor,
                       shape: BoxShape.circle,
                     ),
-                    alignment: Alignment.center,
-                    child: TriageIcon(
-                      TriageIcons.alert,
-                      size: selected
-                          ? TriageSizes.iconSmall
-                          : TriageSizes.iconXSmall,
-                      color: selected ? accent : TriageColors.textInverse,
+                    child: Center(
+                      child: TriageIcon(
+                        TriageIcons.alert,
+                        size: _alertIconSize,
+                        color: badgeIconColor,
+                      ),
                     ),
                   ),
                   const SizedBox(width: TriageSpacing.sm),
                   Text(
-                    '$patientCount',
-                    style: TriageTextStyles.labelLarge.copyWith(
-                      color: selected
-                          ? TriageColors.textInverse
-                          : TriageColors.textPrimary,
+                    '$redCount',
+                    style: TriageTextStyles.labelMedium.copyWith(
+                      color: countColor,
                     ),
                   ),
+                  const SizedBox(width: TriageSpacing.sm),
                 ],
               ),
             ),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:sistema_triage/core/constants/app_colors.dart';
+import 'package:sistema_triage/core/constants/triage_icons.dart';
 import 'package:sistema_triage/core/theme/app_theme.dart';
 import 'package:sistema_triage/core/theme/triage_tokens.dart';
 import 'package:sistema_triage/features/paramedico/data/repositories/paramedico_incidents_repository.dart';
@@ -132,26 +133,11 @@ class ParamedicoMapPage extends StatelessWidget {
                     Row(
                       children: [
                         if (showBackButton) ...[
-                          Material(
-                            color: TriageColors.surface,
-                            shape: const CircleBorder(
-                              side: BorderSide(
-                                color: TriageColors.borderSubtle,
-                                width: TriageSizes.stroke,
-                              ),
-                            ),
-                            child: IconButton(
-                              onPressed: onBack,
-                              tooltip: 'Volver',
-                              constraints: const BoxConstraints.tightFor(
-                                width: TriageSizes.touchTarget,
-                                height: TriageSizes.touchTarget,
-                              ),
-                              icon: const Icon(
-                                Icons.arrow_back,
-                                color: TriageColors.textPrimary,
-                              ),
-                            ),
+                          TriageIconButton(
+                            icon: TriageIcons.arrowLeft,
+                            tooltip: 'Volver',
+                            onPressed: onBack,
+                            variant: TriageIconButtonVariant.surface,
                           ),
                           const SizedBox(width: TriageSpacing.sm),
                         ],
@@ -321,7 +307,7 @@ class ParamedicoMapPage extends StatelessWidget {
                 height: TriageSizes.touchTarget,
                 alignment: Alignment.center,
                 child: TriageIncidentMarker(
-                  patientCount: countsByIncident[e.id]?.total ?? 0,
+                  redCount: countsByIncident[e.id]?.red ?? 0,
                   selected: e.id == selectedIncidentId,
                   onTap: () => onPinTap(e),
                 ),
