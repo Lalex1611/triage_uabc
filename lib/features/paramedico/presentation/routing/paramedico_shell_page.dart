@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:sistema_triage/core/theme/triage_tokens.dart';
 import 'package:sistema_triage/features/paramedico/presentation/navigation/paramedico_navbar_widget.dart';
+import 'package:sistema_triage/features/paramedico/presentation/shared/paramedico_session_actions.dart';
 
 class ParamedicoShellPage extends StatelessWidget {
   const ParamedicoShellPage({super.key, required this.navigationShell});
@@ -17,7 +18,11 @@ class ParamedicoShellPage extends StatelessWidget {
       ? navigationShell.currentIndex
       : -1;
 
-  void _onNavTap(int index) {
+  void _onNavTap(BuildContext context, int index) {
+    if (index == ParamedicoNavbar.profileTab) {
+      ParamedicoSessionActions.openProfileSheet(context);
+      return;
+    }
     if (index == ParamedicoNavbar.mapTab ||
         index == ParamedicoNavbar.incidentsTab) {
       navigationShell.goBranch(
@@ -25,7 +30,6 @@ class ParamedicoShellPage extends StatelessWidget {
         initialLocation: index == navigationShell.currentIndex,
       );
     }
-    // Guía START y Perfil: sin acción por ahora
   }
 
   // Si tu botón "+" anterior navegaba con otro método (p. ej. el helper de
@@ -43,7 +47,7 @@ class ParamedicoShellPage extends StatelessWidget {
       body: navigationShell,
       bottomNavigationBar: ParamedicoNavbar(
         currentIndex: _navIndex,
-        onTap: _onNavTap,
+        onTap: (i) => _onNavTap(context, i),
         onCreateIncident: () => _createIncident(context),
       ),
     );
