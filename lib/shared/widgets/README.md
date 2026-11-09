@@ -32,14 +32,17 @@ import 'package:sistema_triage/shared/widgets/triage_ui.dart';
 | Paso | `TriageSteps` |
 | Opción grande | `TriageLargeOption` (`neutral`, `highlighted`) |
 | Foto | `TriagePhoto` |
-| Hoja inferior con Agarre | `showTriageSheet`; `TriageSheet` solo en hojas fijas (mapa) |
+| Hoja inferior con Agarre | `showTriageSheet` (`dismissible: false` en formularios a medias); `TriageSheet` solo en hojas fijas (mapa) |
+| Selección única (C04, B14) | `TriageRadioOption` |
+| Fila de opción en hojas | `TriageOptionRow`, `.check`, `.toggle` |
 | Botón de color | `TriageLevelButton.start`, `.hospital` o con textos propios |
 | Marcadores de mapa | `TriageIncidentMarker`, `TriagePatientMarker`, `TriageHospitalMarker`, `TriageUnitMarker`, `TriageUserMarker` |
 | Diálogo | `showTriageConfirm`; `showDialog` con `TriageDialog` para más opciones |
 | Mensaje de resultado a pantalla completa | `TriageResultMessage` |
 | Tarjeta de sección | `TriageSectionCard`, con `TriageSectionAction` para "Editar" o "Añadir" |
 | Barra de acciones inferior | `TriageActionBar` |
-| Botón de solo ícono | `TriageIconButton` |
+| Botón de solo ícono | `TriageIconButton` (variantes `sunken`, `surface`, `plain`, `onAccent`; tamaños `small`, `compact`, `large`) |
+| Base de tarjetas tocables y de textos de opción (internas) | `TriageTapCard`, `TriageOptionText` |
 
 La navegación ya tiene el aspecto de Figma, pero sus pestañas y rutas cambian al migrar las pantallas B01, B02, B19, B20, C01, C05 y C13.
 
