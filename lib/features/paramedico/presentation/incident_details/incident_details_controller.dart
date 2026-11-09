@@ -27,13 +27,10 @@ class IncidentDetailsController extends ChangeNotifier {
   IncidentDetailsController({
     required this.incidentId,
     ParamedicoIncidentsRepository? repository,
-    TextEditingController? searchController,
-  }) : _repo = repository ?? ParamedicoIncidentsRepository(),
-       searchController = searchController ?? TextEditingController();
+  }) : _repo = repository ?? ParamedicoIncidentsRepository();
 
   final String incidentId;
   final ParamedicoIncidentsRepository _repo;
-  final TextEditingController searchController;
   final ImagePicker _picker = ImagePicker();
 
   static const contentTabs = [
@@ -49,9 +46,7 @@ class IncidentDetailsController extends ChangeNotifier {
   String? error;
   String? creatorName;
   IncidentTabType activeTab = IncidentTabType.lista;
-  String patientQuery = '';
   PatientTriageFilter triageFilter = PatientTriageFilter.todos;
-  PatientSortOption sortOption = PatientSortOption.recent;
 
   String get currentUserId =>
       Supabase.instance.client.auth.currentUser?.id ?? '';
@@ -71,20 +66,6 @@ class IncidentDetailsController extends ChangeNotifier {
   }
 
   String get routeBase => '/paramedico/incident/$incidentId';
-
-  @override
-  void dispose() {
-    searchController.dispose();
-    super.dispose();
-  }
-
-  void resetFilters() {
-    searchController.clear();
-    patientQuery = '';
-    triageFilter = PatientTriageFilter.todos;
-    sortOption = PatientSortOption.recent;
-    activeTab = IncidentTabType.lista;
-  }
 
   Future<void> load() async {
     if (!SupabaseEnv.isConfigured) {
@@ -121,27 +102,16 @@ class IncidentDetailsController extends ChangeNotifier {
     notifyListeners();
   }
 
-  void setPatientQuery(String value) {
-    patientQuery = value;
-    notifyListeners();
-  }
-
   void setTriageFilter(PatientTriageFilter filter) {
     triageFilter = filter;
-    notifyListeners();
-  }
-
-  void setSortOption(PatientSortOption option) {
-    sortOption = option;
     notifyListeners();
   }
 
   List<ParamedicoPatientRow> get filteredPatients =>
       ParamedicoCatalogMappers.filterAndSortPatients(
         patients: patients,
-        query: patientQuery,
         triageFilter: triageFilter,
-        sortOption: sortOption,
+        sortOption: PatientSortOption.recent,
       );
 
   IncidentHeaderData headerData() {

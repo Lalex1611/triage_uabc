@@ -75,8 +75,6 @@ class _IncidentDetailsFlowPageState extends State<IncidentDetailsFlowPage> {
     switch (_controller.activeTab) {
       case IncidentTabType.lista:
         return IncidentDetailsListTab(
-          searchController: _controller.searchController,
-          onSearchChanged: _controller.setPatientQuery,
           onRefresh: _controller.load,
           triageFiltersData: IncidentDetailsViewMapper.triageFiltersData(
             activeFilter: _controller.triageFilter,

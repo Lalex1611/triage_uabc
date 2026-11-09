@@ -7,8 +7,6 @@ import 'package:sistema_triage/shared/widgets/triage_ui.dart';
 
 // Pestaña Lista de la vista de detalles de incidente
 class IncidentDetailsListTab extends StatelessWidget {
-  final TextEditingController searchController;
-  final ValueChanged<String> onSearchChanged;
   final Future<void> Function() onRefresh;
   final PatientTriageFiltersData triageFiltersData;
   final String emptyMessage;
@@ -16,8 +14,6 @@ class IncidentDetailsListTab extends StatelessWidget {
 
   const IncidentDetailsListTab({
     super.key,
-    required this.searchController,
-    required this.onSearchChanged,
     required this.onRefresh,
     required this.triageFiltersData,
     required this.emptyMessage,

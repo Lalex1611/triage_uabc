@@ -36,13 +36,6 @@ class IncidentDetailsVisualTest extends StatefulWidget {
 class _IncidentDetailsVisualTestState extends State<IncidentDetailsVisualTest> {
   IncidentTabType _activeTab = IncidentTabType.lista;
   PatientTriageFilter _activeFilter = PatientTriageFilter.todos;
-  final _searchCtrl = TextEditingController();
-
-  @override
-  void dispose() {
-    _searchCtrl.dispose();
-    super.dispose();
-  }
 
   void _showEditMock(BuildContext context, String currentName) {
     showDialog(
@@ -95,8 +88,6 @@ class _IncidentDetailsVisualTestState extends State<IncidentDetailsVisualTest> {
 
     final listTab = _activeTab == IncidentTabType.lista
         ? IncidentDetailsListTab(
-            searchController: _searchCtrl,
-            onSearchChanged: (_) {},
             onRefresh: () async {},
             triageFiltersData: PatientTriageFiltersData(
               activeFilter: _activeFilter,

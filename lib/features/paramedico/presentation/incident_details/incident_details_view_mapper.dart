@@ -80,7 +80,7 @@ class IncidentDetailsViewMapper {
       return 'Aún no hay pacientes en este incidente.\nUse «Registrar paciente» para añadir uno.';
     }
     if (filtered.isEmpty) {
-      return 'No hay pacientes con ese criterio de búsqueda o filtro.';
+      return 'No hay pacientes con ese filtro.';
     }
     return '';
   }

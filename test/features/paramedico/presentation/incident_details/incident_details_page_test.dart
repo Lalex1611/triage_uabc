@@ -68,8 +68,6 @@ Widget _page({
       onTabChanged: onTabChanged ?? (_) {},
     ),
     tabBody: IncidentDetailsListTab(
-      searchController: TextEditingController(),
-      onSearchChanged: (_) {},
       onRefresh: () async {},
       triageFiltersData: PatientTriageFiltersData(
         activeFilter: PatientTriageFilter.todos,
@@ -303,6 +301,18 @@ void main() {
           creatorName: null,
         ).isClosed,
         isTrue,
+      );
+    });
+
+    test('sin coincidencias, el mensaje solo habla del filtro', () {
+      expect(
+        IncidentDetailsViewMapper.listEmptyMessage(
+          allPatients: [
+            ParamedicoPatientRow.fromJson({'id': 'abcdef'}),
+          ],
+          filtered: const [],
+        ),
+        'No hay pacientes con ese filtro.',
       );
     });
 
