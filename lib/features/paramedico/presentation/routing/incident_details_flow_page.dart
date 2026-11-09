@@ -10,8 +10,8 @@ import 'package:sistema_triage/features/paramedico/presentation/incident_details
 import 'package:sistema_triage/features/paramedico/presentation/incident_details/widgets/incident_details_map_tab_widget.dart';
 import 'package:sistema_triage/features/paramedico/presentation/incident_details/widgets/incident_details_photos_tab_widget.dart';
 import 'package:sistema_triage/features/paramedico/presentation/incident_details/widgets/incident_details_stats_tab_widget.dart';
+import 'package:sistema_triage/features/paramedico/presentation/incident_details/widgets/incident_more_actions_sheet_widget.dart';
 import 'package:sistema_triage/features/paramedico/domain/services/incident_presentation_formatters.dart';
-import 'package:sistema_triage/shared/widgets/app_header.dart';
 
 // Ruta de detalle de incidente: enlaza IncidentDetailsController con IncidentDetailsPage
 class IncidentDetailsFlowPage extends StatefulWidget {
@@ -58,14 +58,15 @@ class _IncidentDetailsFlowPageState extends State<IncidentDetailsFlowPage> {
     if (mounted) setState(() {});
   }
 
-  PreferredSizeWidget _appBar(BuildContext context) {
-    return AppHeader(
-      type: HeaderType.incident,
-      color: Colors.white,
-      isConnected: true,
-      hasNotifications: false,
-      backLabel: 'Regresar a Incidentes',
-      onBack: () => _controller.leave(context),
+  void _showMoreActions(BuildContext context) {
+    final header = _controller.headerData();
+    showIncidentMoreActions(
+      context,
+      title: '${header.id} · ${header.title}',
+      onEditTitle: () => unawaited(_controller.editIncidentTitle(context)),
+      onEditLocation: () => unawaited(_controller.editIncidentCoords(context)),
+      onAddPhotos: () => _controller.showIncidentImageSourceDialog(context),
+      onCloseIncident: () => unawaited(_controller.confirmClose(context)),
     );
   }
 
@@ -77,11 +78,6 @@ class _IncidentDetailsFlowPageState extends State<IncidentDetailsFlowPage> {
           searchController: _controller.searchController,
           onSearchChanged: _controller.setPatientQuery,
           onRefresh: _controller.load,
-          listHeaderData: IncidentDetailsViewMapper.listHeaderData(
-            patientCount: _controller.patients.length,
-            sortOption: _controller.sortOption,
-            onSortChanged: _controller.setSortOption,
-          ),
           triageFiltersData: IncidentDetailsViewMapper.triageFiltersData(
             activeFilter: _controller.triageFilter,
             onFilterChanged: _controller.setTriageFilter,
@@ -122,11 +118,12 @@ class _IncidentDetailsFlowPageState extends State<IncidentDetailsFlowPage> {
 
     return IncidentDetailsPage(
       shellMode: mode,
-      appBar: mode == IncidentDetailsShellMode.ready ? _appBar(context) : null,
       errorMessage: _controller.error,
       onBack: () => _controller.leave(context),
-      headerData: inc != null ? _controller.headerData(context) : null,
-      metadataData: inc != null ? _controller.metadataData() : null,
+      onMoreTap: _controller.canEditIncident
+          ? () => _showMoreActions(context)
+          : null,
+      headerData: inc != null ? _controller.headerData() : null,
       tabSelectorData: inc != null ? _controller.tabSelectorData() : null,
       tabBody: inc != null ? _tabBody(context) : null,
       onStartTap: inc != null

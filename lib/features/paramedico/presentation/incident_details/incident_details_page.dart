@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:sistema_triage/features/paramedico/domain/entities/incident_details/incident_header_data.dart';
-import 'package:sistema_triage/features/paramedico/domain/entities/incident_details/incident_metadata_data.dart';
 import 'package:sistema_triage/features/paramedico/domain/entities/incident_details/incident_tab_data.dart';
 import 'package:sistema_triage/features/paramedico/presentation/incident_details/incident_details_controller.dart';
 import 'package:sistema_triage/features/paramedico/presentation/incident_details/widgets/incident_action_buttons_widget.dart';
@@ -8,14 +7,13 @@ import 'package:sistema_triage/features/paramedico/presentation/incident_details
 import 'package:sistema_triage/features/paramedico/presentation/incident_details/widgets/incident_detail_header_widget.dart';
 import 'package:sistema_triage/shared/widgets/triage_ui.dart';
 
-// Cascarón de la vista de detalles de incidente (paramédico)
+// Cascarón de la vista de detalles de incidente (paramédico, B07 a B10)
 class IncidentDetailsPage extends StatelessWidget {
   final IncidentDetailsShellMode shellMode;
-  final PreferredSizeWidget? appBar;
   final String? errorMessage;
   final VoidCallback? onBack;
+  final VoidCallback? onMoreTap;
   final IncidentHeaderData? headerData;
-  final IncidentMetadataData? metadataData;
   final IncidentTabSelectorData? tabSelectorData;
   final Widget? tabBody;
   final VoidCallback? onStartTap;
@@ -25,11 +23,10 @@ class IncidentDetailsPage extends StatelessWidget {
   const IncidentDetailsPage({
     super.key,
     required this.shellMode,
-    this.appBar,
     this.errorMessage,
     this.onBack,
+    this.onMoreTap,
     this.headerData,
-    this.metadataData,
     this.tabSelectorData,
     this.tabBody,
     this.onStartTap,
@@ -41,18 +38,28 @@ class IncidentDetailsPage extends StatelessWidget {
   Widget build(BuildContext context) {
     switch (shellMode) {
       case IncidentDetailsShellMode.loading:
-        return _LoadingShell(appBar: appBar, onBack: onBack);
-      case IncidentDetailsShellMode.error:
-        return _ErrorShell(
-          appBar: appBar,
-          message: errorMessage ?? 'No encontrado.',
+        return _StateShell(
           onBack: onBack,
+          child: const CircularProgressIndicator(
+            color: TriageColors.paramedicAccent,
+          ),
+        );
+      case IncidentDetailsShellMode.error:
+        return _StateShell(
+          onBack: onBack,
+          child: Text(
+            errorMessage ?? 'No encontrado.',
+            textAlign: TextAlign.center,
+            style: TriageTextStyles.bodyMedium.copyWith(
+              color: TriageColors.textSecondary,
+            ),
+          ),
         );
       case IncidentDetailsShellMode.ready:
         return _ContentShell(
-          appBar: appBar,
+          onBack: onBack,
+          onMoreTap: onMoreTap,
           headerData: headerData!,
-          metadataData: metadataData!,
           tabSelectorData: tabSelectorData!,
           tabBody: tabBody!,
           onStartTap: onStartTap,
@@ -63,82 +70,39 @@ class IncidentDetailsPage extends StatelessWidget {
   }
 }
 
-class _LoadingShell extends StatelessWidget {
-  final PreferredSizeWidget? appBar;
+/// Encabezado y un contenido centrado, para los estados de carga y error
+class _StateShell extends StatelessWidget {
   final VoidCallback? onBack;
+  final Widget child;
 
-  const _LoadingShell({this.appBar, this.onBack});
+  const _StateShell({required this.onBack, required this.child});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: TriageColors.canvas,
-      appBar:
-          appBar ??
-          AppBar(
-            backgroundColor: TriageColors.surface,
-            elevation: 0,
-            leading: IconButton(
-              icon: const TriageIcon(
-                TriageIcons.arrowLeft,
-                color: TriageColors.textPrimary,
-              ),
-              onPressed: onBack,
-            ),
-          ),
-      body: const Center(
-        child: CircularProgressIndicator(color: TriageColors.paramedicAccent),
-      ),
-    );
-  }
-}
-
-class _ErrorShell extends StatelessWidget {
-  final PreferredSizeWidget? appBar;
-  final String message;
-  final VoidCallback? onBack;
-
-  const _ErrorShell({this.appBar, required this.message, this.onBack});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: TriageColors.canvas,
-      appBar:
-          appBar ??
-          AppBar(
-            backgroundColor: TriageColors.surface,
-            elevation: 0,
-            title: Text(
-              'Incidente',
-              style: TriageTextStyles.titleSmall.copyWith(
-                color: TriageColors.textPrimary,
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          TriageDetailHeader(title: 'Incidente', onBack: onBack),
+          Expanded(
+            child: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(TriageSpacing.xxl),
+                child: child,
               ),
             ),
-            leading: IconButton(
-              icon: const TriageIcon(
-                TriageIcons.arrowLeft,
-                color: TriageColors.textPrimary,
-              ),
-              onPressed: onBack,
-            ),
           ),
-      body: Center(
-        child: Text(
-          message,
-          style: TriageTextStyles.bodyMedium.copyWith(
-            color: TriageColors.textSecondary,
-          ),
-        ),
+        ],
       ),
     );
   }
 }
 
 class _ContentShell extends StatelessWidget {
-  final PreferredSizeWidget? appBar;
+  final VoidCallback? onBack;
+  final VoidCallback? onMoreTap;
   final IncidentHeaderData headerData;
-  final IncidentMetadataData metadataData;
   final IncidentTabSelectorData tabSelectorData;
   final Widget tabBody;
   final VoidCallback? onStartTap;
@@ -146,9 +110,9 @@ class _ContentShell extends StatelessWidget {
   final VoidCallback? onCloseIncidentTap;
 
   const _ContentShell({
-    this.appBar,
+    required this.onBack,
+    required this.onMoreTap,
     required this.headerData,
-    required this.metadataData,
     required this.tabSelectorData,
     required this.tabBody,
     this.onStartTap,
@@ -156,57 +120,60 @@ class _ContentShell extends StatelessWidget {
     this.onCloseIncidentTap,
   });
 
+  /// Parte máxima de la pantalla para los datos del incidente: con poca altura o
+  /// texto grande se desplazan y dejan sitio al contenido de la pestaña
+  static const _maxInfoShare = 0.3;
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: TriageColors.canvas,
-      appBar: appBar,
-      body: Stack(
-        children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Flexible(
-                child: SingleChildScrollView(
-                  physics: const ClampingScrollPhysics(),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IncidentDetailHeader(data: headerData),
-                      //Transform.translate(
-                      //  offset: const Offset(0, -15),
-                      //  child: IncidentMetadataCard(data: metadataData),
-                      //),
-                    ],
+      body: LayoutBuilder(
+        builder: (context, constraints) => Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            TriageDetailHeader(
+              title: headerData.id,
+              badge: headerData.isClosed
+                  ? const TriageStatusBadge.closed()
+                  : const TriageStatusBadge.active(),
+              onBack: onBack,
+              onMore: onMoreTap,
+              showDivider: false,
+            ),
+            ConstrainedBox(
+              constraints: BoxConstraints(
+                maxHeight: constraints.maxHeight * _maxInfoShare,
+              ),
+              child: SingleChildScrollView(
+                physics: const ClampingScrollPhysics(),
+                child: IncidentDetailHeader(data: headerData),
+              ),
+            ),
+            ColoredBox(
+              color: TriageColors.surface,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  IncidentCustomTabBar(data: tabSelectorData),
+                  const Divider(
+                    height: TriageSizes.hairline,
+                    thickness: TriageSizes.hairline,
+                    color: TriageColors.borderSubtle,
                   ),
-                ),
+                ],
               ),
-              ColoredBox(
-                color: TriageColors.sunken,
-                child: Column(
-                  children: [
-                    const SizedBox(height: 10),
-                    IncidentCustomTabBar(data: tabSelectorData),
-                    const SizedBox(height: 10),
-                  ],
-                ),
-              ),
-              Expanded(
-                child: ColoredBox(color: TriageColors.canvas, child: tabBody),
-              ),
-            ],
-          ),
-          Align(
-            alignment: Alignment.bottomCenter,
-            child: IncidentActionButtons(
+            ),
+            Expanded(child: tabBody),
+            IncidentActionButtons(
               isStatsTab:
                   tabSelectorData.activeTab == IncidentTabType.estadisticas,
               onStartTap: onStartTap,
               onRegisterTap: onRegisterTap,
               onCloseIncidentTap: onCloseIncidentTap,
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:sistema_triage/features/paramedico/data/repositories/paramedico_incidents_repository.dart';
-import 'package:sistema_triage/features/paramedico/domain/constants/patient_sorting_options.dart';
+import 'package:sistema_triage/features/paramedico/domain/constants/emergency_catalog.dart';
 import 'package:sistema_triage/features/paramedico/domain/constants/patient_triage_filter.dart';
 import 'package:sistema_triage/features/paramedico/domain/entities/incident_details/incident_header_data.dart';
-import 'package:sistema_triage/features/paramedico/domain/entities/incident_details/incident_metadata_data.dart';
 import 'package:sistema_triage/features/paramedico/domain/entities/incident_details/patient_card_data.dart';
-import 'package:sistema_triage/features/paramedico/domain/entities/incident_details/patient_list_header_data.dart';
 import 'package:sistema_triage/features/paramedico/domain/entities/incident_details/patient_triage_filters_data.dart';
 import 'package:sistema_triage/features/paramedico/domain/services/incident_presentation_formatters.dart';
 import 'package:sistema_triage/features/paramedico/domain/services/paramedico_catalog_mappers.dart';
@@ -18,58 +16,27 @@ class IncidentDetailsViewMapper {
   static IncidentHeaderData headerData({
     required ParamedicoIncidentSummary incident,
     required List<ParamedicoPatientRow> patients,
-    required bool isEditable,
-    required VoidCallback? onShowMapTap,
-    required VoidCallback? onEditLocationTap,
-    required VoidCallback? onEditTitleTap,
+    required String? creatorName,
   }) {
     final counts = ParamedicoCatalogMappers.triageCountsFor(patients);
-    final coords = IncidentPresentationFormatters.incidentMapCoords(incident);
-    final hasGps = IncidentPresentationFormatters.hasIncidentLocation(incident);
 
     return IncidentHeaderData(
       id: IncidentPresentationFormatters.shortIncidentId(incident.id),
-      createdAtLabel: IncidentPresentationFormatters.formatIncidentExactDate(
-        incident.createdAt,
-      ),
-      title: incident.generatedTitle,
-      latitude: coords.$1,
-      longitude: coords.$2,
+      title: EmergencyCatalog.nameFor(incident.emergencyType),
       gpsCoordinates: IncidentPresentationFormatters.incidentGpsLabel(incident),
-      hasGps: hasGps,
+      authorLine: [
+        ?creatorName,
+        IncidentPresentationFormatters.relativeCreated(
+          incident.createdAt,
+        ).toLowerCase(),
+        IncidentPresentationFormatters.formatTime(incident.createdAt),
+      ].join(' · '),
+      isClosed: incident.status == 'cerrado',
       redCount: counts.red,
       yellowCount: counts.yellow,
       greenCount: counts.green,
       blackCount: counts.black,
       totalPatients: counts.total,
-      isEditable: isEditable,
-      onShowMapTap: hasGps ? onShowMapTap : null,
-      onEditLocationTap: isEditable ? onEditLocationTap : null,
-      onEditTitleTap: isEditable ? onEditTitleTap : null,
-    );
-  }
-
-  static IncidentMetadataData metadataData({
-    required String? creatorName,
-    required ParamedicoIncidentSummary incident,
-  }) {
-    return IncidentMetadataData(
-      creatorName: creatorName ?? '—',
-      timeElapsedLabel: IncidentPresentationFormatters.relativeCreated(
-        incident.createdAt,
-      ),
-    );
-  }
-
-  static PatientListHeaderData listHeaderData({
-    required int patientCount,
-    required PatientSortOption sortOption,
-    required ValueChanged<PatientSortOption> onSortChanged,
-  }) {
-    return PatientListHeaderData(
-      patientCount: patientCount,
-      sortOption: sortOption,
-      onSortChanged: onSortChanged,
     );
   }
 
@@ -95,7 +62,8 @@ class IncidentDetailsViewMapper {
         number: i + 1,
         triageLevel: TriageLevel.fromDb(p.triageColor) ?? TriageLevel.green,
         name: p.displayName,
-        dateStr: IncidentPresentationFormatters.formatDateTime(p.createdAt),
+        dateStr: IncidentPresentationFormatters.formatTime(p.createdAt),
+        note: p.note,
         status:
             PatientLifecycleStatus.fromDb(p.status) ??
             PatientLifecycleStatus.waiting,

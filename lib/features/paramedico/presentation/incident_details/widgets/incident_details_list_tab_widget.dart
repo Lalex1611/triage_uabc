@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:sistema_triage/core/layout/app_responsive.dart';
 import 'package:sistema_triage/features/paramedico/domain/entities/incident_details/patient_card_data.dart';
-import 'package:sistema_triage/features/paramedico/domain/entities/incident_details/patient_list_header_data.dart';
 import 'package:sistema_triage/features/paramedico/domain/entities/incident_details/patient_triage_filters_data.dart';
-import 'package:sistema_triage/features/paramedico/presentation/incident_details/widgets/patient_list_header_widget.dart';
 import 'package:sistema_triage/features/paramedico/presentation/incident_details/widgets/patient_triage_filters_widget.dart';
 import 'package:sistema_triage/shared/widgets/triage_ui.dart';
 
@@ -11,7 +10,6 @@ class IncidentDetailsListTab extends StatelessWidget {
   final TextEditingController searchController;
   final ValueChanged<String> onSearchChanged;
   final Future<void> Function() onRefresh;
-  final PatientListHeaderData listHeaderData;
   final PatientTriageFiltersData triageFiltersData;
   final String emptyMessage;
   final List<PatientCardData> patientCards;
@@ -21,7 +19,6 @@ class IncidentDetailsListTab extends StatelessWidget {
     required this.searchController,
     required this.onSearchChanged,
     required this.onRefresh,
-    required this.listHeaderData,
     required this.triageFiltersData,
     required this.emptyMessage,
     required this.patientCards,
@@ -29,22 +26,24 @@ class IncidentDetailsListTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final gutter = context.horizontalPadding;
+
     return RefreshIndicator(
       onRefresh: onRefresh,
       color: TriageColors.paramedicAccent,
       backgroundColor: TriageColors.surface,
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(0, 10, 0, 120),
+        padding: const EdgeInsets.symmetric(vertical: TriageSpacing.md),
         children: [
-          const SizedBox(height: 16),
-          PatientListHeader(data: listHeaderData),
-          const SizedBox(height: 12),
           PatientTriageFilters(data: triageFiltersData),
-          const SizedBox(height: 16),
+          const SizedBox(height: TriageSpacing.md),
           if (emptyMessage.isNotEmpty)
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+              padding: EdgeInsets.symmetric(
+                horizontal: gutter,
+                vertical: TriageSpacing.xxl,
+              ),
               child: Text(
                 emptyMessage,
                 textAlign: TextAlign.center,
@@ -59,13 +58,17 @@ class IncidentDetailsListTab extends StatelessWidget {
                   ? data.name
                   : 'Paciente sin nombre';
               final code = data.id.isNotEmpty ? data.id : 'Sin código';
-              final detailText = '$code • ${data.dateStr}';
 
               return Padding(
-                padding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
+                padding: EdgeInsets.fromLTRB(
+                  gutter,
+                  0,
+                  gutter,
+                  TriageSpacing.md,
+                ),
                 child: TriagePatientCard(
                   name: displayName,
-                  detail: detailText,
+                  detail: [code, data.dateStr, ?data.note].join(' · '),
                   level: data.triageLevel,
                   badge: TriageStatusBadge.patient(data.status),
                   onTap: data.onCardTap,

@@ -10,7 +10,6 @@ import 'package:sistema_triage/features/paramedico/data/repositories/paramedico_
 import 'package:sistema_triage/features/paramedico/domain/constants/patient_sorting_options.dart';
 import 'package:sistema_triage/features/paramedico/domain/constants/patient_triage_filter.dart';
 import 'package:sistema_triage/features/paramedico/domain/entities/incident_details/incident_header_data.dart';
-import 'package:sistema_triage/features/paramedico/domain/entities/incident_details/incident_metadata_data.dart';
 import 'package:sistema_triage/features/paramedico/domain/entities/incident_details/incident_tab_data.dart';
 import 'package:sistema_triage/features/paramedico/domain/entities/incident_details/patient_card_data.dart';
 import 'package:sistema_triage/features/paramedico/domain/services/incident_presentation_formatters.dart';
@@ -145,22 +144,11 @@ class IncidentDetailsController extends ChangeNotifier {
         sortOption: sortOption,
       );
 
-  IncidentHeaderData headerData(BuildContext context) {
-    final inc = incident!;
+  IncidentHeaderData headerData() {
     return IncidentDetailsViewMapper.headerData(
-      incident: inc,
-      patients: patients,
-      isEditable: canEditIncident,
-      onShowMapTap: () => openInteractiveMap(context),
-      onEditLocationTap: () => unawaited(editIncidentCoords(context)),
-      onEditTitleTap: () => unawaited(editIncidentTitle(context)),
-    );
-  }
-
-  IncidentMetadataData metadataData() {
-    return IncidentDetailsViewMapper.metadataData(
-      creatorName: creatorName,
       incident: incident!,
+      patients: patients,
+      creatorName: creatorName,
     );
   }
 
