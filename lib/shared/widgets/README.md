@@ -37,6 +37,7 @@ import 'package:sistema_triage/shared/widgets/triage_ui.dart';
 | Paso | `TriageSteps` |
 | Opción grande | `TriageLargeOption` (`neutral`, `highlighted`, `tinted`) |
 | Foto | `TriagePhoto` |
+| Visor de fotografía (D18) | `showTriagePhotoViewer` |
 | Hoja inferior con Agarre | `showTriageSheet` (`dismissible: false` en formularios a medias); `TriageSheet` solo en hojas fijas (mapa) |
 | Selección única (C04, B14) | `TriageRadioOption` |
 | Fila de opción en hojas | `TriageOptionRow`, `.check`, `.toggle` |
