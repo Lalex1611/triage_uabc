@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:sistema_triage/core/constants/triage_icons.dart';
 import 'package:sistema_triage/core/theme/triage_tokens.dart';
+import 'package:sistema_triage/shared/widgets/triage_icon_button_widget.dart';
 import 'package:sistema_triage/shared/widgets/triage_icon_widget.dart';
 
 /// Buscador del rediseño (Figma "TRIAGE/Buscador")
@@ -93,19 +94,13 @@ class _TriageSearchBarState extends State<TriageSearchBar> {
             valueListenable: _controller,
             builder: (context, value, _) => value.text.isEmpty
                 ? const SizedBox(width: TriageSpacing.md)
-                : IconButton(
-                    onPressed: _clear,
+                : TriageIconButton(
+                    icon: TriageIcons.close,
                     tooltip: 'Borrar búsqueda',
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints.tightFor(
-                      width: TriageSizes.touchTargetCompact,
-                      height: TriageSizes.touchTargetCompact,
-                    ),
-                    icon: const TriageIcon(
-                      TriageIcons.close,
-                      size: TriageSizes.iconSmall,
-                      color: TriageColors.textTertiary,
-                    ),
+                    onPressed: _clear,
+                    variant: TriageIconButtonVariant.plain,
+                    size: TriageIconButtonSize.small,
+                    color: TriageColors.textTertiary,
                   ),
           ),
         ],
