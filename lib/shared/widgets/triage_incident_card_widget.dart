@@ -95,38 +95,7 @@ class TriageIncidentCard extends StatelessWidget {
             color: TriageColors.borderSubtle,
           ),
           const SizedBox(height: TriageSpacing.sm),
-          // Conteo a la izquierda y total a la derecha; si no caben
-          // (texto grande) el total baja a otra línea
-          Wrap(
-            alignment: WrapAlignment.spaceBetween,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            spacing: TriageSpacing.sm,
-            runSpacing: TriageSpacing.sm,
-            children: [
-              TriageLevelCount(counts: counts),
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const TriageIcon(
-                    TriageIcons.users,
-                    size: TriageSizes.iconXSmall,
-                    color: TriageColors.textSecondary,
-                  ),
-                  const SizedBox(width: TriageSpacing.xs),
-                  Flexible(
-                    child: Text(
-                      patientCount == 1
-                          ? '1 paciente'
-                          : '$patientCount pacientes',
-                      style: TriageTextStyles.labelMedium.copyWith(
-                        color: TriageColors.textSecondary,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
+          TriageLevelTotals(counts: counts, patientCount: patientCount),
         ],
       ),
     );

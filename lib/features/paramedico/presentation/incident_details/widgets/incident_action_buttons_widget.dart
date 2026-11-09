@@ -36,31 +36,17 @@ class IncidentActionButtons extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: const BoxDecoration(
-        color: TriageColors.surface,
-        boxShadow: TriageShadows.bar,
-      ),
-      child: SafeArea(
-        top: false,
-        child: SizedBox(
-          width: double.infinity,
-          child: isStatsTab
-              ? TriageButton(
-                  label: 'CERRAR INCIDENTE',
-                  variant: TriageButtonVariant.secondary,
-                  size: TriageButtonSize.large,
-                  onPressed: onCloseIncidentTap,
-                )
-              : TriageButton(
-                  label: 'REGISTRAR PACIENTE',
-                  variant: TriageButtonVariant.primary,
-                  size: TriageButtonSize.large,
-                  onPressed: () => _showRegisterModal(context),
-                ),
-        ),
-      ),
+    return TriageActionBar(
+      primary: isStatsTab
+          ? TriageButton(
+              label: 'Cerrar incidente',
+              variant: TriageButtonVariant.secondary,
+              onPressed: onCloseIncidentTap,
+            )
+          : TriageButton(
+              label: 'Registrar paciente',
+              onPressed: () => _showRegisterModal(context),
+            ),
     );
   }
 }

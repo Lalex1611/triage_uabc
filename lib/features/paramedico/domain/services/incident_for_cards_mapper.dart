@@ -12,7 +12,7 @@ class IncidentForCardsMapper {
     required String currentUserId,
   }) {
     return IncidentForCards(
-      id: IncidentPresentationFormatters.shortIncidentId(summary.id).replaceFirst('#', ''),
+      id: IncidentPresentationFormatters.shortIncidentId(summary.id),
       name_card: summary.generatedTitle,
       dateTime: summary.createdAt ?? DateTime.now(),
       latitude: summary.latitude ?? 0.0,

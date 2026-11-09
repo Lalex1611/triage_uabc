@@ -243,6 +243,41 @@ void main() {
   });
 
   group('TriageDetailHeader', () {
+    testWidgets('con insignia, el título es discreto y va junto a ella', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _app(
+          const TriageDetailHeader(
+            title: 'INC-729',
+            badge: TriageStatusBadge.active(),
+          ),
+        ),
+      );
+      expect(find.text('ACTIVO'), findsOneWidget);
+      final title = tester.widget<Text>(find.text('INC-729')).style!;
+      expect(title.fontSize, TriageTextStyles.labelMedium.fontSize);
+      expect(title.color, TriageColors.textSecondary);
+      expect(
+        tester.getSemantics(find.text('INC-729')),
+        isSemantics(label: 'INC-729', isHeader: true),
+      );
+      expect(
+        tester.getCenter(find.text('INC-729')).dy,
+        closeTo(tester.getCenter(find.text('ACTIVO')).dy, 1),
+      );
+    });
+
+    testWidgets('showDivider decide si hay línea inferior', (tester) async {
+      await tester.pumpWidget(_app(const TriageDetailHeader(title: 'A')));
+      expect(find.byType(Divider), findsOneWidget);
+
+      await tester.pumpWidget(
+        _app(const TriageDetailHeader(title: 'A', showDivider: false)),
+      );
+      expect(find.byType(Divider), findsNothing);
+    });
+
     testWidgets('línea superior con el color del rol', (tester) async {
       await tester.pumpWidget(
         _app(

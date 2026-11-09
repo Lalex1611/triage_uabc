@@ -29,14 +29,10 @@ class IncidentDetailHeaderVisualTest extends StatelessWidget {
         body: SafeArea(
           child: IncidentDetailHeader(
             data: IncidentHeaderData(
-              id: 'INC-2026-001',
-              createdAtLabel: '12-marzo-2026 14:32',
-              title: '12-Mar-2026 14:32 - Blvd. 2000',
-              latitude: 19.4326,
-              longitude: -99.1332,
+              id: 'INC-A1B2C3',
+              title: 'Accidente vehicular',
               gpsCoordinates: '19.43260, -99.13320',
-              hasGps: true,
-              isEditable: true,
+              authorLine: 'Carlos Huerta · hace 28 minutos · 14:32',
               redCount: 1,
               yellowCount: 2,
               greenCount: 50,

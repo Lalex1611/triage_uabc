@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:sistema_triage/core/layout/app_responsive.dart';
 import 'package:sistema_triage/features/paramedico/domain/entities/incident_details/incident_header_data.dart';
 import 'package:sistema_triage/shared/widgets/triage_ui.dart';
 
-// Cabecera superior específica para la vista de detalles del incidente
+/// Bloque de datos del incidente bajo el encabezado (B07 a B10): tipo, ubicación,
+/// autor y conteo de pacientes
 class IncidentDetailHeader extends StatelessWidget {
   final IncidentHeaderData data;
 
@@ -10,186 +12,72 @@ class IncidentDetailHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    final gutter = context.horizontalPadding;
+
+    return ColoredBox(
       color: TriageColors.surface,
-      padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
-      width: double.infinity,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          /* FILA 1: ID del incidente y Fecha de creación */
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  data.id,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TriageTextStyles.labelMedium.copyWith(
-                    color: TriageColors.textSecondary,
-                  ),
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(gutter, 0, gutter, TriageSpacing.md),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          spacing: TriageSpacing.xs,
+          children: [
+            Semantics(
+              header: true,
+              child: Text(
+                data.title,
+                style: TriageTextStyles.screenTitle.copyWith(
+                  color: TriageColors.textPrimary,
                 ),
               ),
-              const SizedBox(width: 12),
-              Text(
-                data.createdAtLabel,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.right,
-                style: TriageTextStyles.bodySmall.copyWith(
-                  color: TriageColors.textSecondary,
-                ),
+            ),
+            _MetaRow(icon: TriageIcons.location, text: data.gpsCoordinates),
+            _MetaRow(icon: TriageIcons.clock, text: data.authorLine),
+            Padding(
+              padding: const EdgeInsets.only(top: TriageSpacing.xs),
+              child: TriageLevelTotals(
+                counts: {
+                  TriageLevel.red: data.redCount,
+                  TriageLevel.yellow: data.yellowCount,
+                  TriageLevel.green: data.greenCount,
+                  TriageLevel.black: data.blackCount,
+                },
+                patientCount: data.totalPatients,
               ),
-            ],
-          ),
-
-          const SizedBox(height: 6),
-
-          /* FILA 2: Título del Incidente y Botón de Editar */
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Text(
-                  data.title,
-                  style: TriageTextStyles.dataLarge.copyWith(
-                    color: TriageColors.textPrimary,
-                  ),
-                ),
-              ),
-              if (data.isEditable && data.onEditTitleTap != null) ...[
-                const SizedBox(width: 8),
-                GestureDetector(
-                  onTap: data.onEditTitleTap,
-                  child: const TriageIcon(
-                    TriageIcons.pencil,
-                    size: 20,
-                    color: TriageColors.textPrimary,
-                  ),
-                ),
-              ],
-            ],
-          ),
-
-          const SizedBox(height: 6),
-
-          /* FILA 3: Ubicación GPS y Controles (Mostrar / Editar) */
-          Row(
-            children: [
-              const TriageIcon(
-                TriageIcons.location,
-                size: 14,
-                color: TriageColors.textSecondary,
-              ),
-              const SizedBox(width: 6),
-              Flexible(
-                child: Text(
-                  data.gpsCoordinates,
-                  style: TriageTextStyles.bodySmall.copyWith(
-                    color: TriageColors.textSecondary,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              if (data.hasGps && data.onShowMapTap != null) ...[
-                const SizedBox(width: 12),
-                GestureDetector(
-                  onTap: data.onShowMapTap,
-                  child: Text(
-                    'Mostrar',
-                    style: TriageTextStyles.labelSmall.copyWith(
-                      color: TriageColors.textPrimary,
-                      decoration: TextDecoration.underline,
-                    ),
-                  ),
-                ),
-              ],
-              if (data.isEditable && data.onEditLocationTap != null) ...[
-                const SizedBox(width: 12),
-                GestureDetector(
-                  onTap: data.onEditLocationTap,
-                  child: Text(
-                    'Editar',
-                    style: TriageTextStyles.labelSmall.copyWith(
-                      color: TriageColors.textPrimary,
-                      decoration: TextDecoration.underline,
-                    ),
-                  ),
-                ),
-              ],
-            ],
-          ),
-
-          const SizedBox(height: 16),
-
-          /* FILA 4: Cuadros de conteo de Triage y Total de Pacientes */
-          Row(
-            children: [
-              _buildTriageSquare(data.redCount, TriageColors.triageRed),
-              _buildTriageSquare(
-                data.yellowCount,
-                TriageColors.triageYellow,
-                textColor: TriageColors.textPrimary,
-              ),
-              _buildTriageSquare(data.greenCount, TriageColors.triageGreen),
-              _buildTriageSquare(data.blackCount, TriageColors.triageBlack),
-              const Spacer(),
-              _buildTotalPatients(),
-            ],
-          ),
-        ],
+            ),
+          ],
+        ),
       ),
     );
   }
+}
 
-  Widget _buildTriageSquare(
-    int count,
-    Color color, {
-    Color textColor = TriageColors.textInverse,
-  }) {
-    return Container(
-      width: 26,
-      height: 26,
-      margin: const EdgeInsets.only(right: 8),
-      decoration: BoxDecoration(
-        color: color,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      alignment: Alignment.center,
-      child: Text(
-        count.toString(),
-        style: TriageTextStyles.labelMedium.copyWith(color: textColor),
-      ),
-    );
-  }
+class _MetaRow extends StatelessWidget {
+  const _MetaRow({required this.icon, required this.text});
 
-  Widget _buildTotalPatients() {
-    return Container(
-      height: 28,
-      padding: const EdgeInsets.symmetric(horizontal: 10),
-      decoration: BoxDecoration(
-        color: TriageColors.canvas,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: TriageColors.borderSubtle, width: 1),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const TriageIcon(
-            TriageIcons.users,
-            size: 14,
-            color: TriageColors.textPrimary,
-          ),
-          const SizedBox(width: 6),
-          Text(
-            '${data.totalPatients} Pacientes',
-            style: TriageTextStyles.labelMedium.copyWith(
-              color: TriageColors.textPrimary,
+  final String icon;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      spacing: TriageSpacing.sm,
+      children: [
+        TriageIcon(
+          icon,
+          size: TriageSizes.iconXSmall,
+          color: TriageColors.textSecondary,
+        ),
+        Expanded(
+          child: Text(
+            text,
+            style: TriageTextStyles.bodySmall.copyWith(
+              color: TriageColors.textSecondary,
             ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }

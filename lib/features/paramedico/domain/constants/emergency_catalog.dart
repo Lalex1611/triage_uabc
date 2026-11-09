@@ -14,4 +14,14 @@ class EmergencyCatalog {
   static const List<EmergencyType> standardTypes = postgresIncidentTypes;
 
   static String get defaultTypeId => postgresIncidentTypes.first.id;
+
+  /// Nombre visible de un tipo; los que no están en el catálogo (p. ej.
+  /// `violencia`, que existe en el enum) se muestran a partir de su clave
+  static String nameFor(String id) {
+    for (final type in postgresIncidentTypes) {
+      if (type.id == id) return type.name;
+    }
+    final text = id.replaceAll('_', ' ').trim();
+    return text.isEmpty ? 'Otro' : text[0].toUpperCase() + text.substring(1);
+  }
 }

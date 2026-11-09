@@ -25,7 +25,7 @@ class IncidentPresentationFormatters {
     final short = id.length >= 6
         ? id.substring(0, 6).toUpperCase()
         : id.toUpperCase();
-    return '#INC-$short';
+    return 'INC-$short';
   }
 
   static String shortPatientId(String id) {
@@ -61,6 +61,14 @@ class IncidentPresentationFormatters {
     final mi = x.minute.toString().padLeft(2, '0');
     final ss = x.second.toString().padLeft(2, '0');
     return '$dd/$mm/${x.year} $hh:$mi:$ss';
+  }
+
+  static String formatTime(DateTime? d) {
+    if (d == null) return '—';
+    final x = d.toLocal();
+    final hh = x.hour.toString().padLeft(2, '0');
+    final mi = x.minute.toString().padLeft(2, '0');
+    return '$hh:$mi';
   }
 
   static String formatIncidentExactDate(DateTime? d) {

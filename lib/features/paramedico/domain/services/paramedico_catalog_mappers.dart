@@ -82,21 +82,10 @@ class ParamedicoCatalogMappers {
 
   static List<ParamedicoPatientRow> filterAndSortPatients({
     required List<ParamedicoPatientRow> patients,
-    required String query,
     required PatientTriageFilter triageFilter,
     required PatientSortOption sortOption,
   }) {
     var list = List<ParamedicoPatientRow>.from(patients);
-    final q = query.trim().toLowerCase();
-    if (q.isNotEmpty) {
-      list = list
-          .where(
-            (p) =>
-                p.displayName.toLowerCase().contains(q) ||
-                p.id.toLowerCase().contains(q),
-          )
-          .toList();
-    }
     if (triageFilter != PatientTriageFilter.todos) {
       list = list.where((p) => matchesTriageFilter(p, triageFilter)).toList();
     }

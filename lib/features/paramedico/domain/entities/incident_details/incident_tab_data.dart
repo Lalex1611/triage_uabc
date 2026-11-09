@@ -1,13 +1,12 @@
 // Catálogo de opciones para las pestañas de la vista de detalles
 enum IncidentTabType {
-  lista('Lista', 95),
-  mapa('Mapa', 96),
-  fotos('Fotos', 95),
-  estadisticas('Estadísticas', 96);
+  lista('Pacientes'),
+  mapa('Mapa'),
+  fotos('Detalles'),
+  estadisticas('Resumen');
 
   final String label;
-  final double width;
-  const IncidentTabType(this.label, this.width);
+  const IncidentTabType(this.label);
 }
 
 class IncidentTabSelectorData {

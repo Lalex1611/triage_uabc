@@ -10,7 +10,6 @@ import 'package:sistema_triage/features/paramedico/data/repositories/paramedico_
 import 'package:sistema_triage/features/paramedico/domain/constants/patient_sorting_options.dart';
 import 'package:sistema_triage/features/paramedico/domain/constants/patient_triage_filter.dart';
 import 'package:sistema_triage/features/paramedico/domain/entities/incident_details/incident_header_data.dart';
-import 'package:sistema_triage/features/paramedico/domain/entities/incident_details/incident_metadata_data.dart';
 import 'package:sistema_triage/features/paramedico/domain/entities/incident_details/incident_tab_data.dart';
 import 'package:sistema_triage/features/paramedico/domain/entities/incident_details/patient_card_data.dart';
 import 'package:sistema_triage/features/paramedico/domain/services/incident_presentation_formatters.dart';
@@ -28,13 +27,10 @@ class IncidentDetailsController extends ChangeNotifier {
   IncidentDetailsController({
     required this.incidentId,
     ParamedicoIncidentsRepository? repository,
-    TextEditingController? searchController,
-  }) : _repo = repository ?? ParamedicoIncidentsRepository(),
-       searchController = searchController ?? TextEditingController();
+  }) : _repo = repository ?? ParamedicoIncidentsRepository();
 
   final String incidentId;
   final ParamedicoIncidentsRepository _repo;
-  final TextEditingController searchController;
   final ImagePicker _picker = ImagePicker();
 
   static const contentTabs = [
@@ -50,9 +46,7 @@ class IncidentDetailsController extends ChangeNotifier {
   String? error;
   String? creatorName;
   IncidentTabType activeTab = IncidentTabType.lista;
-  String patientQuery = '';
   PatientTriageFilter triageFilter = PatientTriageFilter.todos;
-  PatientSortOption sortOption = PatientSortOption.recent;
 
   String get currentUserId =>
       Supabase.instance.client.auth.currentUser?.id ?? '';
@@ -72,20 +66,6 @@ class IncidentDetailsController extends ChangeNotifier {
   }
 
   String get routeBase => '/paramedico/incident/$incidentId';
-
-  @override
-  void dispose() {
-    searchController.dispose();
-    super.dispose();
-  }
-
-  void resetFilters() {
-    searchController.clear();
-    patientQuery = '';
-    triageFilter = PatientTriageFilter.todos;
-    sortOption = PatientSortOption.recent;
-    activeTab = IncidentTabType.lista;
-  }
 
   Future<void> load() async {
     if (!SupabaseEnv.isConfigured) {
@@ -122,45 +102,23 @@ class IncidentDetailsController extends ChangeNotifier {
     notifyListeners();
   }
 
-  void setPatientQuery(String value) {
-    patientQuery = value;
-    notifyListeners();
-  }
-
   void setTriageFilter(PatientTriageFilter filter) {
     triageFilter = filter;
-    notifyListeners();
-  }
-
-  void setSortOption(PatientSortOption option) {
-    sortOption = option;
     notifyListeners();
   }
 
   List<ParamedicoPatientRow> get filteredPatients =>
       ParamedicoCatalogMappers.filterAndSortPatients(
         patients: patients,
-        query: patientQuery,
         triageFilter: triageFilter,
-        sortOption: sortOption,
+        sortOption: PatientSortOption.recent,
       );
 
-  IncidentHeaderData headerData(BuildContext context) {
-    final inc = incident!;
+  IncidentHeaderData headerData() {
     return IncidentDetailsViewMapper.headerData(
-      incident: inc,
-      patients: patients,
-      isEditable: canEditIncident,
-      onShowMapTap: () => openInteractiveMap(context),
-      onEditLocationTap: () => unawaited(editIncidentCoords(context)),
-      onEditTitleTap: () => unawaited(editIncidentTitle(context)),
-    );
-  }
-
-  IncidentMetadataData metadataData() {
-    return IncidentDetailsViewMapper.metadataData(
-      creatorName: creatorName,
       incident: incident!,
+      patients: patients,
+      creatorName: creatorName,
     );
   }
 

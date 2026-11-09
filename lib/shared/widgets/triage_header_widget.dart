@@ -180,6 +180,9 @@ class TriageHomeHeader extends StatelessWidget {
 /// - [useCloseIcon] muestra una X en vez de la flecha, para pantallas que se
 ///   abandonan sin volver atrás (C03, C09 y C11).
 /// - "Más opciones" solo con [onMore].
+/// - Con [badge], [title] pasa a ser una etiqueta discreta junto a la insignia
+///   ("INC-729 · ACTIVO", B07); si no caben, la insignia baja de línea.
+/// - [showDivider] en `false` cuando debajo sigue contenido de la misma superficie.
 class TriageDetailHeader extends StatelessWidget {
   const TriageDetailHeader({
     super.key,
@@ -188,6 +191,8 @@ class TriageDetailHeader extends StatelessWidget {
     this.onBack,
     this.onMore,
     this.useCloseIcon = false,
+    this.badge,
+    this.showDivider = true,
   });
 
   final String title;
@@ -195,11 +200,14 @@ class TriageDetailHeader extends StatelessWidget {
   final VoidCallback? onBack;
   final VoidCallback? onMore;
   final bool useCloseIcon;
+  final Widget? badge;
+  final bool showDivider;
 
   @override
   Widget build(BuildContext context) {
     final canPop = ModalRoute.of(context)?.impliesAppBarDismissal ?? false;
     final back = onBack ?? (canPop ? () => Navigator.maybePop(context) : null);
+    final badge = this.badge;
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.dark,
@@ -242,27 +250,48 @@ class TriageDetailHeader extends StatelessWidget {
                         const SizedBox(width: TriageSpacing.xs),
                       ],
                       Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Semantics(
-                              header: true,
-                              child: Text(
-                                title,
-                                style: TriageTextStyles.titleMedium.copyWith(
-                                  color: TriageColors.textPrimary,
-                                ),
+                        child: badge != null
+                            ? Wrap(
+                                spacing: TriageSpacing.sm,
+                                runSpacing: TriageSpacing.xs,
+                                crossAxisAlignment: WrapCrossAlignment.center,
+                                children: [
+                                  Semantics(
+                                    header: true,
+                                    child: Text(
+                                      title,
+                                      style: TriageTextStyles.labelMedium
+                                          .copyWith(
+                                            color: TriageColors.textSecondary,
+                                          ),
+                                    ),
+                                  ),
+                                  badge,
+                                ],
+                              )
+                            : Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Semantics(
+                                    header: true,
+                                    child: Text(
+                                      title,
+                                      style: TriageTextStyles.titleMedium
+                                          .copyWith(
+                                            color: TriageColors.textPrimary,
+                                          ),
+                                    ),
+                                  ),
+                                  if (subtitle != null)
+                                    Text(
+                                      subtitle!,
+                                      style: TriageTextStyles.bodySmall
+                                          .copyWith(
+                                            color: TriageColors.textSecondary,
+                                          ),
+                                    ),
+                                ],
                               ),
-                            ),
-                            if (subtitle != null)
-                              Text(
-                                subtitle!,
-                                style: TriageTextStyles.bodySmall.copyWith(
-                                  color: TriageColors.textSecondary,
-                                ),
-                              ),
-                          ],
-                        ),
                       ),
                       if (onMore != null) ...[
                         const SizedBox(width: TriageSpacing.xs),
@@ -280,11 +309,12 @@ class TriageDetailHeader extends StatelessWidget {
                 ),
               ),
             ),
-            const Divider(
-              height: TriageSizes.hairline,
-              thickness: TriageSizes.hairline,
-              color: TriageColors.borderSubtle,
-            ),
+            if (showDivider)
+              const Divider(
+                height: TriageSizes.hairline,
+                thickness: TriageSizes.hairline,
+                color: TriageColors.borderSubtle,
+              ),
           ],
         ),
       ),
