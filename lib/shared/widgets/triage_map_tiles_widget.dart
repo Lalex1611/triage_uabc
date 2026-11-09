@@ -40,7 +40,7 @@ class TriageMapTiles extends StatelessWidget {
             child: Padding(
               padding: const EdgeInsets.all(TriageSpacing.xxs),
               child: Text(
-                '© OpenStreetMap',
+                '© OpenStreetMap contributors',
                 style: TriageTextStyles.labelSmall.copyWith(
                   color: TriageColors.textSecondary,
                 ),

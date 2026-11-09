@@ -141,7 +141,7 @@ void main() {
       ),
       findsOneWidget,
     );
-    expect(find.text('© OpenStreetMap'), findsOneWidget);
+    expect(find.text('© OpenStreetMap contributors'), findsOneWidget);
   });
 
   testWidgets('sin pacientes marca el punto del incidente', (tester) async {
