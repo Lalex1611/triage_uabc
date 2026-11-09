@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
 
@@ -684,6 +685,45 @@ class ParamedicoIncidentsRepository {
         .from('incidents')
         .update({'generated_title': title})
         .eq('id', incidentId);
+  }
+
+  static const _incidentPhotosBucket = 'incident_photos';
+
+  /// Las fotos antiguas guardan una ruta absoluta del teléfono, no están en Storage
+  static bool _isStoredPhoto(String path) => !path.startsWith('/');
+
+  /// Sube la foto y devuelve su ruta en Storage, la que se guarda en el incidente
+  Future<String> uploadIncidentPhoto({
+    required String incidentId,
+    required String localPath,
+  }) async {
+    final extension = localPath.split('.').last.toLowerCase();
+    final path = '$incidentId/${const Uuid().v4()}.$extension';
+    await _c.storage
+        .from(_incidentPhotosBucket)
+        .upload(
+          path,
+          File(localPath),
+          fileOptions: FileOptions(
+            contentType: 'image/${extension == 'jpg' ? 'jpeg' : extension}',
+          ),
+        );
+    return path;
+  }
+
+  /// Enlaces temporales de las fotos en Storage, por ruta
+  Future<Map<String, String>> signIncidentPhotos(Iterable<String> paths) async {
+    final stored = paths.where(_isStoredPhoto).toList();
+    if (stored.isEmpty) return {};
+    final signed = await _c.storage
+        .from(_incidentPhotosBucket)
+        .createSignedUrls(stored, const Duration(hours: 1).inSeconds);
+    return {for (final s in signed) s.path: s.signedUrl};
+  }
+
+  Future<void> deleteIncidentPhoto(String path) async {
+    if (!_isStoredPhoto(path)) return;
+    await _c.storage.from(_incidentPhotosBucket).remove([path]);
   }
 
   Future<void> updateIncidentPhotoPaths({
