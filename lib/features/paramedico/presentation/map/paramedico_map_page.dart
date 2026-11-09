@@ -321,7 +321,7 @@ class ParamedicoMapPage extends StatelessWidget {
                 height: TriageSizes.touchTarget,
                 alignment: Alignment.center,
                 child: TriageIncidentMarker(
-                  redCount: countsByIncident[e.id]?.red ?? 0,
+                  patientCount: countsByIncident[e.id]?.total ?? 0,
                   selected: e.id == selectedIncidentId,
                   onTap: () => onPinTap(e),
                 ),

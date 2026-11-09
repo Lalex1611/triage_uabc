@@ -5,7 +5,7 @@ import 'package:sistema_triage/shared/widgets/triage_icon_widget.dart';
 
 /// Marcador de incidente en el mapa (Figma "TRIAGE/Marcador de incidente")
 ///
-/// Muestra el número de pacientes en rojo del incidente. Siempre es rojo
+/// Muestra el total de pacientes del incidente. Siempre es rojo
 /// (color de rol paramédico). Seleccionado: relleno rojo y texto blanco.
 /// Pensado para ir dentro de un `Marker` de flutter_map, que tiene tamaño fijo,
 /// por eso el contenido se reduce (FittedBox) en vez de desbordarse con
@@ -13,12 +13,12 @@ import 'package:sistema_triage/shared/widgets/triage_icon_widget.dart';
 class TriageIncidentMarker extends StatelessWidget {
   const TriageIncidentMarker({
     super.key,
-    required this.redCount,
+    required this.patientCount,
     required this.onTap,
     this.selected = false,
   });
 
-  final int redCount;
+  final int patientCount;
   final bool selected;
   final VoidCallback? onTap;
 
@@ -37,9 +37,9 @@ class TriageIncidentMarker extends StatelessWidget {
       button: true,
       enabled: onTap != null,
       selected: selected,
-      label: redCount == 1
-          ? 'Incidente con 1 paciente en rojo'
-          : 'Incidente con $redCount pacientes en rojo',
+      label: patientCount == 1
+          ? 'Incidente con 1 paciente'
+          : 'Incidente con $patientCount pacientes',
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: onTap,
@@ -86,7 +86,7 @@ class TriageIncidentMarker extends StatelessWidget {
                   ),
                   const SizedBox(width: TriageSpacing.sm),
                   Text(
-                    '$redCount',
+                    '$patientCount',
                     style: TriageTextStyles.labelLarge.copyWith(
                       color: selected
                           ? TriageColors.textInverse

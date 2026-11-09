@@ -35,7 +35,7 @@ double _contrast(Color a, Color b) {
 void main() {
   testWidgets('normal: píldora blanca de 42 con borde rojo', (tester) async {
     await tester.pumpWidget(
-      _wrap(TriageIncidentMarker(redCount: 8, onTap: () {})),
+      _wrap(TriageIncidentMarker(patientCount: 8, onTap: () {})),
     );
     final decoration = _pillDecoration(tester);
     expect(decoration.color, TriageColors.surface);
@@ -55,7 +55,9 @@ void main() {
     tester,
   ) async {
     await tester.pumpWidget(
-      _wrap(TriageIncidentMarker(redCount: 8, selected: true, onTap: () {})),
+      _wrap(
+        TriageIncidentMarker(patientCount: 8, selected: true, onTap: () {}),
+      ),
     );
     final decoration = _pillDecoration(tester);
     expect(decoration.color, TriageColors.paramedicAccent);
@@ -69,7 +71,7 @@ void main() {
 
   testWidgets('usa el ícono de alerta del sistema de diseño', (tester) async {
     await tester.pumpWidget(
-      _wrap(TriageIncidentMarker(redCount: 1, onTap: () {})),
+      _wrap(TriageIncidentMarker(patientCount: 1, onTap: () {})),
     );
     expect(
       tester.widget<TriageIcon>(find.byType(TriageIcon)).asset,
@@ -80,7 +82,7 @@ void main() {
   testWidgets('responde al toque en toda la celda', (tester) async {
     var taps = 0;
     await tester.pumpWidget(
-      _wrap(TriageIncidentMarker(redCount: 3, onTap: () => taps++)),
+      _wrap(TriageIncidentMarker(patientCount: 3, onTap: () => taps++)),
     );
     final cell = find.byType(TriageIncidentMarker);
     await tester.tapAt(tester.getTopLeft(cell) + const Offset(1, 1));
@@ -89,12 +91,14 @@ void main() {
 
   testWidgets('se anuncia como botón, en singular o plural', (tester) async {
     await tester.pumpWidget(
-      _wrap(TriageIncidentMarker(redCount: 1, selected: true, onTap: () {})),
+      _wrap(
+        TriageIncidentMarker(patientCount: 1, selected: true, onTap: () {}),
+      ),
     );
     expect(
       tester.getSemantics(find.byType(TriageIncidentMarker)),
       isSemantics(
-        label: 'Incidente con 1 paciente en rojo\n1',
+        label: 'Incidente con 1 paciente\n1',
         isButton: true,
         isSelected: true,
         hasTapAction: true,
@@ -102,14 +106,11 @@ void main() {
     );
 
     await tester.pumpWidget(
-      _wrap(TriageIncidentMarker(redCount: 3, onTap: () {})),
+      _wrap(TriageIncidentMarker(patientCount: 3, onTap: () {})),
     );
     expect(
       tester.getSemantics(find.byType(TriageIncidentMarker)),
-      isSemantics(
-        label: 'Incidente con 3 pacientes en rojo\n3',
-        isButton: true,
-      ),
+      isSemantics(label: 'Incidente con 3 pacientes\n3', isButton: true),
     );
   });
 
@@ -129,7 +130,7 @@ void main() {
   ) async {
     await tester.pumpWidget(
       _wrap(
-        TriageIncidentMarker(redCount: 128, selected: true, onTap: () {}),
+        TriageIncidentMarker(patientCount: 128, selected: true, onTap: () {}),
         textScale: 2,
       ),
     );

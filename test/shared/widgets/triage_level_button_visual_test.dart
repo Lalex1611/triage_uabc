@@ -78,7 +78,7 @@ class _LevelSandboxState extends State<_LevelSandbox> {
                 width: 88,
                 height: TriageSizes.touchTarget,
                 child: TriageIncidentMarker(
-                  redCount: 8,
+                  patientCount: 8,
                   selected: _incidentSelected,
                   onTap: () =>
                       setState(() => _incidentSelected = !_incidentSelected),
