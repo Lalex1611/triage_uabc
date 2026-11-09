@@ -87,10 +87,7 @@ class IncidentDetailsController extends ChangeNotifier {
       final lat = inc?.latitude;
       final lng = inc?.longitude;
       final pins = lat != null && lng != null
-          ? await _repo.listMapPatientPinsForIncidents(
-              [incidentId],
-              incidentCentersById: {incidentId: LatLng(lat, lng)},
-            )
+          ? await _loadMapPatients(LatLng(lat, lng))
           : <MapPatientPin>[];
       String? creator;
       if (inc != null && inc.createdBy.isNotEmpty) {
@@ -106,6 +103,19 @@ class IncidentDetailsController extends ChangeNotifier {
       loading = false;
       error = e.toString();
       notifyListeners();
+    }
+  }
+
+  /// Si falla, el mapa marca solo el punto del incidente y el resto sigue visible
+  Future<List<MapPatientPin>> _loadMapPatients(LatLng center) async {
+    try {
+      return await _repo.listMapPatientPinsForIncidents(
+        [incidentId],
+        incidentCentersById: {incidentId: center},
+      );
+    } catch (e) {
+      debugPrint('No se pudieron cargar los pacientes del mapa: $e');
+      return [];
     }
   }
 
