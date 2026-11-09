@@ -41,7 +41,10 @@ void main() {
     tester,
   ) async {
     await tester.pumpWidget(
-      _wrap(TriageTabs(labels: _labels, selectedIndex: 0, onChanged: (_) {})),
+      _wrap(
+        TriageTabs(labels: _labels, selectedIndex: 0, onChanged: (_) {}),
+        width: 600,
+      ),
     );
     final cells = find.descendant(
       of: find.byType(TriageTabs),
@@ -52,17 +55,97 @@ void main() {
     expect(tester.getSize(cells.first).height, 46);
   });
 
-  testWidgets('en pantalla angosta reduce el texto sin desbordar', (
+  group('cuando no caben a partes iguales', () {
+    Widget narrow({int selectedIndex = 0, ValueChanged<int>? onChanged}) =>
+        _wrap(
+          TriageTabs(
+            labels: _labels,
+            selectedIndex: selectedIndex,
+            onChanged: onChanged ?? (_) {},
+          ),
+          width: 220,
+        );
+
+    final scrollable = find.descendant(
+      of: find.byType(TriageTabs),
+      matching: find.byType(Scrollable),
+    );
+
+    testWidgets('se desplazan sin desbordar y sin reducir el texto', (
+      tester,
+    ) async {
+      await tester.pumpWidget(narrow());
+      expect(tester.takeException(), isNull);
+      expect(scrollable, findsOneWidget);
+      expect(find.byType(FittedBox), findsNothing);
+      expect(
+        tester.widget<Text>(find.text('Pacientes')).style!.fontSize,
+        TriageTextStyles.labelMedium.fontSize,
+      );
+    });
+
+    testWidgets('al desplazarse se puede tocar la última pestaña', (
+      tester,
+    ) async {
+      int? changed;
+      await tester.pumpWidget(narrow(onChanged: (i) => changed = i));
+      await tester.drag(scrollable, const Offset(-1000, 0));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Resumen'));
+      expect(changed, 3);
+    });
+
+    testWidgets('mantiene a la vista la pestaña seleccionada', (tester) async {
+      await tester.pumpWidget(narrow(selectedIndex: 3));
+      await tester.pump();
+      expect(find.text('Resumen').hitTestable(), findsOneWidget);
+
+      await tester.pumpWidget(narrow());
+      await tester.pumpAndSettle();
+      expect(find.text('Pacientes').hitTestable(), findsOneWidget);
+    });
+  });
+
+  testWidgets('si no caben iguales, se reparten según su texto', (
     tester,
   ) async {
     await tester.pumpWidget(
       _wrap(
         TriageTabs(labels: _labels, selectedIndex: 0, onChanged: (_) {}),
-        width: 220,
+        width: 500,
       ),
     );
     expect(tester.takeException(), isNull);
-    expect(find.text('Pacientes'), findsOneWidget);
+    Size cellOf(String label) => tester.getSize(
+      find.ancestor(
+        of: find.text(label),
+        matching: find.byType(GestureDetector),
+      ),
+    );
+    expect(cellOf('Pacientes').width, greaterThan(cellOf('Mapa').width));
+    expect(
+      find.descendant(
+        of: find.byType(TriageTabs),
+        matching: find.byType(Scrollable),
+      ),
+      findsNothing,
+    );
+  });
+
+  testWidgets('con espacio suficiente no hay desplazamiento', (tester) async {
+    await tester.pumpWidget(
+      _wrap(
+        TriageTabs(labels: _labels, selectedIndex: 0, onChanged: (_) {}),
+        width: 600,
+      ),
+    );
+    expect(
+      find.descendant(
+        of: find.byType(TriageTabs),
+        matching: find.byType(Scrollable),
+      ),
+      findsNothing,
+    );
   });
 
   testWidgets('el lector anuncia cada pestaña como botón y la activa', (
