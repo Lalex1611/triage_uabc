@@ -57,18 +57,15 @@ class TriagePatientCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final badge = this.badge;
+    // Sin límite de líneas: nombres y datos clínicos nunca se cortan
     final nameText = Text(
       name,
-      maxLines: 1,
-      overflow: TextOverflow.ellipsis,
       style: TriageTextStyles.labelLarge.copyWith(
         color: TriageColors.textPrimary,
       ),
     );
     final detailText = Text(
       detail,
-      maxLines: 1,
-      overflow: TextOverflow.ellipsis,
       style: TriageTextStyles.bodySmall.copyWith(
         color: TriageColors.textSecondary,
       ),

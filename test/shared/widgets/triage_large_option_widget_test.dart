@@ -150,6 +150,23 @@ void main() {
     }
   });
 
+  testWidgets('el símbolo se reduce en pantallas estrechas', (tester) async {
+    Size symbolSize() => tester.getSize(
+      find
+          .descendant(
+            of: find.byType(TriageLargeOption),
+            matching: find.byType(DecoratedBox),
+          )
+          .last,
+    );
+
+    await tester.pumpWidget(_wrap(_option(), width: 393));
+    expect(symbolSize(), const Size(50, 50));
+
+    await tester.pumpWidget(_wrap(_option(), width: 320));
+    expect(symbolSize().width, closeTo(50 * 0.82, 0.1));
+  });
+
   testWidgets('se ajusta al contenido y crece con el texto al 200 %', (
     tester,
   ) async {

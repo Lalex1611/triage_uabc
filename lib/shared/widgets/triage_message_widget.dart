@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:sistema_triage/core/layout/app_responsive.dart';
 import 'package:sistema_triage/core/theme/triage_level_style.dart';
 import 'package:sistema_triage/core/theme/triage_role_theme.dart';
 import 'package:sistema_triage/core/theme/triage_tokens.dart';
@@ -205,10 +206,10 @@ class TriageDialog extends StatelessWidget {
             borderRadius: _radius,
             clipBehavior: Clip.antiAlias,
             child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(
+              padding: EdgeInsets.fromLTRB(
+                context.horizontalPadding,
                 TriageSpacing.xxl,
-                TriageSpacing.xxl,
-                TriageSpacing.xxl,
+                context.horizontalPadding,
                 TriageSpacing.xl,
               ),
               child: Column(
@@ -216,7 +217,12 @@ class TriageDialog extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 spacing: TriageSpacing.md,
                 children: [
-                  Center(child: _MessageIconBadge(icon, size: _iconSize)),
+                  Center(
+                    child: _MessageIconBadge(
+                      icon,
+                      size: context.rDim(_iconSize),
+                    ),
+                  ),
                   _MessageTitle(title, TriageTextStyles.titleLarge),
                   if (message != null) _MessageBody(message),
                   ?content,
@@ -272,23 +278,33 @@ class TriageResultMessage extends StatelessWidget {
   Widget build(BuildContext context) {
     final message = this.message;
     final content = this.content;
+    final gutter = context.horizontalPadding;
+    // En móviles bajos, el ícono y el margen ceden espacio al contenido
+    final isShort = context.isShortScreen;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Expanded(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(
-              TriageSpacing.xxl,
-              _topPadding,
-              TriageSpacing.xxl,
+            padding: EdgeInsets.fromLTRB(
+              gutter,
+              isShort ? TriageSpacing.xl : context.rDim(_topPadding),
+              gutter,
               TriageSpacing.xxl,
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               spacing: TriageSpacing.lg,
               children: [
-                Center(child: _MessageIconBadge(icon, size: _iconSize)),
+                Center(
+                  child: _MessageIconBadge(
+                    icon,
+                    size: context.rDim(
+                      isShort ? TriageDialog._iconSize : _iconSize,
+                    ),
+                  ),
+                ),
                 _MessageTitle(
                   title,
                   prominentTitle
@@ -308,10 +324,10 @@ class TriageResultMessage extends StatelessWidget {
         SafeArea(
           top: false,
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(
-              TriageSpacing.xxl,
+            padding: EdgeInsets.fromLTRB(
+              gutter,
               TriageSpacing.md,
-              TriageSpacing.xxl,
+              gutter,
               TriageSpacing.xxl,
             ),
             child: Column(

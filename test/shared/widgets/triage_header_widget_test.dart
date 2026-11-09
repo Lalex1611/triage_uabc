@@ -175,6 +175,50 @@ void main() {
       },
     );
 
+    testWidgets('textos largos no se cortan', (tester) async {
+      _narrowScreen(tester);
+      const title = 'Dra. Mariana Ruiz Hernández de la Torre y Fernández';
+      await tester.pumpWidget(
+        _app(
+          TriageHomeHeader(
+            eyebrow: 'Médico receptor en turno de urgencias generales',
+            title: title,
+            subtitle: 'Hospital General de Tijuana · Urgencias generales',
+            onProfileTap: () {},
+            onNotificationsTap: () {},
+          ),
+        ),
+      );
+      expect(tester.takeException(), isNull);
+      final text = tester.widget<Text>(find.text(title));
+      expect(text.maxLines, isNull);
+      expect(text.overflow, isNot(TextOverflow.ellipsis));
+      expect(tester.getSize(find.text(title)).height, greaterThan(24));
+    });
+
+    testWidgets('el punto de avisos queda dentro del círculo de la campana', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _app(
+          TriageHomeHeader(
+            title: 'Carlos',
+            onNotificationsTap: () {},
+            hasNotifications: true,
+          ),
+        ),
+      );
+      final dot = tester.getRect(
+        find.byKey(const ValueKey('triage-header-dot')),
+      );
+      final button = tester.getCenter(
+        find.byTooltip('Notificaciones, hay avisos nuevos'),
+      );
+      expect(dot.center.dx, greaterThan(button.dx));
+      expect(dot.center.dy, lessThan(button.dy));
+      expect(dot.center.dx - button.dx, closeTo(7, 1));
+    });
+
     testWidgets('con texto al 200 % en pantalla de 320 crece sin desbordarse', (
       tester,
     ) async {
@@ -266,6 +310,25 @@ void main() {
       await tester.tap(find.byTooltip('Regresar'));
       await tester.tap(find.byTooltip('Más opciones'));
       expect((back, more), (1, 1));
+    });
+
+    testWidgets('título y subtítulo largos no se cortan', (tester) async {
+      _narrowScreen(tester);
+      const title = 'Paciente con un nombre bastante largo de registrar';
+      await tester.pumpWidget(
+        _app(
+          TriageDetailHeader(
+            title: title,
+            subtitle: 'Bruce Cervantes Hernández · INC-729 · Choque múltiple',
+            onBack: () {},
+            onMore: () {},
+          ),
+        ),
+      );
+      expect(tester.takeException(), isNull);
+      final text = tester.widget<Text>(find.text(title));
+      expect(text.maxLines, isNull);
+      expect(tester.getSize(find.text(title)).height, greaterThan(24));
     });
 
     testWidgets('sin onMore no muestra "más opciones"', (tester) async {

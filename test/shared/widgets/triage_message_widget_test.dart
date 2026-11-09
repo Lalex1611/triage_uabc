@@ -346,7 +346,48 @@ void main() {
     Text title(WidgetTester tester) =>
         tester.widget<Text>(find.text('Recepción confirmada'));
 
+    double iconSize(WidgetTester tester) => tester
+        .getSize(
+          find
+              .ancestor(
+                of: find.byType(TriageIcon),
+                matching: find.byType(DecoratedBox),
+              )
+              .first,
+        )
+        .width;
+
+    void setScreen(WidgetTester tester, Size size) {
+      tester.view.physicalSize = size;
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+    }
+
+    testWidgets('en móviles estrechos el ícono se reduce', (tester) async {
+      setScreen(tester, const Size(320, 800));
+      await tester.pumpWidget(_app(result()));
+      expect(iconSize(tester), closeTo(88 * 0.82, 0.1));
+    });
+
+    testWidgets('en móviles bajos el ícono cede espacio', (tester) async {
+      setScreen(tester, const Size(393, 600));
+      await tester.pumpWidget(_app(result()));
+      expect(iconSize(tester), 64);
+    });
+
+    testWidgets('el margen lateral se reduce en pantallas estrechas', (
+      tester,
+    ) async {
+      setScreen(tester, const Size(300, 800));
+      await tester.pumpWidget(_app(result()));
+      expect(
+        tester.getTopLeft(find.byType(TriageButton).first).dx,
+        TriageSpacing.md,
+      );
+    });
+
     testWidgets('ícono de 88 y título grande por defecto', (tester) async {
+      setScreen(tester, const Size(393, 852));
       await tester.pumpWidget(_app(result()));
       expect(
         tester.getSize(
