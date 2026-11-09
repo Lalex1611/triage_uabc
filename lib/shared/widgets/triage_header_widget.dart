@@ -109,8 +109,6 @@ class TriageHomeHeader extends StatelessWidget {
                                 ),
                                 child: Text(
                                   eyebrow!,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
                                   style: TriageTextStyles.labelSmall.copyWith(
                                     color: onBand,
                                   ),
@@ -120,8 +118,6 @@ class TriageHomeHeader extends StatelessWidget {
                               header: true,
                               child: Text(
                                 title,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
                                 style: TriageTextStyles.titleMedium.copyWith(
                                   color: onBand,
                                 ),
@@ -130,8 +126,6 @@ class TriageHomeHeader extends StatelessWidget {
                             if (subtitle != null)
                               Text(
                                 subtitle!,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
                                 style: TriageTextStyles.bodySmall.copyWith(
                                   color: onBand,
                                 ),
@@ -249,8 +243,6 @@ class TriageDetailHeader extends StatelessWidget {
                               header: true,
                               child: Text(
                                 title,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
                                 style: TriageTextStyles.titleMedium.copyWith(
                                   color: TriageColors.textPrimary,
                                 ),
@@ -259,8 +251,6 @@ class TriageDetailHeader extends StatelessWidget {
                             if (subtitle != null)
                               Text(
                                 subtitle!,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
                                 style: TriageTextStyles.bodySmall.copyWith(
                                   color: TriageColors.textSecondary,
                                 ),
@@ -312,10 +302,10 @@ class _HeaderButton extends StatelessWidget {
     this.showDot = false,
   });
 
-  // Punto de avisos de Figma: diámetro, anillo y distancia al borde
+  // Punto de avisos de Figma: diámetro, anillo y posición relativa al círculo
   static const double _dot = 12;
   static const double _dotRing = 2;
-  static const double _dotInset = 7;
+  static const _dotAlignment = Alignment(0.5, -0.5);
 
   final String icon;
   final String tooltip;
@@ -349,23 +339,19 @@ class _HeaderButton extends StatelessWidget {
       icon: !showDot
           ? circle
           : Stack(
-              clipBehavior: Clip.none,
+              alignment: _dotAlignment,
               children: [
                 circle,
-                Positioned(
-                  top: _dotInset,
-                  right: _dotInset,
-                  child: Container(
-                    key: const ValueKey('triage-header-dot'),
-                    width: _dot,
-                    height: _dot,
-                    decoration: BoxDecoration(
-                      color: TriageColors.danger,
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: TriageColors.textInverse,
-                        width: _dotRing,
-                      ),
+                Container(
+                  key: const ValueKey('triage-header-dot'),
+                  width: _dot,
+                  height: _dot,
+                  decoration: BoxDecoration(
+                    color: TriageColors.danger,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: TriageColors.textInverse,
+                      width: _dotRing,
                     ),
                   ),
                 ),

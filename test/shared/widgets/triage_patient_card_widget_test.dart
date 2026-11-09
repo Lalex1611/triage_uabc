@@ -111,29 +111,77 @@ void main() {
     );
   });
 
-  testWidgets('con texto al 200 % en pantalla de 320 no se desborda', (
+  testWidgets('nombres y detalles largos no se cortan, en ninguna variante', (
     tester,
   ) async {
+    const name = 'Alexander Arellano Odabachea Fernández de la Torre';
+    const detail = 'PAC-2033 · 14:38 · fractura expuesta de tibia izquierda';
     _narrowScreen(tester);
     await tester.pumpWidget(
       _wrap(
         Column(
           children: [
             TriagePatientCard(
-              name: 'Paciente sin identificar',
-              detail: 'PAC-2032 · 14:36 · inconsciente',
-              level: TriageLevel.red,
-              badge: TriageStatusBadge.patient(PatientLifecycleStatus.waiting),
+              name: name,
+              detail: detail,
+              level: TriageLevel.yellow,
               onTap: () {},
             ),
             TriagePatientCard.room(
-              name: 'Ramiro Hernández',
-              detail: 'Hace 35 min · del incidente INC-731',
-              level: TriageLevel.yellow,
-              badge: TriageStatusBadge.patient(PatientLifecycleStatus.waiting),
+              name: name,
+              detail: detail,
+              level: TriageLevel.orange,
               onTap: () {},
             ),
           ],
+        ),
+      ),
+    );
+    expect(tester.takeException(), isNull);
+    for (final text in [find.text(name), find.text(detail)]) {
+      for (final widget in tester.widgetList<Text>(text)) {
+        expect(widget.maxLines, isNull);
+        expect(widget.overflow, isNot(TextOverflow.ellipsis));
+      }
+    }
+    final lineHeight =
+        TriageTextStyles.labelLarge.height! *
+        TriageTextStyles.labelLarge.fontSize!;
+    expect(
+      tester.getSize(find.text(name).first).height,
+      greaterThan(lineHeight),
+    );
+  });
+
+  testWidgets('con texto al 200 % en pantalla de 320 no se desborda', (
+    tester,
+  ) async {
+    _narrowScreen(tester);
+    await tester.pumpWidget(
+      _wrap(
+        SingleChildScrollView(
+          child: Column(
+            children: [
+              TriagePatientCard(
+                name: 'Paciente sin identificar',
+                detail: 'PAC-2032 · 14:36 · inconsciente',
+                level: TriageLevel.red,
+                badge: TriageStatusBadge.patient(
+                  PatientLifecycleStatus.waiting,
+                ),
+                onTap: () {},
+              ),
+              TriagePatientCard.room(
+                name: 'Ramiro Hernández',
+                detail: 'Hace 35 min · del incidente INC-731',
+                level: TriageLevel.yellow,
+                badge: TriageStatusBadge.patient(
+                  PatientLifecycleStatus.waiting,
+                ),
+                onTap: () {},
+              ),
+            ],
+          ),
         ),
         textScale: 2,
       ),
