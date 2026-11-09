@@ -18,20 +18,21 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 ///
 /// Altura fija (proporción de la pantalla): el encabezado y el buscador quedan
 /// fijos y solo la lista se desplaza.
-Future<void> showParamedicoIncidentsSheet(BuildContext context) {
-  final parentContext = context;
-  return showTriageSheet<void>(
+Future<void> showParamedicoIncidentsSheet(BuildContext context) async {
+  final path = await showTriageSheet<String>(
     context,
     showClose: false,
-    builder: (_) => _IncidentsSheetBody(parentContext: parentContext),
+    builder: (_) => const _IncidentsSheetBody(),
   );
+  // La hoja devuelve la ruta elegida y la navegación ocurre ya con la hoja
+  // cerrada, no en el mismo instante en que se cierra
+  if (path != null && context.mounted) {
+    pushParamedicoFullScreen(context, path);
+  }
 }
 
 class _IncidentsSheetBody extends StatefulWidget {
-  const _IncidentsSheetBody({required this.parentContext});
-
-  /// Contexto de la pantalla que abrió la hoja: sigue vivo cuando la hoja se cierra
-  final BuildContext parentContext;
+  const _IncidentsSheetBody();
 
   @override
   State<_IncidentsSheetBody> createState() => _IncidentsSheetBodyState();
@@ -76,12 +77,8 @@ class _IncidentsSheetBodyState extends State<_IncidentsSheetBody> {
         sortOption: _sort,
       );
 
-  // Cierra la hoja y abre la pantalla completa desde la pantalla de origen
-  void _openFullScreen(String path) {
-    Navigator.of(context).pop();
-    final parent = widget.parentContext;
-    if (parent.mounted) pushParamedicoFullScreen(parent, path);
-  }
+  // Cierra la hoja devolviendo la ruta; quien la abrió navega después
+  void _openFullScreen(String path) => Navigator.of(context).pop(path);
 
   Future<void> _pickSort() async {
     final choice = await showTriageSheet<IncidentSortOption>(
@@ -259,9 +256,11 @@ class _IncidentsSheetBodyState extends State<_IncidentsSheetBody> {
               separatorBuilder: (_, _) =>
                   const SizedBox(height: TriageSpacing.md),
               itemBuilder: (context, i) {
-                final card = _controller.toCard(visible[i], _uid);
+                final incident = visible[i];
+                // card.id es el folio para mostrar (INC-XXXXXX), no el id real
+                final card = _controller.toCard(incident, _uid);
                 return TriageIncidentCard(
-                  folio: _folio(card),
+                  folio: card.id,
                   timeAgo: _timeAgo(card.dateTime),
                   title: card.name_card,
                   location: _coordinates(card),
@@ -272,16 +271,12 @@ class _IncidentsSheetBodyState extends State<_IncidentsSheetBody> {
                     TriageLevel.black: card.black,
                   },
                   patientCount: card.totalVictims,
-                  onTap: () => _openFullScreen('/paramedico/incident/${card.id}'),
+                  onTap: () =>
+                      _openFullScreen('/paramedico/incident/${incident.id}'),
                 );
               },
             ),
     );
-  }
-
-  static String _folio(IncidentForCards card) {
-    final id = card.id;
-    return 'INC-${(id.length >= 6 ? id.substring(0, 6) : id).toUpperCase()}';
   }
 
   static String _timeAgo(DateTime dt) {
