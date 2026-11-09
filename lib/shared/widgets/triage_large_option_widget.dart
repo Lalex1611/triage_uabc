@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:sistema_triage/core/constants/triage_icons.dart';
+import 'package:sistema_triage/core/layout/app_responsive.dart';
 import 'package:sistema_triage/core/theme/triage_role_theme.dart';
 import 'package:sistema_triage/core/theme/triage_tokens.dart';
 import 'package:sistema_triage/shared/widgets/triage_icon_widget.dart';
@@ -64,7 +65,7 @@ class TriageLargeOption extends StatelessWidget {
                 child: Row(
                   children: [
                     SizedBox.square(
-                      dimension: _symbolSize,
+                      dimension: context.rDim(_symbolSize),
                       child: DecoratedBox(
                         decoration: BoxDecoration(
                           color: neutral ? TriageColors.sunken : role.soft,
