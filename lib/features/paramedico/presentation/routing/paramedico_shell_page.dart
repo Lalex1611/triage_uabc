@@ -3,6 +3,8 @@ import 'package:go_router/go_router.dart';
 import 'package:sistema_triage/core/theme/triage_tokens.dart';
 import 'package:sistema_triage/features/paramedico/presentation/navigation/paramedico_navbar_widget.dart';
 import 'package:sistema_triage/features/paramedico/presentation/shared/paramedico_session_actions.dart';
+import 'package:sistema_triage/features/paramedico/presentation/incidents/paramedico_incidents_sheet.dart';
+
 
 class ParamedicoShellPage extends StatelessWidget {
   const ParamedicoShellPage({super.key, required this.navigationShell});
@@ -19,12 +21,15 @@ class ParamedicoShellPage extends StatelessWidget {
       : -1;
 
   void _onNavTap(BuildContext context, int index) {
+    if (index == ParamedicoNavbar.incidentsTab) {
+      showParamedicoIncidentsSheet(context);
+      return;
+    }
     if (index == ParamedicoNavbar.profileTab) {
       ParamedicoSessionActions.openProfileSheet(context);
       return;
     }
-    if (index == ParamedicoNavbar.mapTab ||
-        index == ParamedicoNavbar.incidentsTab) {
+    if (index == ParamedicoNavbar.mapTab) {
       navigationShell.goBranch(
         index,
         initialLocation: index == navigationShell.currentIndex,

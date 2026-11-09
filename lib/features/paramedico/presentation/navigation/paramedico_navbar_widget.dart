@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:sistema_triage/core/constants/triage_icons.dart';
-import 'package:sistema_triage/core/layout/app_responsive.dart';
 import 'package:sistema_triage/core/theme/triage_tokens.dart';
 import 'package:sistema_triage/shared/widgets/app_module_bottom_nav.dart';
 import 'package:sistema_triage/shared/widgets/triage_icon_widget.dart';
@@ -27,11 +26,10 @@ class ParamedicoNavbar extends StatelessWidget {
   static const int guideTab = 2;
   static const int profileTab = 3;
 
-  // TODO: sustituir el ícono de Guía START por el de Figma cuando exista en TriageIcons
   static const _tabs = [
     AppModuleBottomNavTab(iconPath: TriageIcons.map, label: 'Mapa'),
     AppModuleBottomNavTab(iconPath: TriageIcons.list, label: 'Incidentes'),
-    AppModuleBottomNavTab(iconPath: TriageIcons.list, label: 'Guía START'),
+    AppModuleBottomNavTab(iconPath: TriageIcons.clipboard, label: 'Guía START'),
     AppModuleBottomNavTab(iconPath: TriageIcons.user, label: 'Perfil'),
   ];
 
@@ -53,13 +51,12 @@ class _CreateIncidentButton extends StatelessWidget {
 
   final VoidCallback onTap;
 
-  // Medidas de Figma; rDim las reduce en pantallas estrechas, sin bajar de 48
+  // Medidas que solo tiene esta pieza
   static const double _size = 64;
+  static const double _iconSize = 32;
 
   @override
   Widget build(BuildContext context) {
-    final size = context.rDim(_size);
-
     return Semantics(
       button: true,
       label: 'Crear incidente',
@@ -70,12 +67,13 @@ class _CreateIncidentButton extends StatelessWidget {
         child: InkWell(
           onTap: onTap,
           customBorder: const CircleBorder(),
-          child: SizedBox.square(
-            dimension: size,
+          child: const SizedBox(
+            width: _size,
+            height: _size,
             child: Center(
               child: TriageIcon(
                 TriageIcons.plus,
-                size: size / 2,
+                size: _iconSize,
                 color: TriageColors.textInverse,
               ),
             ),
