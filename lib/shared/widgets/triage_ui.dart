@@ -31,6 +31,7 @@ export 'package:sistema_triage/shared/widgets/triage_level_button_widget.dart';
 export 'package:sistema_triage/shared/widgets/triage_level_count_widget.dart';
 export 'package:sistema_triage/shared/widgets/triage_level_pill_widget.dart';
 export 'package:sistema_triage/shared/widgets/triage_map_markers_widget.dart';
+export 'package:sistema_triage/shared/widgets/triage_message_widget.dart';
 export 'package:sistema_triage/shared/widgets/triage_metric_widget.dart';
 export 'package:sistema_triage/shared/widgets/triage_patient_card_widget.dart';
 export 'package:sistema_triage/shared/widgets/triage_photo_widget.dart';
