@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:sistema_triage/core/config/supabase_env.dart';
@@ -7,11 +8,21 @@ import 'package:sistema_triage/features/auth/presentation/login/widgets/auth_tex
 import 'package:sistema_triage/shared/widgets/triage_ui.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+  setUpAll(() async {
+    final font = FontLoader('Inter')
+      ..addFont(rootBundle.load('assets/fonts/Inter/Inter-Regular.ttf'))
+      ..addFont(rootBundle.load('assets/fonts/Inter/Inter-SemiBold.ttf'))
+      ..addFont(rootBundle.load('assets/fonts/Inter/Inter-Bold.ttf'));
+    await font.load();
+  });
+
   Future<void> pumpLogin(
     WidgetTester tester,
     Size size, {
     double textScale = 1,
     double keyboardHeight = 0,
+    EdgeInsets safePadding = EdgeInsets.zero,
   }) async {
     tester.view.physicalSize = size;
     tester.view.devicePixelRatio = 1;
@@ -23,6 +34,7 @@ void main() {
           data: MediaQuery.of(context).copyWith(
             textScaler: TextScaler.linear(textScale),
             viewInsets: EdgeInsets.only(bottom: keyboardHeight),
+            padding: safePadding,
           ),
           child: child!,
         ),
@@ -30,6 +42,35 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+  }
+
+  for (final size in [const Size(390, 844), const Size(412, 915)]) {
+    testWidgets('acceso fijo sin desplazamiento a $size', (tester) async {
+      await pumpLogin(
+        tester,
+        size,
+        safePadding: const EdgeInsets.only(top: 46, bottom: 24),
+      );
+      final page = find
+          .descendant(
+            of: find.byType(LoginScreen),
+            matching: find.byType(Scrollable),
+          )
+          .first;
+      final position = tester.state<ScrollableState>(page).position;
+      expect(position.maxScrollExtent, 0);
+      final titleBefore = tester.getTopLeft(find.text('Inicia tu turno'));
+      await tester.drag(find.text('Inicia tu turno'), const Offset(0, -160));
+      await tester.pumpAndSettle();
+      expect(position.pixels, 0);
+      expect(tester.getTopLeft(find.text('Inicia tu turno')), titleBefore);
+      expect(find.text('Entrar').hitTestable(), findsOneWidget);
+      expect(
+        find.text('Consultar a un paciente').hitTestable(),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+    });
   }
 
   for (final size in [

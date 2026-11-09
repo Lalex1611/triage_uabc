@@ -108,116 +108,137 @@ class _LoginScreenState extends State<LoginScreen> {
     return Scaffold(
       backgroundColor: TriageColors.surface,
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: EdgeInsets.fromLTRB(
-            context.horizontalPadding,
-            TriageSpacing.xxl,
-            context.horizontalPadding,
-            TriageSpacing.xxl,
-          ),
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 560),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.only(
-                      top: TriageSpacing.xxl,
-                      bottom: TriageSpacing.xxl,
-                    ),
-                    child: Center(
-                      child: FractionallySizedBox(
-                        widthFactor: 0.5,
-                        child: SvgPicture.asset(
-                          _currentRole.logoAsset,
-                          semanticsLabel: 'Sistema TRIAGE',
-                          fit: BoxFit.contain,
+        child: LayoutBuilder(
+          builder: (context, viewport) => SingleChildScrollView(
+            primary: false,
+            physics: const ClampingScrollPhysics(),
+            padding: EdgeInsets.fromLTRB(
+              context.horizontalPadding,
+              TriageSpacing.xxl,
+              context.horizontalPadding,
+              TriageSpacing.xxl,
+            ),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: 560,
+                  minHeight: (viewport.maxHeight - 2 * TriageSpacing.xxl).clamp(
+                    0,
+                    double.infinity,
+                  ),
+                ),
+                child: IntrinsicHeight(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Expanded(
+                        // El logo cede espacio antes de permitir desplazamiento.
+                        // Este alto es su mínimo intrínseco; Expanded aprovecha
+                        // el espacio restante sin fijar la altura de la pantalla.
+                        child: SizedBox(
+                          height: 2 * TriageSizes.touchTarget,
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              vertical: TriageSpacing.xxl,
+                            ),
+                            child: Center(
+                              child: FractionallySizedBox(
+                                widthFactor: 0.5,
+                                child: SvgPicture.asset(
+                                  _currentRole.logoAsset,
+                                  semanticsLabel: 'Sistema TRIAGE',
+                                  fit: BoxFit.contain,
+                                ),
+                              ),
+                            ),
+                          ),
                         ),
                       ),
-                    ),
-                  ),
-                  Text(
-                    'Inicia tu turno',
-                    style: TriageTextStyles.screenTitle.copyWith(
-                      color: TriageColors.textPrimary,
-                    ),
-                  ),
-                  const SizedBox(height: TriageSpacing.lg),
-                  Text(
-                    'El sistema reconoce tu rol al entrar. No necesitas elegirlo.',
-                    style: TriageTextStyles.bodyMedium.copyWith(
-                      color: TriageColors.textSecondary,
-                    ),
-                  ),
-                  const SizedBox(height: TriageSpacing.xxl),
-                  AuthTextField(
-                    label: 'Correo institucional',
-                    hint: 'nombre@cruzroja.org.mx',
-                    roleType: _currentRole,
-                    controller: _emailController,
-                    hasError: _hasCredentialError,
-                    onChanged: (_) {},
-                  ),
-                  const SizedBox(height: TriageSpacing.xl),
-                  AuthTextField(
-                    label: 'Contraseña',
-                    hint: 'Escribe tu contraseña',
-                    roleType: _currentRole,
-                    isPassword: true,
-                    controller: _passwordController,
-                    hasError: _hasCredentialError,
-                    onChanged: (_) {},
-                    onForgotPassword: () {},
-                  ),
-                  const SizedBox(height: TriageSpacing.sm),
-                  TriageButton(
-                    label: 'Entrar',
-                    isLoading: _busy,
-                    onPressed: _submit,
-                  ),
-                  const SizedBox(height: TriageSpacing.xl),
-                  DecoratedBox(
-                    decoration: BoxDecoration(
-                      color: TriageColors.sunken,
-                      borderRadius: BorderRadius.circular(TriageRadii.xxl),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(TriageSpacing.lg),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                      Text(
+                        'Inicia tu turno',
+                        style: TriageTextStyles.screenTitle.copyWith(
+                          color: TriageColors.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: TriageSpacing.lg),
+                      Text(
+                        'El sistema reconoce tu rol al entrar. No necesitas elegirlo.',
+                        style: TriageTextStyles.bodyMedium.copyWith(
+                          color: TriageColors.textSecondary,
+                        ),
+                      ),
+                      const SizedBox(height: TriageSpacing.xxl),
+                      AuthTextField(
+                        label: 'Correo institucional',
+                        hint: 'nombre@cruzroja.org.mx',
+                        roleType: _currentRole,
+                        controller: _emailController,
+                        hasError: _hasCredentialError,
+                        onChanged: (_) {},
+                      ),
+                      const SizedBox(height: TriageSpacing.xl),
+                      AuthTextField(
+                        label: 'Contraseña',
+                        hint: 'Escribe tu contraseña',
+                        roleType: _currentRole,
+                        isPassword: true,
+                        controller: _passwordController,
+                        hasError: _hasCredentialError,
+                        onChanged: (_) {},
+                        onForgotPassword: () {},
+                      ),
+                      const SizedBox(height: TriageSpacing.sm),
+                      TriageButton(
+                        label: 'Entrar',
+                        isLoading: _busy,
+                        onPressed: _submit,
+                      ),
+                      const SizedBox(height: TriageSpacing.xl),
+                      DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: TriageColors.sunken,
+                          borderRadius: BorderRadius.circular(TriageRadii.xxl),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.all(TriageSpacing.lg),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
-                              const TriageIcon(
-                                TriageIcons.qr,
-                                color: TriageColors.textSecondary,
-                              ),
-                              const SizedBox(width: TriageSpacing.md),
-                              Expanded(
-                                child: Text(
-                                  '¿Buscas a un familiar? Consulta su estado con '
-                                  'el código que te dieron, sin crear cuenta.',
-                                  style: TriageTextStyles.bodySmall.copyWith(
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const TriageIcon(
+                                    TriageIcons.qr,
                                     color: TriageColors.textSecondary,
                                   ),
-                                ),
+                                  const SizedBox(width: TriageSpacing.md),
+                                  Expanded(
+                                    child: Text(
+                                      '¿Buscas a un familiar? Consulta su estado con '
+                                      'el código que te dieron, sin crear cuenta.',
+                                      style: TriageTextStyles.bodySmall
+                                          .copyWith(
+                                            color: TriageColors.textSecondary,
+                                          ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: TriageSpacing.md),
+                              TriageButton(
+                                label: 'Consultar a un paciente',
+                                variant: TriageButtonVariant.secondary,
+                                size: TriageButtonSize.medium,
+                                onPressed: () =>
+                                    context.go('/consulta-externa'),
                               ),
                             ],
                           ),
-                          const SizedBox(height: TriageSpacing.md),
-                          TriageButton(
-                            label: 'Consultar a un paciente',
-                            variant: TriageButtonVariant.secondary,
-                            size: TriageButtonSize.medium,
-                            onPressed: () => context.go('/consulta-externa'),
-                          ),
-                        ],
+                        ),
                       ),
-                    ),
+                    ],
                   ),
-                ],
+                ),
               ),
             ),
           ),
