@@ -10,6 +10,9 @@ class PatientCardData {
   final TriageLevel triageLevel;
   final String name;
   final String dateStr;
+
+  /// Primera línea de las notas del paciente ("hemorragia")
+  final String? note;
   final PatientLifecycleStatus status;
   final VoidCallback? onEditTap;
   final VoidCallback? onMapTap;
@@ -22,6 +25,7 @@ class PatientCardData {
     required this.name,
     required this.dateStr,
     required this.status,
+    this.note,
     this.onEditTap,
     this.onMapTap,
     this.onCardTap,

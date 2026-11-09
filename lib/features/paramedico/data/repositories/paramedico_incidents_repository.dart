@@ -28,6 +28,7 @@ class ParamedicoIncidentSummary {
     required this.emergencyType,
     required this.createdAt,
     required this.createdBy,
+    this.status = 'activo',
     this.description,
     this.photoPaths = const [],
     this.latitude,
@@ -39,6 +40,7 @@ class ParamedicoIncidentSummary {
   final String emergencyType;
   final DateTime? createdAt;
   final String createdBy;
+  final String status;
   final String? description;
   final List<String> photoPaths;
   final double? latitude;
@@ -55,6 +57,7 @@ class ParamedicoIncidentSummary {
           ? DateTime.tryParse(j['created_at'] as String)
           : null,
       createdBy: j['created_by'] as String? ?? '',
+      status: j['status'] as String? ?? 'activo',
       description: j['description'] as String?,
       photoPaths: _stringListFromDynamic(j['photo_local_paths']),
       latitude: coords?.$1,
@@ -220,6 +223,7 @@ class ParamedicoPatientRow {
     required this.triageColor,
     required this.status,
     required this.createdAt,
+    this.note,
   });
 
   final String id;
@@ -227,6 +231,9 @@ class ParamedicoPatientRow {
   final String triageColor;
   final String status;
   final DateTime? createdAt;
+
+  /// Primera línea de las notas, salvo que ya se use como nombre
+  final String? note;
 
   factory ParamedicoPatientRow.fromJson(Map<String, dynamic> j) {
     final id = j['id'] as String;
@@ -240,6 +247,7 @@ class ParamedicoPatientRow {
         : (notes != null && notes.trim().isNotEmpty)
         ? notes.trim().split('\n').first
         : 'Paciente ${id.length >= 6 ? id.substring(0, 6).toUpperCase() : id}';
+    final firstNote = notes?.trim().split('\n').first.trim();
 
     return ParamedicoPatientRow(
       id: id,
@@ -249,6 +257,9 @@ class ParamedicoPatientRow {
       createdAt: (j['created_at'] as String?) != null
           ? DateTime.tryParse(j['created_at'] as String)
           : null,
+      note: firstNote == null || firstNote.isEmpty || firstNote == display
+          ? null
+          : firstNote,
     );
   }
 }
