@@ -48,6 +48,29 @@ void main() {
     expect(_decoration(tester).color, TriageColors.dangerBackground);
   });
 
+  for (final (label, badge, background) in const [
+    ('REGISTRADO', TriageStatusBadge.registered(), TriageColors.sunken),
+    (
+      'DEFUNCIÓN',
+      TriageStatusBadge.deceased(),
+      TriageColors.triageBlackBackground,
+    ),
+    ('ACTIVO', TriageStatusBadge.active(), TriageColors.paramedicSoft),
+    ('CERRADO', TriageStatusBadge.closed(), TriageColors.sunken),
+  ]) {
+    testWidgets('atajo $label: etiqueta, fondo y contraste', (tester) async {
+      await tester.pumpWidget(_wrap(badge));
+      expect(find.text(label), findsOneWidget);
+      expect(_decoration(tester).color, background);
+      final text = tester.widget<Text>(find.text(label)).style!.color!;
+      final la = text.computeLuminance(), lb = background.computeLuminance();
+      expect(
+        (la > lb ? la + 0.05 : lb + 0.05) / (la > lb ? lb + 0.05 : la + 0.05),
+        greaterThanOrEqualTo(4.5),
+      );
+    });
+  }
+
   testWidgets('altura mínima 26 y se ajusta al contenido', (tester) async {
     await tester.pumpWidget(
       _wrap(TriageStatusBadge.patient(PatientLifecycleStatus.waiting)),
