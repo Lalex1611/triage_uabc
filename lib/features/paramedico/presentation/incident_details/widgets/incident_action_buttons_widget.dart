@@ -37,10 +37,11 @@ class IncidentActionButtons extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return TriageActionBar(
-      primary: isStatsTab
+      // Sin onCloseIncidentTap, quien no puede cerrarlo sigue pudiendo registrar
+      primary: isStatsTab && onCloseIncidentTap != null
           ? TriageButton(
               label: 'Cerrar incidente',
-              variant: TriageButtonVariant.secondary,
+              variant: TriageButtonVariant.danger,
               onPressed: onCloseIncidentTap,
             )
           : TriageButton(

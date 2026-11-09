@@ -8,7 +8,7 @@ void showIncidentMoreActions(
   required VoidCallback onEditTitle,
   required VoidCallback onEditLocation,
   required VoidCallback onAddPhotos,
-  required VoidCallback onCloseIncident,
+  VoidCallback? onCloseIncident,
 }) {
   showTriageSheet<void>(
     context,
@@ -43,12 +43,13 @@ void showIncidentMoreActions(
             detail: 'Documenta la escena',
             onTap: closeThen(onAddPhotos),
           ),
-          TriageOptionRow(
-            icon: TriageIcons.reject,
-            title: 'Cerrar incidente',
-            detail: 'Se retira de la lista de activos',
-            onTap: closeThen(onCloseIncident),
-          ),
+          if (onCloseIncident != null)
+            TriageOptionRow(
+              icon: TriageIcons.reject,
+              title: 'Cerrar incidente',
+              detail: 'Se retira de la lista de activos',
+              onTap: closeThen(onCloseIncident),
+            ),
           Padding(
             padding: const EdgeInsets.fromLTRB(
               TriageSpacing.xl,

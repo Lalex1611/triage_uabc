@@ -57,6 +57,20 @@ class IncidentDetailsViewMapper {
     ];
   }
 
+  static String closeIncidentMessage({
+    required String incidentId,
+    required int patientCount,
+  }) {
+    final folio = IncidentPresentationFormatters.shortIncidentId(incidentId);
+    final consequence = switch (patientCount) {
+      0 => '',
+      1 => ' El paciente conserva su historial y su traslado en curso.',
+      _ =>
+        ' Los $patientCount pacientes conservan su historial y sus traslados en curso.',
+    };
+    return '$folio saldrá de la lista de activos.$consequence';
+  }
+
   static PatientTriageFiltersData triageFiltersData({
     required PatientTriageFilter activeFilter,
     required ValueChanged<PatientTriageFilter> onFilterChanged,

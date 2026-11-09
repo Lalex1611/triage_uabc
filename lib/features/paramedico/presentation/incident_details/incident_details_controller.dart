@@ -63,6 +63,8 @@ class IncidentDetailsController extends ChangeNotifier {
     return inc != null && uid.isNotEmpty && inc.createdBy == uid;
   }
 
+  bool get canCloseIncident => canEditIncident && incident?.status != 'cerrado';
+
   IncidentDetailsShellMode get shellMode {
     if (loading) return IncidentDetailsShellMode.loading;
     if (error != null || incident == null) {
@@ -243,46 +245,22 @@ class IncidentDetailsController extends ChangeNotifier {
       return;
     }
 
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: TriageColors.surface,
-        surfaceTintColor: Colors.transparent,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text(
-          'Cerrar incidente',
-          style: TriageTextStyles.titleMedium.copyWith(
-            color: TriageColors.textPrimary,
-          ),
-        ),
-        content: Text(
-          '¿Marcar este incidente como cerrado?',
-          style: TriageTextStyles.bodyMedium.copyWith(
-            color: TriageColors.textSecondary,
-          ),
-        ),
-        actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text(
-              'Cancelar',
-              style: TriageTextStyles.labelMedium.copyWith(
-                color: TriageColors.textSecondary,
-              ),
-            ),
-          ),
-          TriageButton(
-            label: 'Cerrar',
-            size: TriageButtonSize.medium,
-            variant: TriageButtonVariant.primary,
-            onPressed: () => Navigator.pop(ctx, true),
-          ),
-        ],
+    final confirmed = await showTriageConfirm(
+      context,
+      icon: const TriageMessageIcon(
+        TriageIcons.reject,
+        tone: TriageTone.danger,
       ),
+      title: '¿Cerrar el incidente?',
+      message: IncidentDetailsViewMapper.closeIncidentMessage(
+        incidentId: incidentId,
+        patientCount: patients.length,
+      ),
+      confirmLabel: 'Sí, cerrar incidente',
+      confirmVariant: TriageButtonVariant.danger,
     );
 
-    if (ok != true || !context.mounted) return;
+    if (!confirmed || !context.mounted) return;
 
     try {
       await _repo.closeIncident(incidentId);
