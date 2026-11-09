@@ -225,6 +225,8 @@ class ParamedicoPatientRow {
     required this.status,
     required this.createdAt,
     this.note,
+    this.hospitalName,
+    this.wasRejected = false,
   });
 
   final String id;
@@ -235,6 +237,12 @@ class ParamedicoPatientRow {
 
   /// Primera línea de las notas, salvo que ya se use como nombre
   final String? note;
+
+  /// Hospital destino, si el traslado sigue en pie
+  final String? hospitalName;
+
+  /// Algún hospital canceló su traslado, aunque ahora tenga otro destino
+  final bool wasRejected;
 
   factory ParamedicoPatientRow.fromJson(Map<String, dynamic> j) {
     final id = j['id'] as String;
@@ -261,6 +269,8 @@ class ParamedicoPatientRow {
       note: firstNote == null || firstNote.isEmpty || firstNote == display
           ? null
           : firstNote,
+      hospitalName: (j['hospitals'] as Map<String, dynamic>?)?['name'] as String?,
+      wasRejected: (j['medico_rejected_transfers'] as List?)?.isNotEmpty ?? false,
     );
   }
 }
@@ -435,7 +445,8 @@ class ParamedicoIncidentsRepository {
     final rows = await _c
         .from('patients')
         .select(
-          'id, display_name, triage_color, status, created_at, regulation_folio, descriptive_notes',
+          'id, display_name, triage_color, status, created_at, regulation_folio, descriptive_notes, '
+          'hospitals(name), medico_rejected_transfers(id)',
         )
         .eq('incident_id', incidentId)
         .eq('is_deleted', false)
