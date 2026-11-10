@@ -389,7 +389,9 @@ class _AssignTransferSheetState extends State<AssignTransferSheet> {
                                             color: TriageColors.textSecondary,
                                           ),
                                     ),
-                                    const SizedBox(width: TriageSpacing.sm),
+                                    const SizedBox(
+                                      width: TriageSpacing.sm,
+                                    ), // pendiente a disponibilidad
                                     const TriageStatusBadge(
                                       label: 'Activo',
                                       dotColor: TriageColors.success,
