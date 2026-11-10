@@ -338,7 +338,7 @@ class _AssignTransferSheetState extends State<AssignTransferSheet> {
                     child: TriageTapCard(
                       selected: isSelected,
                       borderColor: isSelected
-                          ? TriageColors.paramedicAccent
+                          ? TriageColors.hospitalAccent
                           : TriageColors.borderMedium,
                       onTap: () => setState(() => _selectedHospital = h),
                       child: Row(
@@ -346,14 +346,14 @@ class _AssignTransferSheetState extends State<AssignTransferSheet> {
                           Container(
                             padding: const EdgeInsets.all(TriageSpacing.sm),
                             decoration: BoxDecoration(
-                              color: TriageColors.paramedicSoft,
+                              color: TriageColors.infoBackground,
                               borderRadius: BorderRadius.circular(
                                 TriageRadii.md,
                               ),
                             ),
                             child: const TriageIcon(
                               TriageIcons.hospital,
-                              color: TriageColors.paramedicAccent,
+                              color: TriageColors.hospitalAccent,
                               size: TriageSizes.icon,
                             ),
                           ),
@@ -374,7 +374,7 @@ class _AssignTransferSheetState extends State<AssignTransferSheet> {
                                   style: TriageTextStyles.bodySmall.copyWith(
                                     color: hasCoords
                                         ? TriageColors.textSecondary
-                                        : TriageColors.warning,
+                                        : TriageColors.textSecondary,
                                   ),
                                 ),
                                 const SizedBox(height: TriageSpacing.xs),
@@ -406,7 +406,7 @@ class _AssignTransferSheetState extends State<AssignTransferSheet> {
                           if (isSelected)
                             const TriageIcon(
                               TriageIcons.checkCircle,
-                              color: TriageColors.paramedicAccent,
+                              color: TriageColors.hospitalAccent,
                               size: TriageSizes.icon,
                             ),
                         ],
@@ -465,7 +465,7 @@ class _AssignTransferSheetState extends State<AssignTransferSheet> {
                     Container(
                       padding: const EdgeInsets.all(TriageSpacing.sm),
                       decoration: BoxDecoration(
-                        color: TriageColors.paramedicAccent,
+                        color: TriageColors.hospitalAccent,
                         borderRadius: BorderRadius.circular(TriageRadii.md),
                       ),
                       child: const TriageIcon(
@@ -560,14 +560,14 @@ class _AssignTransferSheetState extends State<AssignTransferSheet> {
                 dimension: 64,
                 child: DecoratedBox(
                   decoration: const BoxDecoration(
-                    color: TriageColors.paramedicSoft,
+                    color: TriageColors.hospitalSoft,
                     shape: BoxShape.circle,
                   ),
                   child: const Center(
                     child: TriageIcon(
                       TriageIcons.ambulance,
                       size: 32,
-                      color: TriageColors.paramedicAccent,
+                      color: TriageColors.hospitalAccent,
                     ),
                   ),
                 ),
