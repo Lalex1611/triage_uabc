@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:sistema_triage/core/theme/app_theme.dart';
 import 'package:sistema_triage/features/auth/domain/constants/auth_role_type.dart';
+import 'package:sistema_triage/shared/widgets/triage_ui.dart';
 
-class AuthTextField extends StatefulWidget {
+/// Campo de acceso: conserva el límite de 60 caracteres del formulario actual.
+class AuthTextField extends StatelessWidget {
   final String label;
   final String hint;
   final AuthRoleType roleType;
@@ -10,6 +11,7 @@ class AuthTextField extends StatefulWidget {
   final ValueChanged<String> onChanged;
   final VoidCallback? onForgotPassword;
   final TextEditingController? controller;
+  final bool hasError;
 
   const AuthTextField({
     super.key,
@@ -20,127 +22,82 @@ class AuthTextField extends StatefulWidget {
     required this.onChanged,
     this.onForgotPassword,
     this.controller,
+    this.hasError = false,
   });
 
   @override
-  State<AuthTextField> createState() => _AuthTextFieldState();
-}
-
-class _AuthTextFieldState extends State<AuthTextField> {
-  int _currentLength = 0;
-
-  @override
   Widget build(BuildContext context) {
+    OutlineInputBorder border(
+      Color color, [
+      double width = TriageSizes.stroke,
+    ]) => OutlineInputBorder(
+      borderRadius: BorderRadius.circular(TriageRadii.md),
+      borderSide: BorderSide(color: color, width: width),
+    );
+
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
       children: [
-        SizedBox(
-          height: 48,
-          child: TextField(
-            controller: widget.controller,
-            obscureText: widget.isPassword,
-            maxLength: 60,
-            onChanged: (val) {
-              setState(() => _currentLength = val.length);
-              widget.onChanged(val);
-            },
-            style: AppTextStyles.ESC_Regular_bodyMedium.copyWith(
-              fontSize: 12,
-              color: const Color(
-                0xFF999A9D,
-              ), // Como se ve en la imagen el hint/texto
-            ),
-            decoration: InputDecoration(
-              counterText:
-                  '', // Ocultamos el counter interno para dibujarlo abajo
-              floatingLabelBehavior: FloatingLabelBehavior.always,
-              label: RichText(
-                text: TextSpan(
-                  text: widget.label,
-                  style: AppTextStyles.ESC_Bold_titleSmall.copyWith(
-                    color: widget.roleType.primaryColor,
-                    fontSize: 12,
+        MergeSemantics(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                label,
+                style: TriageTextStyles.labelMedium.copyWith(
+                  color: TriageColors.textSecondary,
+                ),
+              ),
+              const SizedBox(height: TriageSpacing.sm),
+              TextField(
+                controller: controller,
+                obscureText: isPassword,
+                maxLength: 60,
+                onChanged: onChanged,
+                style: TriageTextStyles.bodyMedium.copyWith(
+                  color: TriageColors.textPrimary,
+                ),
+                decoration: InputDecoration(
+                  counterText: '',
+                  hintText: hint,
+                  hintStyle: TriageTextStyles.bodyMedium.copyWith(
+                    color: TriageColors.textSecondary,
                   ),
-                  children: [
-                    TextSpan(
-                      text: ' *',
-                      style: AppTextStyles.ESC_Bold_titleSmall.copyWith(
-                        color: const Color(0xFFCE1125), // Asterisco rojo
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
+                  filled: true,
+                  fillColor: TriageColors.surface,
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: TriageSpacing.lg,
+                    vertical: TriageSpacing.md,
+                  ),
+                  enabledBorder: border(
+                    hasError ? TriageColors.danger : TriageColors.borderMedium,
+                  ),
+                  focusedBorder: border(
+                    hasError ? TriageColors.danger : context.triageRole.accent,
+                    TriageSizes.strokeStrong,
+                  ),
                 ),
               ),
-              hintText: widget.hint,
-              hintStyle: AppTextStyles.ESC_Regular_bodyMedium.copyWith(
-                fontSize: 12,
-                color: const Color(0xFF999A9D),
-              ),
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 0,
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(5),
-                borderSide: BorderSide(color: widget.roleType.primaryColor),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(5),
-                borderSide: BorderSide(
-                  color: widget.roleType.primaryColor,
-                  width: 2,
-                ),
-              ),
-            ),
+            ],
           ),
         ),
-        const SizedBox(height: 4),
-        Row(
-          mainAxisAlignment: (() {
-            MainAxisAlignment alignment = MainAxisAlignment.end;
-            if (widget.isPassword) {
-              alignment = MainAxisAlignment.spaceBetween;
-            }
-            return alignment;
-          })(),
-          children: [
-            if (widget.isPassword)
-              Text(
-                '$_currentLength/60',
-                style: AppTextStyles.ESC_Regular_bodyMedium.copyWith(
-                  fontSize: 10,
-                  color: Colors.black, // Color aproximado para el contador
-                ),
+        if (isPassword && onForgotPassword != null) ...[
+          const SizedBox(height: TriageSpacing.xs),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton(
+              onPressed: onForgotPassword,
+              style: TextButton.styleFrom(
+                foregroundColor: context.triageRole.accent,
+                textStyle: TriageTextStyles.labelMedium,
+                minimumSize: const Size(0, TriageSizes.touchTarget),
+                padding: const EdgeInsets.symmetric(vertical: TriageSpacing.md),
               ),
-            if (widget.isPassword && widget.onForgotPassword != null)
-              Expanded(
-                child: Align(
-                  alignment: Alignment.centerRight,
-                  child: GestureDetector(
-                    onTap: widget.onForgotPassword,
-                    child: Text(
-                      '¿olvidaste tu contraseña?',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: AppTextStyles.ESC_Bold_titleSmall.copyWith(
-                        fontSize: 10,
-                        color: widget.roleType.primaryColor,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            if (!widget.isPassword)
-              Text(
-                '$_currentLength/60',
-                style: AppTextStyles.ESC_Regular_bodyMedium.copyWith(
-                  fontSize: 10,
-                  color: Colors.black,
-                ),
-              ),
-          ],
-        ),
+              child: const Text('¿Olvidaste tu contraseña?'),
+            ),
+          ),
+        ],
       ],
     );
   }

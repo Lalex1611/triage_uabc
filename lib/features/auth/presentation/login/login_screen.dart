@@ -2,15 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:sistema_triage/core/config/supabase_env.dart';
+import 'package:sistema_triage/core/layout/app_responsive.dart';
 import 'package:sistema_triage/core/session/auth_gate.dart';
 import 'package:sistema_triage/core/ui/app_snackbar.dart';
-import 'package:sistema_triage/core/theme/app_theme.dart';
 import 'package:sistema_triage/features/auth/domain/constants/auth_role_type.dart';
 import 'package:sistema_triage/features/auth/domain/user_role.dart';
+import 'package:sistema_triage/features/auth/presentation/login/forgot_password_screen.dart';
 import 'package:sistema_triage/features/auth/presentation/login/widgets/auth_text_field.dart';
-import 'package:sistema_triage/features/auth/presentation/login/widgets/auth_action_button.dart';
-import 'package:sistema_triage/features/auth/presentation/login/widgets/auth_consult_button.dart';
-import 'package:sistema_triage/features/auth/presentation/login/widgets/auth_partner_logos_footer.dart';
+import 'package:sistema_triage/shared/widgets/triage_ui.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -25,6 +24,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _busy = false;
+  bool _hasCredentialError = false;
 
   @override
   void dispose() {
@@ -46,11 +46,15 @@ class _LoginScreenState extends State<LoginScreen> {
     final email = _emailController.text.trim();
     final password = _passwordController.text;
     if (email.isEmpty || password.isEmpty) {
+      setState(() => _hasCredentialError = true);
       showAppSnackBar(context, 'Ingresa correo y contraseña.');
       return;
     }
 
-    setState(() => _busy = true);
+    setState(() {
+      _busy = true;
+      _hasCredentialError = false;
+    });
 
     try {
       await Supabase.instance.client.auth.signInWithPassword(
@@ -67,7 +71,7 @@ class _LoginScreenState extends State<LoginScreen> {
           context,
           'Tu cuenta no tiene un rol de la salud asignado. Si eres paramédico o médico, '
           'pide a un administrador que lo active. Para consultar el estado de un '
-          'paciente, toca «Consultar estado» abajo e ingresa el código.',
+          'paciente, toca «Consultar a un paciente» abajo e ingresa el código.',
           isError: true,
         );
         return;
@@ -90,6 +94,7 @@ class _LoginScreenState extends State<LoginScreen> {
       context.go(role.homePath);
     } on AuthException catch (e) {
       if (!mounted) return;
+      setState(() => _hasCredentialError = true);
       showAppSnackBar(context, e.message, isError: true);
     } catch (e) {
       if (!mounted) return;
@@ -102,72 +107,145 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: TriageColors.surface,
       body: SafeArea(
-        child: SingleChildScrollView(
-          child: SizedBox(
-            width: double.infinity,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                const SizedBox(height: 130),
-                SvgPicture.asset(
-                  _currentRole.logoAsset,
-                  height: 224,
-                  fit: BoxFit.contain,
+        child: LayoutBuilder(
+          builder: (context, viewport) => SingleChildScrollView(
+            primary: false,
+            physics: const ClampingScrollPhysics(),
+            padding: EdgeInsets.fromLTRB(
+              context.horizontalPadding,
+              TriageSpacing.xxl,
+              context.horizontalPadding,
+              TriageSpacing.xxl,
+            ),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: 560,
+                  minHeight: (viewport.maxHeight - 2 * TriageSpacing.xxl).clamp(
+                    0,
+                    double.infinity,
+                  ),
                 ),
-                const SizedBox(height: 70),
-                const SizedBox(height: 35),
-                SizedBox(
-                  width: 270,
+                child: IntrinsicHeight(
                   child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
+                      Expanded(
+                        // El logo cede espacio antes de permitir desplazamiento.
+                        // Este alto es su mínimo intrínseco; Expanded aprovecha
+                        // el espacio restante sin fijar la altura de la pantalla.
+                        child: SizedBox(
+                          height: 2 * TriageSizes.touchTarget,
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              vertical: TriageSpacing.xxl,
+                            ),
+                            child: Center(
+                              child: FractionallySizedBox(
+                                widthFactor: 0.5,
+                                child: SvgPicture.asset(
+                                  _currentRole.logoAsset,
+                                  semanticsLabel: 'Sistema TRIAGE',
+                                  fit: BoxFit.contain,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      Text(
+                        'Inicia tu turno',
+                        style: TriageTextStyles.screenTitle.copyWith(
+                          color: TriageColors.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: TriageSpacing.lg),
+                      Text(
+                        'El sistema reconoce tu rol al entrar. No necesitas elegirlo.',
+                        style: TriageTextStyles.bodyMedium.copyWith(
+                          color: TriageColors.textSecondary,
+                        ),
+                      ),
+                      const SizedBox(height: TriageSpacing.xxl),
                       AuthTextField(
-                        label: 'Correo electrónico',
-                        hint: 'usuario@ejemplo.com',
+                        label: 'Correo institucional',
+                        hint: 'nombre@cruzroja.org.mx',
                         roleType: _currentRole,
                         controller: _emailController,
+                        hasError: _hasCredentialError,
                         onChanged: (_) {},
                       ),
-                      const SizedBox(height: 20),
+                      const SizedBox(height: TriageSpacing.xl),
                       AuthTextField(
                         label: 'Contraseña',
-                        hint: '#@8mds!...',
+                        hint: 'Escribe tu contraseña',
                         roleType: _currentRole,
                         isPassword: true,
                         controller: _passwordController,
+                        hasError: _hasCredentialError,
                         onChanged: (_) {},
-                        onForgotPassword: () {},
+                        onForgotPassword: () =>
+                            Navigator.of(context).push<void>(
+                              MaterialPageRoute(
+                                builder: (_) => const ForgotPasswordScreen(),
+                              ),
+                            ),
+                      ),
+                      const SizedBox(height: TriageSpacing.sm),
+                      TriageButton(
+                        label: 'Entrar',
+                        isLoading: _busy,
+                        onPressed: _submit,
+                      ),
+                      const SizedBox(height: TriageSpacing.xl),
+                      DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: TriageColors.sunken,
+                          borderRadius: BorderRadius.circular(TriageRadii.xxl),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.all(TriageSpacing.lg),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const TriageIcon(
+                                    TriageIcons.qr,
+                                    color: TriageColors.textSecondary,
+                                  ),
+                                  const SizedBox(width: TriageSpacing.md),
+                                  Expanded(
+                                    child: Text(
+                                      '¿Buscas a un familiar? Consulta su estado con '
+                                      'el código que te dieron, sin crear cuenta.',
+                                      style: TriageTextStyles.bodySmall
+                                          .copyWith(
+                                            color: TriageColors.textSecondary,
+                                          ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: TriageSpacing.md),
+                              TriageButton(
+                                label: 'Consultar a un paciente',
+                                variant: TriageButtonVariant.secondary,
+                                size: TriageButtonSize.medium,
+                                onPressed: () =>
+                                    context.go('/consulta-externa'),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
                     ],
                   ),
                 ),
-                const SizedBox(height: 27),
-                if (_busy)
-                  const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 8),
-                    child: SizedBox(
-                      height: 40,
-                      width: 40,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    ),
-                  )
-                else
-                  AuthActionButton(roleType: _currentRole, onTap: _submit),
-                const SizedBox(height: 47),
-                Text(
-                  '¿Eres paciente o quieres saber el estado de tu familiar?',
-                  style: AppTextStyles.ESC_SemiBold_bodyMedium.copyWith(
-                    fontSize: 10,
-                    color: const Color(0xFF999A9D),
-                  ),
-                ),
-                const SizedBox(height: 4),
-                AuthConsultButton(onTap: () => context.go('/consulta-externa')),
-                const SizedBox(height: 28),
-                const AuthPartnerLogosFooter(),
-                const SizedBox(height: 32),
-              ],
+              ),
             ),
           ),
         ),

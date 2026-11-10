@@ -4,12 +4,10 @@ import 'package:sistema_triage/features/auth/presentation/login/login_screen.dar
 
 void main() {
   runApp(
-    Theme(
-      data: appTheme,
-      child: const MaterialApp(
-        debugShowCheckedModeBanner: false,
-        home: LoginScreen(),
-      ),
+    MaterialApp(
+      theme: appTheme,
+      debugShowCheckedModeBanner: false,
+      home: const LoginScreen(),
     ),
   );
 }
