@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:sistema_triage/core/theme/app_theme.dart';
+import 'package:sistema_triage/features/paramedico/data/repositories/paramedico_incidents_repository.dart';
 import 'package:sistema_triage/features/paramedico/domain/entities/incident_details/incident_header_data.dart';
 import 'package:sistema_triage/features/paramedico/domain/entities/incident_details/incident_tab_data.dart';
 import 'package:sistema_triage/features/paramedico/domain/entities/incident_details/patient_card_data.dart';
@@ -130,7 +131,25 @@ class _IncidentDetailsVisualTestState extends State<IncidentDetailsVisualTest> {
         onRemovePhoto: (_) async => true,
         onSaveDescription: (_) async {},
       ),
-      _ => IncidentDetailsStatsTab(patients: patients),
+      _ => IncidentDetailsStatsTab(
+        patients: [
+          for (final (i, status) in const [
+            'en_espera',
+            'trasladando',
+            'recibido',
+            'alta_medica',
+          ].indexed)
+            ParamedicoPatientRow(
+              id: 'p$i',
+              displayName: 'Paciente $i',
+              triageColor: i.isEven ? 'rojo' : 'verde',
+              status: status,
+              createdAt: null,
+              hospitalName: i == 0 ? null : 'Hospital General de Tijuana',
+              wasRejected: i == 0,
+            ),
+        ],
+      ),
     };
 
     return Theme(
@@ -150,6 +169,7 @@ class _IncidentDetailsVisualTestState extends State<IncidentDetailsVisualTest> {
         ),
         onBack: () {},
         onMoreTap: () {},
+        onCloseIncidentTap: () {},
         tabSelectorData: IncidentTabSelectorData(
           activeTab: _activeTab,
           availableTabs: IncidentTabType.values,

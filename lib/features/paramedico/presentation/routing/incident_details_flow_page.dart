@@ -65,7 +65,9 @@ class _IncidentDetailsFlowPageState extends State<IncidentDetailsFlowPage> {
       onEditTitle: () => unawaited(_controller.editIncidentTitle(context)),
       onEditLocation: () => unawaited(_controller.editIncidentCoords(context)),
       onAddPhotos: () => _controller.showIncidentImageSourceDialog(context),
-      onCloseIncident: () => unawaited(_controller.confirmClose(context)),
+      onCloseIncident: _controller.canCloseIncident
+          ? () => unawaited(_controller.confirmClose(context))
+          : null,
     );
   }
 
@@ -103,9 +105,7 @@ class _IncidentDetailsFlowPageState extends State<IncidentDetailsFlowPage> {
               _controller.confirmRemoveIncidentPhoto(context, index),
         );
       case IncidentTabType.estadisticas:
-        return IncidentDetailsStatsTab(
-          patients: _controller.patientCards(context),
-        );
+        return IncidentDetailsStatsTab(patients: _controller.patients);
     }
   }
 
@@ -130,7 +130,7 @@ class _IncidentDetailsFlowPageState extends State<IncidentDetailsFlowPage> {
       onRegisterTap: inc != null
           ? () => unawaited(_controller.openRegisterAndRefresh(context))
           : null,
-      onCloseIncidentTap: inc != null
+      onCloseIncidentTap: _controller.canCloseIncident
           ? () => unawaited(_controller.confirmClose(context))
           : null,
     );
