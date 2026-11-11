@@ -107,14 +107,14 @@ void main() {
       'No camina',
       'Sí respira',
       '30 o menos',
-      'Llenado menor a 2 s',
+      'Llenado de 2 s o menos',
       'Sí obedece',
     ]) {
       await _choose(tester, answer);
     }
     expect(find.text('Amarillo · Urgente'), findsOneWidget);
     expect(find.text('Por qué salió amarillo'), findsOneWidget);
-    expect(find.text('Menor a 2 s'), findsOneWidget);
+    expect(find.text('2 s o menos'), findsOneWidget);
 
     await _choose(tester, 'Guardar paciente');
     expect(h.repo.registered.single['triage'], 'amarillo');
@@ -139,6 +139,69 @@ void main() {
     await _choose(tester, 'No camina');
     await _choose(tester, 'No respira ni al abrir la vía aérea');
     expect(find.text('Negro · Fallecido'), findsOneWidget);
+  });
+
+  testWidgets('START guiado: respirar solo al abrir la vía aérea es rojo', (
+    tester,
+  ) async {
+    await tester.pumpWidget(_Harness().app());
+    await _open(tester);
+    await _choose(tester, 'START guiado');
+    await _choose(tester, 'No camina');
+    await _choose(tester, 'Respira solo al abrir la vía aérea');
+    expect(find.text('Rojo · Inmediato'), findsOneWidget);
+    expect(find.text('Solo al abrir la vía aérea'), findsOneWidget);
+  });
+
+  testWidgets('START guiado: un doble toque responde una sola pregunta', (
+    tester,
+  ) async {
+    await tester.pumpWidget(_Harness().app());
+    await _open(tester);
+    await _choose(tester, 'START guiado');
+    // Dos toques antes de redibujar
+    await tester.tap(find.text('No camina'));
+    await tester.tap(find.text('No camina'));
+    await tester.pumpAndSettle();
+    expect(find.text('Paso 2 de 5'), findsOneWidget);
+    expect(find.text('¿Respira?'), findsOneWidget);
+  });
+
+  testWidgets('START guiado sin conexión: se responde y guarda al volver', (
+    tester,
+  ) async {
+    final h = _Harness(
+      repo: FakeIntakeRepository()..incidentError = 'Sin conexión',
+    );
+    await tester.pumpWidget(h.app());
+    await _open(tester);
+    await _choose(tester, 'START guiado');
+    // Sin número de paciente mientras no se pudo leer el incidente
+    expect(find.text('INC-A1B2C3'), findsOneWidget);
+    expect(find.textContaining('Paciente'), findsNothing);
+
+    await _choose(tester, 'Sí, camina');
+    await _choose(tester, 'Guardar paciente');
+    expect(find.text('No se pudo registrar al paciente'), findsOneWidget);
+    expect(h.repo.registered, isEmpty);
+
+    h.repo.incidentError = null;
+    await _choose(tester, 'Guardar paciente');
+    expect(h.repo.registered.single['triage'], 'verde');
+    expect(find.text('PAC-ABCDEF quedó registrado'), findsOneWidget);
+  });
+
+  testWidgets('Asignar color sin conexión avisa y no abre el panel', (
+    tester,
+  ) async {
+    final h = _Harness(
+      repo: FakeIntakeRepository()..incidentError = 'Sin conexión',
+    );
+    await tester.pumpWidget(h.app());
+    await _open(tester);
+    await _choose(tester, 'Asignar color directo');
+    expect(find.byType(TriageSheet), findsNothing);
+    expect(find.textContaining('No se pudo preparar'), findsOneWidget);
   });
 
   testWidgets('START guiado: cambiar el color sugerido', (tester) async {

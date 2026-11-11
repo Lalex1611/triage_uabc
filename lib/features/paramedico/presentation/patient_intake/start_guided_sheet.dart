@@ -64,7 +64,12 @@ class _StartGuidedPanelState extends State<StartGuidedPanel> {
   TriageLevel? get _suggested => _answers.lastOrNull?.level;
   TriageLevel? get _level => _chosenLevel ?? _suggested;
 
-  void _answer(StartAnswer answer) => setState(() => _answers.add(answer));
+  /// Ignora la respuesta si [step] ya no es la pregunta pendiente: un doble
+  /// toque antes de redibujar no debe contestar también la siguiente
+  void _answer(int step, StartAnswer answer) {
+    if (step != _answers.length) return;
+    setState(() => _answers.add(answer));
+  }
 
   void _assignColorMyself() {
     Navigator.pop(context);
@@ -139,9 +144,11 @@ class _StartGuidedPanelState extends State<StartGuidedPanel> {
       },
       child: TriageSheet(
         title: 'START guiado',
-        subtitle:
-            'Paciente ${widget.session.nextNumber} · '
-            '${widget.session.incidentFolio}',
+        // Sin preparar, el número de paciente aún no se conoce
+        subtitle: widget.session.isPrepared
+            ? 'Paciente ${widget.session.nextNumber} · '
+                  '${widget.session.incidentFolio}'
+            : widget.session.incidentFolio,
         steps: level == null
             ? TriageSteps(
                 current: step + 1,
@@ -214,7 +221,7 @@ class _StartGuidedPanelState extends State<StartGuidedPanel> {
             _AnswerOption(
               answer: answer,
               nextStep: index + 2,
-              onTap: () => _answer(answer),
+              onTap: () => _answer(index, answer),
             ),
             const SizedBox(height: TriageSpacing.sm),
           ],

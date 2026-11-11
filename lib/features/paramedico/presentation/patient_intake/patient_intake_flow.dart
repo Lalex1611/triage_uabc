@@ -34,14 +34,16 @@ Future<void> startPatientIntake(
     try {
       await intake.prepare();
     } catch (e) {
-      if (context.mounted) {
+      // START se puede responder sin conexión: al guardar se vuelve a
+      // preparar y, si falla, el error sale en el panel
+      if (option != PatientIntakeOption.startGuided && context.mounted) {
         showAppSnackBar(
           context,
           'No se pudo preparar el registro: $e',
           isError: true,
         );
       }
-      return;
+      if (option != PatientIntakeOption.startGuided) return;
     }
     if (!context.mounted) return;
 

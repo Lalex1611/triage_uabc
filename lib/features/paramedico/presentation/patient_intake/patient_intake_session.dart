@@ -55,6 +55,9 @@ class PatientIntakeSession {
   String? _placeKey;
   bool _prepared = false;
 
+  /// Si ya se leyeron el incidente y el número del siguiente paciente
+  bool get isPrepared => _prepared;
+
   String get incidentFolio =>
       IncidentPresentationFormatters.shortIncidentId(incidentId);
 

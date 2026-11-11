@@ -10,9 +10,14 @@ class FakeIntakeRepository extends ParamedicoIncidentsRepository {
   int incidentReads = 0;
   Object? failWith;
 
+  /// Si no es `null`, leer el incidente falla con este error (sin conexión)
+  Object? incidentError;
+
   @override
   Future<ParamedicoIncidentSummary?> getIncident(String incidentId) async {
     incidentReads++;
+    final error = incidentError;
+    if (error != null) throw error;
     return ParamedicoIncidentSummary(
       id: incidentId,
       generatedTitle: 'Choque',
