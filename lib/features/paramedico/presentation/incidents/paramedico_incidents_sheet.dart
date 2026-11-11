@@ -9,6 +9,7 @@ import 'package:sistema_triage/features/paramedico/data/repositories/paramedico_
 import 'package:sistema_triage/features/paramedico/domain/constants/incident_sorting_options.dart';
 import 'package:sistema_triage/features/paramedico/domain/entities/home/incident_for_cards.dart';
 import 'package:sistema_triage/features/paramedico/domain/services/incident_list_query.dart';
+import 'package:sistema_triage/features/paramedico/presentation/create_incident/create_incident_sheet.dart';
 import 'package:sistema_triage/features/paramedico/presentation/incidents/paramedico_incidents_controller.dart';
 import 'package:sistema_triage/shared/domain/triage_level.dart';
 import 'package:sistema_triage/shared/widgets/triage_ui.dart';
@@ -27,7 +28,11 @@ Future<void> showParamedicoIncidentsSheet(BuildContext context) async {
   // La hoja devuelve la ruta elegida y la navegación ocurre ya con la hoja
   // cerrada, no en el mismo instante en que se cierra
   if (path != null && context.mounted) {
-    pushParamedicoFullScreen(context, path);
+    if (path == '/paramedico/incident/nuevo') {
+      await showCreateIncidentSheet(context);
+    } else {
+      pushParamedicoFullScreen(context, path);
+    }
   }
 }
 

@@ -301,10 +301,12 @@ class CreateIncidentController extends ChangeNotifier {
     );
   }
 
-  Future<void> submit(BuildContext context) async {
+  /// Crea el incidente y devuelve su id (null si falló). Ya no navega: lo hace
+  /// quien llamó (la hoja de nuevo incidente)
+  Future<String?> submit(BuildContext context) async {
     if (!SupabaseEnv.isConfigured) {
       showAppSnackBar(context, 'Supabase no configurado.', isError: true);
-      return;
+      return null;
     }
     submitting = true;
     notifyListeners();
@@ -348,18 +350,20 @@ class CreateIncidentController extends ChangeNotifier {
           photosUploaded = false;
         }
       }
-      if (!context.mounted) return;
-      showAppSnackBar(
+      if (context.mounted) {
+        showAppSnackBar(
         context,
         photosUploaded
             ? 'Incidente creado.'
             : 'Incidente creado, pero no se pudieron subir las fotos. '
                   'Añádelas desde el incidente.',
         isError: !photosUploaded,
-      );
-      context.go('/paramedico/incidentes');
+        );
+      }
+      return id;
     } catch (e) {
       if (context.mounted) showAppSnackBar(context, '$e', isError: true);
+      return null;
     } finally {
       submitting = false;
       notifyListeners();
