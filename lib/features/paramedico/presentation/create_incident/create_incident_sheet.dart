@@ -66,7 +66,7 @@ class _CreateIncidentBodyState extends State<_CreateIncidentBody> {
     _controller.addListener(_onController);
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await _controller.refreshGpsFromDevice(context, silent: true);
-      if (mounted) await _controller.refreshPreviewTitle();
+      if (mounted && _controller.locationConfirmed) await _controller.refreshPreviewTitle();
     });
   }
 
@@ -125,7 +125,7 @@ class _CreateIncidentBodyState extends State<_CreateIncidentBody> {
             primary: TriageButton(
               label: 'Crear incidente',
               isLoading: c.submitting,
-              onPressed: c.submitting ? null : () => unawaited(_create()),
+              onPressed: c.canSubmit ? () => unawaited(_create()) : null,
             ),
           ),
         ],
@@ -195,21 +195,33 @@ class _CreateIncidentBodyState extends State<_CreateIncidentBody> {
 
   Widget _locationSection(CreateIncidentController c) {
     final searching = c.refreshingGps || c.refreshingTitle;
-    final place = searching ? null : _placeFromTitle(c.previewTitle);
-    final address = searching
-        ? 'Buscando dirección…'
-        : (place ?? 'Ubicación seleccionada');
-    final coordinates =
-        '${c.lat.toStringAsFixed(4)}, ${c.lng.toStringAsFixed(4)}';
+    final confirmed = c.locationConfirmed;
+    final failed = !confirmed && !c.refreshingGps && c.locationError != null;
+
+    final place = (confirmed && !searching)
+        ? _placeFromTitle(c.previewTitle)
+        : null;
+    final address = !confirmed
+        ? (failed ? c.locationError! : 'Obteniendo ubicación…')
+        : (searching
+              ? 'Buscando dirección…'
+              : (place ?? 'Ubicación seleccionada'));
+    final coordinates = confirmed
+        ? '${c.lat.toStringAsFixed(4)}, ${c.lng.toStringAsFixed(4)}'
+        : null;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       spacing: TriageSpacing.md,
       children: [
-        const _NumberedHeading(
+        _NumberedHeading( // sin const
           number: 2,
           title: '¿Dónde ocurrió?',
-          subtitle: 'El GPS ya tomó tu posición. Ajústala si no coincide.',
+          subtitle: confirmed
+              ? 'Ubicación confirmada. Ajústala si no coincide.'
+              : failed
+              ? 'Reintenta o elige el punto en el mapa para continuar.'
+              : 'Obteniendo tu posición…',
         ),
         TriageSectionCard(
           child: Column(
@@ -220,33 +232,45 @@ class _CreateIncidentBodyState extends State<_CreateIncidentBody> {
                 borderRadius: BorderRadius.circular(TriageRadii.lg),
                 child: AspectRatio(
                   aspectRatio: _mapAspectRatio,
-                  // Solo vista previa: no captura los gestos del scroll
-                  child: IgnorePointer(
-                    child: FlutterMap(
-                      // Se reconstruye al cambiar la posición
-                      key: ValueKey((c.lat, c.lng)),
-                      options: MapOptions(
-                        initialCenter: LatLng(c.lat, c.lng),
-                        initialZoom: _mapZoom,
-                        interactionOptions: const InteractionOptions(
-                          flags: InteractiveFlag.none,
-                        ),
-                      ),
-                      children: [
-                        const TriageMapTiles(),
-                        MarkerLayer(
-                          markers: [
-                            Marker(
-                              point: LatLng(c.lat, c.lng),
-                              width: TriageSizes.touchTarget,
-                              height: TriageSizes.touchTarget,
-                              child: const TriageUserMarker(),
+                  child: confirmed
+                      // Solo vista previa: no captura los gestos del scroll
+                      ? IgnorePointer(
+                          child: FlutterMap(
+                            // Se reconstruye al cambiar la posición
+                            key: ValueKey((c.lat, c.lng)),
+                            options: MapOptions(
+                              initialCenter: LatLng(c.lat, c.lng),
+                              initialZoom: _mapZoom,
+                              interactionOptions: const InteractionOptions(
+                                flags: InteractiveFlag.none,
+                              ),
                             ),
-                          ],
+                            children: [
+                              const TriageMapTiles(),
+                              MarkerLayer(
+                                markers: [
+                                  Marker(
+                                    point: LatLng(c.lat, c.lng),
+                                    width: TriageSizes.touchTarget,
+                                    height: TriageSizes.touchTarget,
+                                    child: const TriageUserMarker(),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        )
+                      // Sin ubicación confirmada no se muestra un punto falso
+                      : const ColoredBox(
+                          color: TriageColors.surface,
+                          child: Center(
+                            child: TriageIcon(
+                              TriageIcons.location,
+                              size: TriageSizes.icon,
+                              color: TriageColors.textSecondary,
+                            ),
+                          ),
                         ),
-                      ],
-                    ),
-                  ),
                 ),
               ),
               Row(
@@ -267,17 +291,25 @@ class _CreateIncidentBodyState extends State<_CreateIncidentBody> {
                             color: TriageColors.textPrimary,
                           ),
                         ),
-                        Text(
-                          coordinates,
-                          style: TriageTextStyles.bodySmall.copyWith(
-                            color: TriageColors.textSecondary,
+                        if (coordinates != null)
+                          Text(
+                            coordinates,
+                            style: TriageTextStyles.bodySmall.copyWith(
+                              color: TriageColors.textSecondary,
+                            ),
                           ),
-                        ),
                       ],
                     ),
                   ),
+                  if (failed)
+                    TriageSectionAction(
+                      label: 'Reintentar',
+                      onTap: () => unawaited(
+                        c.refreshGpsFromDevice(context, silent: true),
+                      ),
+                    ),
                   TriageSectionAction(
-                    label: 'Ajustar',
+                    label: confirmed ? 'Ajustar' : 'Elegir en el mapa',
                     onTap: () => unawaited(c.openLocationMap(context)),
                   ),
                 ],

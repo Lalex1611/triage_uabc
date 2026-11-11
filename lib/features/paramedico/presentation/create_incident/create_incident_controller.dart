@@ -42,10 +42,13 @@ class CreateIncidentController extends ChangeNotifier {
   String previewTitle = 'Generando título…';
   String? customTitle;
   bool refreshingTitle = false;
+  bool locationConfirmed = false;
+  String? locationError;
   final List<String> photos = [];
   int unreadNotifications = 0;
 
   String get displayTitle => customTitle ?? previewTitle;
+  bool get canSubmit => locationConfirmed && !submitting;
 
   String _buildDraftIdLabel() {
     final raw = DateTime.now().millisecondsSinceEpoch.toRadixString(36);
@@ -156,18 +159,29 @@ class CreateIncidentController extends ChangeNotifier {
       if (p != null) {
         lat = p.lat;
         lng = p.lng;
+        locationConfirmed = true;
+        locationError = null;
         capturedAt = DateTime.now();
         if (customTitle == null) {
           unawaited(refreshPreviewTitle());
         }
-      } else if (!silent && context.mounted) {
-        showAppSnackBar(
-          context,
-          IncidentLocationService.errorMessageForNullResult()!,
-          isError: true,
-        );
+      } else {
+        // Si ya confirmó una ubicación manualmente, no se pisa con el error
+        if (!locationConfirmed) {
+          locationError = IncidentLocationService.errorMessageForNullResult();
+        }
+        if (!silent && context.mounted) {
+          showAppSnackBar(
+            context,
+            IncidentLocationService.errorMessageForNullResult()!,
+            isError: true,
+          );
+        }
       }
     } catch (e) {
+      if (!locationConfirmed) {
+        locationError = 'No se pudo leer el GPS: $e';
+      }
       if (!silent && context.mounted) {
         showAppSnackBar(context, 'No se pudo leer el GPS: $e', isError: true);
       }
@@ -186,6 +200,8 @@ class CreateIncidentController extends ChangeNotifier {
     if (result == null) return;
     lat = result.latitude;
     lng = result.longitude;
+    locationConfirmed = true;
+    locationError = null;
     capturedAt = DateTime.now();
     if (customTitle == null) {
       await refreshPreviewTitle();
@@ -304,6 +320,14 @@ class CreateIncidentController extends ChangeNotifier {
   /// Crea el incidente y devuelve su id (null si falló). Ya no navega: lo hace
   /// quien llamó (la hoja de nuevo incidente)
   Future<String?> submit(BuildContext context) async {
+    if (!locationConfirmed) {
+      showAppSnackBar(
+        context,
+        'Confirma la ubicación antes de crear el incidente.',
+        isError: true,
+      );
+      return null;
+    }
     if (!SupabaseEnv.isConfigured) {
       showAppSnackBar(context, 'Supabase no configurado.', isError: true);
       return null;
