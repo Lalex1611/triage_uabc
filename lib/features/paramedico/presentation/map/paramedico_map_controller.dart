@@ -64,6 +64,7 @@ class ParamedicoMapController extends ChangeNotifier {
   int? _visibilityEpoch;
   bool _mapReady = false;
   VoidCallback? _pendingWhenMapReady;
+  int _focusGeneration = 0;
 
   StreamSubscription<Position>? _positionSub;
 
@@ -379,10 +380,12 @@ class ParamedicoMapController extends ChangeNotifier {
     final patientId = pendingFocusPatientId;
     pendingFocusId = null;
     pendingFocusPatientId = null;
+    final generation = ++_focusGeneration;
 
     var found = _incidentById(id);
     if (found == null) {
       await load(silent: true);
+      if (generation != _focusGeneration) return;
       found = _incidentById(id);
     }
     if (!context.mounted) return;
@@ -540,6 +543,7 @@ class ParamedicoMapController extends ChangeNotifier {
 
   void clearSelection() {
     if (selectedIncidentId == null) return;
+    _focusGeneration++;
     _stopPositionStream();
     selectedIncidentId = null;
     forceShowPatientsIncidentId = null;
