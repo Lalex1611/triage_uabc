@@ -267,9 +267,10 @@ class CreateIncidentController extends ChangeNotifier {
   }
 
   Future<void> pickImage(ImageSource source) async {
+    if (submitting) return;
     try {
       final image = await _picker.pickImage(source: source, imageQuality: 80);
-      if (image != null) {
+      if (image != null && !submitting) {
         photos.add(image.path);
         notifyListeners();
       }
@@ -277,6 +278,7 @@ class CreateIncidentController extends ChangeNotifier {
   }
 
   void removePhotoAt(int index) {
+    if (submitting) return;
     if (index < 0 || index >= photos.length) return;
     photos.removeAt(index);
     notifyListeners();
@@ -357,12 +359,13 @@ class CreateIncidentController extends ChangeNotifier {
       }
       // El incidente ya existe: si fallan las fotos no se debe volver a crear
       var photosUploaded = true;
-      if (photos.isNotEmpty) {
+      final photosToUpload = List<String>.of(photos);
+      if (photosToUpload.isNotEmpty) {
         try {
           await _repo.updateIncidentPhotoPaths(
             incidentId: id,
             photoPaths: [
-              for (final photo in photos)
+              for (final photo in photosToUpload)
                 await _repo.uploadIncidentPhoto(
                   incidentId: id,
                   localPath: photo,

@@ -360,12 +360,12 @@ class _CreateIncidentBodyState extends State<_CreateIncidentBody> {
                 crossAxisSpacing: TriageSpacing.sm,
                 children: [
                   TriagePhoto(
-                    onTap: () => c.showImageSourceDialog(context),
+                    onTap: c.submitting ? null : () => c.showImageSourceDialog(context),
                   ),
                   for (var i = 0; i < c.photos.length; i++)
                     TriagePhoto(
                       image: FileImage(File(c.photos[i])),
-                      onTap: () => unawaited(_openPhotoMenu(i)),
+                      onTap: c.submitting ? null : () => unawaited(_openPhotoMenu(i)),
                     ),
                 ],
               ),
