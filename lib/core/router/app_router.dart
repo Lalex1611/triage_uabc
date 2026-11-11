@@ -9,7 +9,6 @@ import 'package:sistema_triage/features/consulta_externa/presentation/screens/co
 import 'package:sistema_triage/features/consulta_externa/presentation/screens/consulta_status_screen.dart';
 import 'package:sistema_triage/features/medico/presentation/routing/medico_home_flow_page.dart';
 import 'package:sistema_triage/features/medico/presentation/routing/medico_patient_details_flow_page.dart';
-import 'package:sistema_triage/features/paramedico/presentation/routing/create_incident_flow_page.dart';
 import 'package:sistema_triage/features/paramedico/presentation/routing/incident_details_flow_page.dart';
 import 'package:sistema_triage/features/paramedico/presentation/routing/paramedico_home_tab_page.dart';
 import 'package:sistema_triage/features/paramedico/presentation/routing/paramedico_incidents_tab_page.dart';
@@ -132,11 +131,6 @@ final GoRouter appRouter = GoRouter(
                   : StartTriageTabOption.asignacionRapida,
             );
           },
-        ),
-        GoRoute(
-          parentNavigatorKey: rootNavigatorKey,
-          path: 'incident/nuevo',
-          builder: (context, state) => const CreateIncidentFlowPage(),
         ),
         GoRoute(
           parentNavigatorKey: rootNavigatorKey,
