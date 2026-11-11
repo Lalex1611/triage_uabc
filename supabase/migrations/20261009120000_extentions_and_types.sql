@@ -23,7 +23,6 @@ create type public.emergency_type as enum (
   'emergencia_medica',
   'derrumbe',
   'incidente_masivo',
-  'violencia',
   'otro'
 );
 
