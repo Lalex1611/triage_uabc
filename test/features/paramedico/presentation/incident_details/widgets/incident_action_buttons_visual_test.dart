@@ -50,8 +50,7 @@ class IncidentActionButtonsVisualTest extends StatelessWidget {
 
             // Los botones fijos
             IncidentActionButtons(
-              onStartTap: () => print('INICIAR START tocado'),
-              onRegisterTap: () => print('REGISTRAR PACIENTE tocado'),
+              onRegisterTap: () => debugPrint('REGISTRAR PACIENTE tocado'),
             ),
           ],
         ),

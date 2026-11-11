@@ -16,7 +16,6 @@ class IncidentDetailsPage extends StatelessWidget {
   final IncidentHeaderData? headerData;
   final IncidentTabSelectorData? tabSelectorData;
   final Widget? tabBody;
-  final VoidCallback? onStartTap;
   final VoidCallback? onRegisterTap;
   final VoidCallback? onCloseIncidentTap;
 
@@ -29,7 +28,6 @@ class IncidentDetailsPage extends StatelessWidget {
     this.headerData,
     this.tabSelectorData,
     this.tabBody,
-    this.onStartTap,
     this.onRegisterTap,
     this.onCloseIncidentTap,
   });
@@ -62,7 +60,6 @@ class IncidentDetailsPage extends StatelessWidget {
           headerData: headerData!,
           tabSelectorData: tabSelectorData!,
           tabBody: tabBody!,
-          onStartTap: onStartTap,
           onRegisterTap: onRegisterTap,
           onCloseIncidentTap: onCloseIncidentTap,
         );
@@ -105,7 +102,6 @@ class _ContentShell extends StatelessWidget {
   final IncidentHeaderData headerData;
   final IncidentTabSelectorData tabSelectorData;
   final Widget tabBody;
-  final VoidCallback? onStartTap;
   final VoidCallback? onRegisterTap;
   final VoidCallback? onCloseIncidentTap;
 
@@ -115,7 +111,6 @@ class _ContentShell extends StatelessWidget {
     required this.headerData,
     required this.tabSelectorData,
     required this.tabBody,
-    this.onStartTap,
     this.onRegisterTap,
     this.onCloseIncidentTap,
   });
@@ -168,7 +163,6 @@ class _ContentShell extends StatelessWidget {
             IncidentActionButtons(
               isStatsTab:
                   tabSelectorData.activeTab == IncidentTabType.estadisticas,
-              onStartTap: onStartTap,
               onRegisterTap: onRegisterTap,
               onCloseIncidentTap: onCloseIncidentTap,
             ),

@@ -124,11 +124,8 @@ class _IncidentDetailsFlowPageState extends State<IncidentDetailsFlowPage> {
       headerData: inc != null ? _controller.headerData() : null,
       tabSelectorData: inc != null ? _controller.tabSelectorData() : null,
       tabBody: inc != null ? _tabBody(context) : null,
-      onStartTap: inc != null
-          ? () => unawaited(_controller.openTriageAndRefresh(context))
-          : null,
       onRegisterTap: inc != null
-          ? () => unawaited(_controller.openRegisterAndRefresh(context))
+          ? () => unawaited(_controller.openRegistration(context))
           : null,
       onCloseIncidentTap: _controller.canCloseIncident
           ? () => unawaited(_controller.confirmClose(context))
