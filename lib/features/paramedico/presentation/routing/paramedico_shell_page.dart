@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:sistema_triage/core/theme/triage_tokens.dart';
 import 'package:sistema_triage/features/paramedico/presentation/navigation/paramedico_navbar_widget.dart';
 import 'package:sistema_triage/features/paramedico/presentation/shared/paramedico_session_actions.dart';
 import 'package:sistema_triage/features/paramedico/presentation/incidents/paramedico_incidents_sheet.dart';
+import 'package:sistema_triage/features/paramedico/presentation/create_incident/create_incident_sheet.dart';
 
 
 class ParamedicoShellPage extends StatelessWidget {
@@ -40,7 +43,7 @@ class ParamedicoShellPage extends StatelessWidget {
   // Si tu botón "+" anterior navegaba con otro método (p. ej. el helper de
   // core/router/paramedico_stack_nav.dart), usa ese mismo aquí.
   void _createIncident(BuildContext context) {
-    context.push('/paramedico/incident/nuevo');
+    unawaited(showCreateIncidentSheet(context));
   }
 
   @override

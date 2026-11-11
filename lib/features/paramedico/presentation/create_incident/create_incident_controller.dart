@@ -42,10 +42,13 @@ class CreateIncidentController extends ChangeNotifier {
   String previewTitle = 'Generando título…';
   String? customTitle;
   bool refreshingTitle = false;
+  bool locationConfirmed = false;
+  String? locationError;
   final List<String> photos = [];
   int unreadNotifications = 0;
 
   String get displayTitle => customTitle ?? previewTitle;
+  bool get canSubmit => locationConfirmed && !submitting;
 
   String _buildDraftIdLabel() {
     final raw = DateTime.now().millisecondsSinceEpoch.toRadixString(36);
@@ -156,18 +159,29 @@ class CreateIncidentController extends ChangeNotifier {
       if (p != null) {
         lat = p.lat;
         lng = p.lng;
+        locationConfirmed = true;
+        locationError = null;
         capturedAt = DateTime.now();
         if (customTitle == null) {
           unawaited(refreshPreviewTitle());
         }
-      } else if (!silent && context.mounted) {
-        showAppSnackBar(
-          context,
-          IncidentLocationService.errorMessageForNullResult()!,
-          isError: true,
-        );
+      } else {
+        // Si ya confirmó una ubicación manualmente, no se pisa con el error
+        if (!locationConfirmed) {
+          locationError = IncidentLocationService.errorMessageForNullResult();
+        }
+        if (!silent && context.mounted) {
+          showAppSnackBar(
+            context,
+            IncidentLocationService.errorMessageForNullResult()!,
+            isError: true,
+          );
+        }
       }
     } catch (e) {
+      if (!locationConfirmed) {
+        locationError = 'No se pudo leer el GPS: $e';
+      }
       if (!silent && context.mounted) {
         showAppSnackBar(context, 'No se pudo leer el GPS: $e', isError: true);
       }
@@ -186,6 +200,8 @@ class CreateIncidentController extends ChangeNotifier {
     if (result == null) return;
     lat = result.latitude;
     lng = result.longitude;
+    locationConfirmed = true;
+    locationError = null;
     capturedAt = DateTime.now();
     if (customTitle == null) {
       await refreshPreviewTitle();
@@ -251,9 +267,10 @@ class CreateIncidentController extends ChangeNotifier {
   }
 
   Future<void> pickImage(ImageSource source) async {
+    if (submitting) return;
     try {
       final image = await _picker.pickImage(source: source, imageQuality: 80);
-      if (image != null) {
+      if (image != null && !submitting) {
         photos.add(image.path);
         notifyListeners();
       }
@@ -261,6 +278,7 @@ class CreateIncidentController extends ChangeNotifier {
   }
 
   void removePhotoAt(int index) {
+    if (submitting) return;
     if (index < 0 || index >= photos.length) return;
     photos.removeAt(index);
     notifyListeners();
@@ -301,10 +319,20 @@ class CreateIncidentController extends ChangeNotifier {
     );
   }
 
-  Future<void> submit(BuildContext context) async {
+  /// Crea el incidente y devuelve su id (null si falló). Ya no navega: lo hace
+  /// quien llamó (la hoja de nuevo incidente)
+  Future<String?> submit(BuildContext context) async {
+    if (!locationConfirmed) {
+      showAppSnackBar(
+        context,
+        'Confirma la ubicación antes de crear el incidente.',
+        isError: true,
+      );
+      return null;
+    }
     if (!SupabaseEnv.isConfigured) {
       showAppSnackBar(context, 'Supabase no configurado.', isError: true);
-      return;
+      return null;
     }
     submitting = true;
     notifyListeners();
@@ -331,12 +359,13 @@ class CreateIncidentController extends ChangeNotifier {
       }
       // El incidente ya existe: si fallan las fotos no se debe volver a crear
       var photosUploaded = true;
-      if (photos.isNotEmpty) {
+      final photosToUpload = List<String>.of(photos);
+      if (photosToUpload.isNotEmpty) {
         try {
           await _repo.updateIncidentPhotoPaths(
             incidentId: id,
             photoPaths: [
-              for (final photo in photos)
+              for (final photo in photosToUpload)
                 await _repo.uploadIncidentPhoto(
                   incidentId: id,
                   localPath: photo,
@@ -348,18 +377,20 @@ class CreateIncidentController extends ChangeNotifier {
           photosUploaded = false;
         }
       }
-      if (!context.mounted) return;
-      showAppSnackBar(
+      if (context.mounted) {
+        showAppSnackBar(
         context,
         photosUploaded
             ? 'Incidente creado.'
             : 'Incidente creado, pero no se pudieron subir las fotos. '
                   'Añádelas desde el incidente.',
         isError: !photosUploaded,
-      );
-      context.go('/paramedico/incidentes');
+        );
+      }
+      return id;
     } catch (e) {
       if (context.mounted) showAppSnackBar(context, '$e', isError: true);
+      return null;
     } finally {
       submitting = false;
       notifyListeners();
