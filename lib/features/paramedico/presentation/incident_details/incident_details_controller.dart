@@ -232,7 +232,7 @@ class IncidentDetailsController extends ChangeNotifier {
     if (context.canPop()) {
       context.pop();
     } else {
-      context.go('/paramedico');
+      context.go('/paramedico/incidentes');
     }
   }
 
