@@ -809,7 +809,8 @@ class ParamedicoIncidentsRepository {
   }
 
   /// Registro completo (display_name + demographics + ubicación del paciente + código de consulta)
-  Future<String> registerPatientFull({
+  /// Devuelve el id del paciente y su código de consulta
+  Future<({String patientId, String code})> registerPatientFull({
     required String incidentId,
     required String triageColor,
     required String displayName,
@@ -847,7 +848,10 @@ class ParamedicoIncidentsRepository {
       locationLng: locationLng,
     );
 
-    return _createConsultationCode(patientId);
+    return (
+      patientId: patientId,
+      code: await _createConsultationCode(patientId),
+    );
   }
 
   Future<void> updatePatientRecord({
