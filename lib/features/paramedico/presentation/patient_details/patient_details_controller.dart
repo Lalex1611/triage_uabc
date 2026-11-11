@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:sistema_triage/core/config/supabase_env.dart';
 import 'package:sistema_triage/core/router/paramedico_stack_nav.dart';
 import 'package:sistema_triage/core/ui/app_snackbar.dart';
@@ -14,12 +15,11 @@ import 'package:sistema_triage/features/paramedico/domain/constants/triage_catal
 import 'package:sistema_triage/features/paramedico/domain/services/incident_presentation_formatters.dart';
 import 'package:sistema_triage/features/paramedico/domain/services/paramedico_catalog_mappers.dart';
 import 'package:sistema_triage/features/paramedico/domain/services/patient_demographics_mapper.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:sistema_triage/features/paramedico/presentation/create_incident/widgets/incident_location_map_dialog_widget.dart';
+import 'package:sistema_triage/features/paramedico/presentation/patient_details/widgets/transfer_flow/assign_transfer_sheet_widget.dart';
 import 'package:sistema_triage/features/paramedico/presentation/shared/patient_location_actions.dart';
-import 'package:sistema_triage/features/paramedico/presentation/patient_details/widgets/transfer_flow/transfer_folio_dialog_widget.dart';
-import 'package:sistema_triage/features/paramedico/presentation/patient_details/widgets/transfer_flow/transfer_insurance_question_dialog_widget.dart';
 import 'package:sistema_triage/shared/patient/consultation_code_qr_dialog.dart';
+import 'package:sistema_triage/shared/widgets/triage_ui.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 enum PatientDetailsShellMode { loading, error, notFound, ready }
@@ -567,9 +567,6 @@ class PatientDetailsController extends ChangeNotifier {
         await load();
         return;
       }
-      if (s == PatientStatus.enEspera) {
-        return;
-      }
       if (s == PatientStatus.trasladando) {
         if (!context.mounted) return;
         await runTrasladoWizard(context);
@@ -582,9 +579,28 @@ class PatientDetailsController extends ChangeNotifier {
     }
   }
 
+  TriageLevel _mapTriageLevel(String? color) {
+    switch (color?.toLowerCase()) {
+      case 'rojo':
+      case 'red':
+        return TriageLevel.red;
+      case 'amarillo':
+      case 'yellow':
+        return TriageLevel.yellow;
+      case 'negro':
+      case 'black':
+        return TriageLevel.black;
+      case 'verde':
+      case 'green':
+      default:
+        return TriageLevel.green;
+    }
+  }
+
   Future<void> runTrasladoWizard(BuildContext context) async {
     final d = detail;
     if (d == null) return;
+
     final unitId = await _repo.currentAmbulanceUnitId();
     if (unitId == null || unitId.isEmpty) {
       if (context.mounted) {
@@ -597,6 +613,7 @@ class PatientDetailsController extends ChangeNotifier {
       return;
     }
     if (!context.mounted) return;
+
     if (hospitals.isEmpty) {
       showAppSnackBar(
         context,
@@ -606,142 +623,64 @@ class PatientDetailsController extends ChangeNotifier {
       return;
     }
 
-    final hasInsurance = await showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => TransferInsuranceQuestionDialog(
-        onBackTap: () => Navigator.pop(ctx),
-        onNoTap: () => Navigator.pop(ctx, false),
-        onYesTap: () => Navigator.pop(ctx, true),
-      ),
-    );
-    if (!context.mounted || hasInsurance == null) return;
+    Map<String, dynamic>? transferResult;
 
-    final pickedHospital = await showDialog<HospitalRow>(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) {
-        return Dialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(15),
-          ),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxHeight: 480, maxWidth: 400),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Container(
-                  color: const Color(0xFFCE1125),
-                  padding: const EdgeInsets.all(16),
-                  child: const Text(
-                    'Hospital de destino',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                    ),
-                  ),
-                ),
-                Expanded(
-                  child: ListView.separated(
-                    padding: EdgeInsets.zero,
-                    itemCount: hospitals.length,
-                    separatorBuilder: (_, index) => const Divider(height: 1),
-                    itemBuilder: (_, i) {
-                      final h = hospitals[i];
-                      return ListTile(
-                        title: Text(h.name),
-                        subtitle: h.address != null && h.address!.isNotEmpty
-                            ? Text(
-                                h.address!,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                              )
-                            : (h.latitude == null
-                                  ? const Text(
-                                      'Sin coordenadas en base de datos — complétalas en Supabase.',
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        color: Colors.orange,
-                                      ),
-                                    )
-                                  : null),
-                        onTap: () => Navigator.pop(ctx, h),
-                      );
-                    },
-                  ),
-                ),
-                TextButton(
-                  onPressed: () => Navigator.pop(ctx),
-                  child: const Text('Cancelar'),
-                ),
-              ],
-            ),
-          ),
-        );
+    final String rawDescription =
+        (d.demographics['description'] as String?) ?? '';
+    final String conditionSummary = rawDescription.trim().isNotEmpty
+        ? rawDescription.trim()
+        : 'Sin observaciones clínicas';
+
+    // Despliega la hoja modal unificada de 4 pasos reutilizando la lista de `HospitalRow`
+    final String? postAction = await showAssignTransferSheet(
+      context,
+      patientName: d.displayName,
+      patientFolio: d.id.length >= 8
+          ? d.id.substring(0, 8).toUpperCase()
+          : d.id,
+      triageLevel: _mapTriageLevel(d.triageColor),
+      conditionSummary: conditionSummary,
+      hospitals: hospitals,
+      ambulanceUnits: <String>[unitId],
+      onSubmit: (Map<String, dynamic> data) {
+        transferResult = data;
       },
     );
-    if (!context.mounted || pickedHospital == null) return;
 
-    final folio = await showDialog<String>(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => TransferFolioDialog(
-        onBackTap: () => Navigator.pop(ctx),
-        onSubmit: (s) => Navigator.pop(ctx, s),
-      ),
-    );
-    if (!context.mounted || folio == null) return;
+    if (!context.mounted || transferResult == null) return;
+
+    final pickedHospital = transferResult!['picked_hospital'] as HospitalRow?;
+    if (pickedHospital == null) return;
+
+    final rawFolio = transferResult!['regulation_folio'] as String?;
+    final insuranceInfo = transferResult!['insurance'] as String?;
+    final hasInsurance =
+        insuranceInfo != null &&
+        insuranceInfo != 'No tiene seguro' &&
+        insuranceInfo != 'No lo sé';
 
     await _repo.applyPatientTransfer(
       patientId: d.id,
       newStatus: 'trasladando',
       hospitalId: pickedHospital.id,
-      regulationFolio: folio.trim().isEmpty ? null : folio.trim(),
+      regulationFolio: (rawFolio == null || rawFolio.trim().isEmpty)
+          ? null
+          : rawFolio.trim(),
       demographicsExtras: {
         'has_medical_insurance': hasInsurance,
+        'medical_insurance_institution': insuranceInfo,
         'transfer_destination_hospital_name': pickedHospital.name,
       },
       patientLocationLat: pickedHospital.latitude,
       patientLocationLng: pickedHospital.longitude,
     );
+
     if (!context.mounted) return;
     await load();
-    if (!context.mounted) return;
-    await _showEmergencyHospitalAssignedDialog(context, pickedHospital.name);
-  }
 
-  Future<void> _showEmergencyHospitalAssignedDialog(
-    BuildContext context,
-    String hospitalName,
-  ) {
-    return showDialog<void>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        contentPadding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
-        content: Row(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Icon(Icons.check_circle, color: Color(0xFF2CA24D), size: 28),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                'Hospital de emergencia asignado: "$hospitalName"',
-                style: const TextStyle(fontSize: 15, color: Colors.black87),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Aceptar'),
-          ),
-        ],
-      ),
-    );
+    if (postAction == 'incident' && d.incidentId.isNotEmpty) {
+      context.go('/paramedico/incident/${d.incidentId}');
+    }
   }
 
   void onBack(BuildContext context) {
