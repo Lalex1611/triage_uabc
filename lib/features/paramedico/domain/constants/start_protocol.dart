@@ -13,7 +13,7 @@ class StartAnswer {
   final TriageLevel? level;
 }
 
-/// Pregunta del protocolo START, con sus dos respuestas
+/// Pregunta del protocolo START, con sus respuestas
 class StartStep {
   const StartStep({
     required this.question,
@@ -33,8 +33,8 @@ class StartStep {
 /// Protocolo START en el orden en que se pregunta
 ///
 /// La última pregunta clasifica con cualquiera de sus respuestas. Si el
-/// paciente respira tras abrir la vía aérea se responde «Sí respira» y sigue al
-/// paso 3; si no respira ni así, es negro.
+/// paciente solo respira tras abrir la vía aérea es rojo; si no respira ni así,
+/// negro. Solo quien respira por sí mismo sigue al paso 3.
 const startSteps = [
   StartStep(
     question: '¿El paciente camina por sí mismo?',
@@ -56,6 +56,11 @@ const startSteps = [
         label: 'No respira ni al abrir la vía aérea',
         reason: 'No, ni al abrir la vía aérea',
         level: TriageLevel.black,
+      ),
+      StartAnswer(
+        label: 'Respira solo al abrir la vía aérea',
+        reason: 'Solo al abrir la vía aérea',
+        level: TriageLevel.red,
       ),
       StartAnswer(label: 'Sí respira', reason: 'Sí'),
     ],
@@ -83,7 +88,7 @@ const startSteps = [
         reason: 'Mayor a 2 s o sin pulso',
         level: TriageLevel.red,
       ),
-      StartAnswer(label: 'Llenado menor a 2 s', reason: 'Menor a 2 s'),
+      StartAnswer(label: 'Llenado de 2 s o menos', reason: '2 s o menos'),
     ],
   ),
   StartStep(
