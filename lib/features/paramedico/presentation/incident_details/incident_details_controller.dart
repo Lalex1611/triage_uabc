@@ -18,6 +18,7 @@ import 'package:sistema_triage/features/paramedico/domain/services/incident_pres
 import 'package:sistema_triage/features/paramedico/domain/services/paramedico_catalog_mappers.dart';
 import 'package:sistema_triage/features/paramedico/presentation/create_incident/widgets/incident_location_map_dialog_widget.dart';
 import 'package:sistema_triage/features/paramedico/presentation/incident_details/incident_details_view_mapper.dart';
+import 'package:sistema_triage/features/paramedico/presentation/patient_intake/patient_intake_flow.dart';
 import 'package:sistema_triage/features/paramedico/presentation/routing/patient_registration_route_seed.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:sistema_triage/shared/widgets/triage_ui.dart';
@@ -271,6 +272,19 @@ class IncidentDetailsController extends ChangeNotifier {
       if (!context.mounted) return;
       showAppSnackBar(context, '$e', isError: true);
     }
+  }
+
+  /// B11: abre el panel de registro y actualiza el incidente tras cada paciente
+  Future<void> openRegistration(BuildContext context) {
+    final header = headerData();
+    return startPatientIntake(
+      context,
+      incidentId: incidentId,
+      subtitle: '${header.id} · ${header.title}',
+      onPatientsChanged: () => unawaited(load(showLoader: false)),
+      openGuidedStart: () => openTriageAndRefresh(context),
+      openExtendedRegistration: () => openRegisterAndRefresh(context),
+    );
   }
 
   Future<void> openTriageAndRefresh(BuildContext context) async {
