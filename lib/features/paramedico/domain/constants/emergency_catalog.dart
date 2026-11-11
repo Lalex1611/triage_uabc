@@ -5,6 +5,11 @@ import 'package:sistema_triage/features/paramedico/domain/entities/create_incide
 class EmergencyCatalog {
   static const List<EmergencyType> postgresIncidentTypes = [
     EmergencyType(id: 'accidente_vehicular', name: 'Accidente vehicular'),
+    EmergencyType(id: 'atropellamiento', name: 'Atropellamiento'),
+    EmergencyType(id: 'caida', name: 'Caida'),
+    EmergencyType(id: 'violencia', name: 'Violencia'),
+    EmergencyType(id: 'incendio_quemadura', name: 'Incendio o Quemadura'),
+    EmergencyType(id: 'emergencia_medica', name: 'Emergencia Medica'),
     EmergencyType(id: 'derrumbe', name: 'Derrumbe'),
     EmergencyType(id: 'incidente_masivo', name: 'Incidente masivo'),
     EmergencyType(id: 'otro', name: 'Otro'),
