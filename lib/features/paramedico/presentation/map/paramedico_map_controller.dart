@@ -206,7 +206,7 @@ class ParamedicoMapController extends ChangeNotifier {
     _positionSub = null;
   }
 
-  Future<void> load() async {
+  Future<void> load({bool silent = false}) async {
     if (!SupabaseEnv.isConfigured) {
       loading = false;
       error = 'Supabase no configurado.';
@@ -215,9 +215,11 @@ class ParamedicoMapController extends ChangeNotifier {
       notifyListeners();
       return;
     }
-    loading = true;
-    error = null;
-    notifyListeners();
+    if(!silent) {
+      loading = true;
+      error = null;
+      notifyListeners();
+    }
 
     try {
       final list = await _repo.listOpenIncidents();
@@ -248,12 +250,18 @@ class ParamedicoMapController extends ChangeNotifier {
       counts = loadedCounts;
       patientsByIncident = grouped;
       radiusMetersByIncident = radii;
+      incidents = list;
+      counts = loadedCounts;
+      patientsByIncident = grouped;
+      radiusMetersByIncident = radii;
       loading = false;
       notifyListeners();
     } catch (e) {
-      error = e.toString();
-      loading = false;
-      notifyListeners();
+      if(!silent){
+        error = e.toString();
+        loading = false;
+        notifyListeners();
+      }
     }
   }
 
@@ -293,6 +301,13 @@ class ParamedicoMapController extends ChangeNotifier {
     if (selectedIncidentId == null) return null;
     for (final e in incidents) {
       if (e.id == selectedIncidentId) return e;
+    }
+    return null;
+  }
+
+  ParamedicoIncidentSummary? _incidentById(String id) {
+    for (final e in incidents) {
+      if (e.id == id) return e;
     }
     return null;
   }
@@ -365,15 +380,14 @@ class ParamedicoMapController extends ChangeNotifier {
     pendingFocusId = null;
     pendingFocusPatientId = null;
 
-    ParamedicoIncidentSummary? inc;
-    for (final e in incidents) {
-      if (e.id == id) {
-        inc = e;
-        break;
-      }
+    var found = _incidentById(id);
+    if (found == null) {
+      await load(silent: true);
+      found = _incidentById(id);
     }
     if (!context.mounted) return;
-    if (inc == null) {
+
+    if (found == null) {
       showAppSnackBar(
         context,
         'El incidente no está activo o no aparece en el mapa.',
@@ -381,6 +395,9 @@ class ParamedicoMapController extends ChangeNotifier {
       );
       return;
     }
+
+    final ParamedicoIncidentSummary inc = found;
+
     if (inc.latitude == null || inc.longitude == null) {
       showAppSnackBar(
         context,
