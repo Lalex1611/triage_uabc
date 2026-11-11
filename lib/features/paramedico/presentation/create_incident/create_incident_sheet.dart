@@ -26,6 +26,7 @@ Future<void> showCreateIncidentSheet(BuildContext context) async {
     title: 'Nuevo incidente',
     // Formulario a medias: no se cierra arrastrando ni tocando fuera
     dismissible: false,
+    showClose: false,
     builder: (_) => const _CreateIncidentBody(),
   );
   if (createdId != null && context.mounted) {
@@ -82,7 +83,8 @@ class _CreateIncidentBodyState extends State<_CreateIncidentBody> {
 
   Future<void> _create() async {
     final id = await _controller.submit(context);
-    if (id != null && mounted) Navigator.of(context).pop(id);
+    if (!mounted) return;
+    if (id != null) Navigator.of(context).pop(id);
   }
 
   @override
