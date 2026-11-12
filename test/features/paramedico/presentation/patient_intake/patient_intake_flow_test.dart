@@ -12,7 +12,6 @@ class _Harness {
 
   final FakeIntakeRepository repo;
   int changes = 0;
-  final legacy = <String>[];
 
   Widget app({double textScale = 1}) => MaterialApp(
     builder: (context, navigator) => MediaQuery(
@@ -29,7 +28,6 @@ class _Harness {
             incidentId: 'a1b2c3d4',
             subtitle: 'INC-A1B2C3 · Accidente vehicular',
             onPatientsChanged: () => changes++,
-            openExtendedRegistration: () async => legacy.add('extendido'),
             session: PatientIntakeSession(
               incidentId: 'a1b2c3d4',
               repository: repo,
@@ -58,6 +56,34 @@ Future<void> _choose(WidgetTester tester, String option) async {
   await tester.pumpAndSettle();
 }
 
+/// Caja de un `TriageField` o `TriageSelectField`: la etiqueta va encima, en
+/// el mismo nodo semántico
+Finder _field(String label, Finder box) => find.descendant(
+  of: find
+      .ancestor(of: find.text(label), matching: find.byType(MergeSemantics))
+      .first,
+  matching: box,
+);
+
+Future<void> _type(WidgetTester tester, String label, String text) async {
+  final field = _field(label, find.byType(TextFormField));
+  await tester.ensureVisible(field);
+  await tester.enterText(field, text);
+  await tester.pump();
+}
+
+Future<void> _select(WidgetTester tester, String label, String option) async {
+  final field = _field(
+    label,
+    find.byWidgetPredicate((w) => w is DropdownButtonFormField),
+  );
+  await tester.ensureVisible(field);
+  await tester.tap(field);
+  await tester.pumpAndSettle();
+  await tester.tap(find.text(option).last);
+  await tester.pumpAndSettle();
+}
+
 Future<void> _pickAndSave(WidgetTester tester, String levelTitle) async {
   await tester.ensureVisible(find.text(levelTitle));
   await tester.tap(find.text(levelTitle));
@@ -82,14 +108,83 @@ void main() {
     }
   });
 
-  testWidgets('Registro extendido cierra B11 y abre su pantalla', (
+  testWidgets('Registro extendido guarda los datos que lee la ficha', (
     tester,
   ) async {
     final h = _Harness();
     await tester.pumpWidget(h.app());
     await _open(tester);
     await _choose(tester, 'Registro extendido');
-    expect(h.legacy, ['extendido']);
+    expect(find.byType(TriageSheet), findsOneWidget);
+    expect(find.text('Paciente 6 · INC-A1B2C3'), findsOneWidget);
+    final save = find.widgetWithText(TriageButton, 'Guardar paciente');
+    expect(tester.widget<TriageButton>(save).onPressed, isNull);
+
+    await _choose(tester, 'Urgente');
+    await _type(tester, 'Nombre o alias', 'Bruce Cervantes');
+    await _type(tester, 'Edad', '22');
+    await _select(tester, 'Sexo', 'Masculino');
+    await _select(tester, 'Tipo de sangre', 'O+');
+    await _type(tester, 'Teléfono de contacto', '664 123 4567');
+    await _type(tester, 'Descripción', 'Hemorragia en muslo derecho');
+    await _choose(tester, 'Hemorragia');
+    await _choose(tester, 'Guardar paciente');
+
+    final saved = h.repo.registered.single;
+    expect(saved['triage'], 'amarillo');
+    expect(saved['name'], 'Bruce Cervantes');
+    expect(saved['demographics'], {
+      'description': 'Hemorragia en muslo derecho',
+      'injury_types': ['hemorragia'],
+      'gender': 'masculino',
+      'blood_type': 'oPositivo',
+      'birth_year': DateTime.now().year - 22,
+      'emergency_contact': '664 123 4567',
+      'photo_local_paths': <String>[],
+    });
+    expect(h.changes, 1);
+    expect(find.text('PAC-ABCDEF quedó registrado'), findsOneWidget);
+    expect(find.byType(TriageSheet), findsNothing);
+  });
+
+  testWidgets('Registro extendido: una edad no válida impide guardar', (
+    tester,
+  ) async {
+    await tester.pumpWidget(_Harness().app());
+    await _open(tester);
+    await _choose(tester, 'Registro extendido');
+    await _choose(tester, 'Leve');
+    await _type(tester, 'Edad', '200');
+    expect(find.text('Escribe la edad en años'), findsOneWidget);
+    final save = find.widgetWithText(TriageButton, 'Guardar paciente');
+    expect(tester.widget<TriageButton>(save).onPressed, isNull);
+  });
+
+  testWidgets('Registro extendido con datos pide confirmación al salir', (
+    tester,
+  ) async {
+    final h = _Harness();
+    await tester.pumpWidget(h.app());
+    await _open(tester);
+    await _choose(tester, 'Registro extendido');
+    await _type(tester, 'Nombre o alias', 'Ana');
+    await tester.tap(find.byTooltip('Cerrar'));
+    await tester.pumpAndSettle();
+    expect(find.text('¿Salir sin registrar?'), findsOneWidget);
+    await tester.tap(find.text('Salir y perder los datos'));
+    await tester.pumpAndSettle();
+    expect(find.byType(TriageSheet), findsNothing);
+    expect(h.repo.registered, isEmpty);
+  });
+
+  testWidgets('Registro extendido vacío se cierra sin preguntar', (
+    tester,
+  ) async {
+    await tester.pumpWidget(_Harness().app());
+    await _open(tester);
+    await _choose(tester, 'Registro extendido');
+    await _choose(tester, 'Cancelar');
+    expect(find.text('¿Salir sin registrar?'), findsNothing);
     expect(find.byType(TriageSheet), findsNothing);
   });
 
@@ -399,5 +494,19 @@ void main() {
       await _choose(tester, 'Sí, camina');
       expect(tester.takeException(), isNull);
     });
+
+    testWidgets(
+      'Registro extendido sin desbordes en $width al ${scale * 100} %',
+      (tester) async {
+        tester.view.physicalSize = Size(width, 800);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        await tester.pumpWidget(_Harness().app(textScale: scale));
+        await _open(tester);
+        await _choose(tester, 'Registro extendido');
+        await _choose(tester, 'Hemorragia');
+        expect(tester.takeException(), isNull);
+      },
+    );
   }
 }

@@ -19,7 +19,6 @@ import 'package:sistema_triage/features/paramedico/domain/services/paramedico_ca
 import 'package:sistema_triage/features/paramedico/presentation/create_incident/widgets/incident_location_map_dialog_widget.dart';
 import 'package:sistema_triage/features/paramedico/presentation/incident_details/incident_details_view_mapper.dart';
 import 'package:sistema_triage/features/paramedico/presentation/patient_intake/patient_intake_flow.dart';
-import 'package:sistema_triage/features/paramedico/presentation/routing/patient_registration_route_seed.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:sistema_triage/shared/widgets/triage_ui.dart';
 
@@ -282,25 +281,7 @@ class IncidentDetailsController extends ChangeNotifier {
       incidentId: incidentId,
       subtitle: '${header.id} · ${header.title}',
       onPatientsChanged: () => unawaited(load(showLoader: false)),
-      openExtendedRegistration: () => openRegisterAndRefresh(context),
     );
-  }
-
-  Future<void> openRegisterAndRefresh(BuildContext context) async {
-    final i = incident;
-    if (i == null) return;
-    final Object? extra = i.latitude != null && i.longitude != null
-        ? PatientRegistrationRouteSeed(
-            latitude: i.latitude!,
-            longitude: i.longitude!,
-          )
-        : null;
-    await pushParamedicoFullScreen(
-      context,
-      '$routeBase/register',
-      extra: extra,
-    );
-    await load();
   }
 
   Future<void> openIncidentOnMap(BuildContext context) async {
