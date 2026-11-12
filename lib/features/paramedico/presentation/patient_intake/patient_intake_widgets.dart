@@ -5,7 +5,41 @@ import 'package:image_picker/image_picker.dart';
 import 'package:sistema_triage/core/layout/app_responsive.dart';
 import 'package:sistema_triage/shared/widgets/triage_ui.dart';
 
-/// Los cuatro colores START en dos filas, para Asignar color y START guiado
+/// Pregunta «¿Salir sin registrar?» antes de cerrar un panel con datos
+///
+/// Devuelve `true` solo con «Salir y perder los datos»; tocar fuera sigue
+/// registrando.
+Future<bool> confirmDiscardPatient(BuildContext context) async {
+  final leave = await showDialog<bool>(
+    context: context,
+    builder: (dialogContext) => TriageDialog(
+      icon: const TriageMessageIcon(
+        TriageIcons.alert,
+        tone: TriageTone.warning,
+      ),
+      title: '¿Salir sin registrar?',
+      message:
+          'Perderás la clasificación de este paciente. En escena conviene '
+          'registrar aunque sea con el color.',
+      actions: [
+        TriageButton(
+          label: 'Seguir registrando',
+          onPressed: () => Navigator.pop(dialogContext),
+        ),
+        TriageButton(
+          label: 'Salir y perder los datos',
+          variant: TriageButtonVariant.subtle,
+          size: TriageButtonSize.medium,
+          onPressed: () => Navigator.pop(dialogContext, true),
+        ),
+      ],
+    ),
+  );
+  return leave ?? false;
+}
+
+/// Los cuatro colores START en dos filas, para Asignar color, START guiado y
+/// Registro extendido
 class StartLevelGrid extends StatelessWidget {
   const StartLevelGrid({
     super.key,

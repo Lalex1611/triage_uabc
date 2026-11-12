@@ -82,32 +82,7 @@ class _StartGuidedPanelState extends State<StartGuidedPanel> {
       Navigator.pop(context);
       return;
     }
-    final leave = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => TriageDialog(
-        icon: const TriageMessageIcon(
-          TriageIcons.alert,
-          tone: TriageTone.warning,
-        ),
-        title: '¿Salir sin registrar?',
-        message:
-            'Perderás la clasificación de este paciente. En escena conviene '
-            'registrar aunque sea con el color.',
-        actions: [
-          TriageButton(
-            label: 'Seguir registrando',
-            onPressed: () => Navigator.pop(dialogContext),
-          ),
-          TriageButton(
-            label: 'Salir y perder los datos',
-            variant: TriageButtonVariant.subtle,
-            size: TriageButtonSize.medium,
-            onPressed: () => Navigator.pop(dialogContext, true),
-          ),
-        ],
-      ),
-    );
-    if (leave == true && mounted) Navigator.pop(context);
+    if (await confirmDiscardPatient(context) && mounted) Navigator.pop(context);
   }
 
   Future<void> _save() async {
