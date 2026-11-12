@@ -55,6 +55,9 @@ class PatientIntakeSession {
   String? _placeKey;
   bool _prepared = false;
 
+  /// Si ya se leyeron el incidente y el número del siguiente paciente
+  bool get isPrepared => _prepared;
+
   String get incidentFolio =>
       IncidentPresentationFormatters.shortIncidentId(incidentId);
 
@@ -79,6 +82,7 @@ class PatientIntakeSession {
     required TriageLevel level,
     String? name,
     List<String> photos = const [],
+    StartTriageTabOption mode = StartTriageTabOption.asignacionRapida,
   }) async {
     await prepare();
     final point = await _devicePoint() ?? _incidentPoint;
@@ -102,7 +106,7 @@ class PatientIntakeSession {
       demographics: {
         'photo_local_paths': List<String>.from(photos),
         'registered_from_start': true,
-        'start_triage_mode': StartTriageTabOption.asignacionRapida.name,
+        'start_triage_mode': mode.name,
       },
       locationLat: point.lat,
       locationLng: point.lng,

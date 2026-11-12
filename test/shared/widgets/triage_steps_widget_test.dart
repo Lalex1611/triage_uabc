@@ -50,6 +50,23 @@ void main() {
     expect(find.bySemanticsLabel('Paso 2 de 3'), findsOneWidget);
   });
 
+  testWidgets('con showLabel lo escribe bajo las barras y lo anuncia una vez', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _wrap(
+        TriageRoleTheme.paramedic,
+        const TriageSteps(current: 3, total: 5, showLabel: true),
+      ),
+    );
+    expect(find.text('Paso 3 de 5'), findsOneWidget);
+    expect(find.bySemanticsLabel('Paso 3 de 5'), findsOneWidget);
+    expect(
+      tester.getTopLeft(find.text('Paso 3 de 5')).dy,
+      greaterThan(tester.getBottomLeft(find.byType(DecoratedBox).first).dy),
+    );
+  });
+
   testWidgets('rechaza un paso fuera de rango', (tester) async {
     expect(() => TriageSteps(current: 0, total: 3), throwsAssertionError);
     expect(() => TriageSteps(current: 4, total: 3), throwsAssertionError);
