@@ -1,3 +1,7 @@
+import 'dart:convert';
+import 'dart:io';
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:sistema_triage/features/paramedico/data/repositories/paramedico_incidents_repository.dart';
 import 'package:sistema_triage/shared/widgets/triage_ui.dart';
@@ -12,6 +16,8 @@ Future<String?> showAssignTransferSheet(
   String patientFolio = '',
   TriageLevel triageLevel = TriageLevel.green,
   String conditionSummary = '',
+  double? latitude,
+  double? longitude,
   List<HospitalRow> hospitals = const <HospitalRow>[],
   List<String> ambulanceUnits = const <String>[],
   List<String> insuranceOptions = const <String>[
@@ -32,6 +38,8 @@ Future<String?> showAssignTransferSheet(
       patientFolio: patientFolio,
       triageLevel: triageLevel,
       conditionSummary: conditionSummary,
+      latitude: latitude,
+      longitude: longitude,
       hospitals: hospitals,
       ambulanceUnits: ambulanceUnits,
       insuranceOptions: insuranceOptions,
@@ -41,12 +49,24 @@ Future<String?> showAssignTransferSheet(
   );
 }
 
+class _RouteEstimate {
+  final double distanceKm;
+  final int durationMinutes;
+
+  const _RouteEstimate({
+    required this.distanceKm,
+    required this.durationMinutes,
+  });
+}
+
 /// Widget modal de 4 pasos adaptado a la lista de [HospitalRow]
 class AssignTransferSheet extends StatefulWidget {
   final String patientName;
   final String patientFolio;
   final TriageLevel triageLevel;
   final String conditionSummary;
+  final double? latitude;
+  final double? longitude;
 
   final List<HospitalRow> hospitals;
   final List<String> ambulanceUnits;
@@ -61,6 +81,8 @@ class AssignTransferSheet extends StatefulWidget {
     this.patientFolio = '',
     this.triageLevel = TriageLevel.green,
     this.conditionSummary = '',
+    this.latitude,
+    this.longitude,
     this.hospitals = const <HospitalRow>[],
     this.ambulanceUnits = const <String>[],
     this.insuranceOptions = const <String>[
@@ -89,6 +111,9 @@ class _AssignTransferSheetState extends State<AssignTransferSheet> {
   // Paso 2: Selección de hospital
   String _searchQuery = '';
   HospitalRow? _selectedHospital;
+  bool _userPickedHospital = false;
+  bool _loadingRoutes = false;
+  Map<String, _RouteEstimate> _roadRoutes = <String, _RouteEstimate>{};
 
   // Paso 3: Unidad y Folio
   String? _selectedUnit;
@@ -97,7 +122,7 @@ class _AssignTransferSheetState extends State<AssignTransferSheet> {
   @override
   void initState() {
     super.initState();
-    final List<HospitalRow> hList = widget.hospitals;
+    final List<HospitalRow> hList = _sortedHospitals;
     final List<String> uList = widget.ambulanceUnits;
     final List<String> iList = widget.insuranceOptions;
 
@@ -110,12 +135,180 @@ class _AssignTransferSheetState extends State<AssignTransferSheet> {
     if (iList.isNotEmpty) {
       _selectedInstitution = iList.first;
     }
+
+    _fetchRoadRoutes();
   }
 
   @override
   void dispose() {
     _folioController.dispose();
     super.dispose();
+  }
+
+  bool _hasValidCoords(double? lat, double? lng) {
+    return lat != null &&
+        lng != null &&
+        lat.isFinite &&
+        lng.isFinite &&
+        !(lat == 0.0 && lng == 0.0);
+  }
+
+  /// Consulta distancia y tiempo real por calles (OSRM) desde el paciente hacia cada hospital
+  Future<void> _fetchRoadRoutes() async {
+    final double? originLat = widget.latitude;
+    final double? originLng = widget.longitude;
+    if (!_hasValidCoords(originLat, originLng)) return;
+
+    final List<HospitalRow> withCoords = widget.hospitals
+        .where((HospitalRow h) => _hasValidCoords(h.latitude, h.longitude))
+        .toList();
+    if (withCoords.isEmpty) return;
+
+    setState(() => _loadingRoutes = true);
+
+    final HttpClient client = HttpClient()
+      ..connectionTimeout = const Duration(seconds: 4);
+
+    try {
+      final StringBuffer coordsBuffer = StringBuffer('$originLng,$originLat');
+      for (final HospitalRow h in withCoords) {
+        coordsBuffer.write(';${h.longitude},${h.latitude}');
+      }
+
+      final Uri uri = Uri.parse(
+        'https://router.project-osrm.org/table/v1/driving/$coordsBuffer'
+        '?sources=0&annotations=duration,distance',
+      );
+
+      final HttpClientRequest request = await client.getUrl(uri);
+      final HttpClientResponse response = await request.close().timeout(
+        const Duration(seconds: 4),
+      );
+
+      if (response.statusCode != 200) return;
+
+      final String body = await response.transform(utf8.decoder).join();
+      final Map<String, dynamic> json =
+          jsonDecode(body) as Map<String, dynamic>;
+
+      if (json['code'] != 'Ok') return;
+
+      final List<dynamic>? durationsMatrix =
+          json['durations'] as List<dynamic>?;
+      final List<dynamic>? distancesMatrix =
+          json['distances'] as List<dynamic>?;
+      if (durationsMatrix == null ||
+          durationsMatrix.isEmpty ||
+          distancesMatrix == null ||
+          distancesMatrix.isEmpty) {
+        return;
+      }
+
+      final List<dynamic> durations = durationsMatrix.first as List<dynamic>;
+      final List<dynamic> distances = distancesMatrix.first as List<dynamic>;
+
+      final Map<String, _RouteEstimate> resolved = <String, _RouteEstimate>{};
+      for (int i = 0; i < withCoords.length; i++) {
+        final int matrixIdx = i + 1;
+        if (matrixIdx >= durations.length || matrixIdx >= distances.length) {
+          break;
+        }
+        final num? sec = durations[matrixIdx] as num?;
+        final num? meters = distances[matrixIdx] as num?;
+        if (sec != null && meters != null) {
+          final int mins = ((sec.toDouble() * 0.85) / 60.0).round();
+          resolved[withCoords[i].id] = _RouteEstimate(
+            distanceKm: meters.toDouble() / 1000.0,
+            durationMinutes: mins < 1 ? 1 : mins,
+          );
+        }
+      }
+
+      if (!mounted || resolved.isEmpty) return;
+
+      setState(() {
+        _roadRoutes = resolved;
+        if (!_userPickedHospital && _sortedHospitals.isNotEmpty) {
+          _selectedHospital = _sortedHospitals.first;
+        }
+      });
+    } catch (_) {
+      // Si falla la red, se conserva el cálculo Haversine de respaldo
+    } finally {
+      client.close(force: true);
+      if (mounted) {
+        setState(() => _loadingRoutes = false);
+      }
+    }
+  }
+
+  double _degToRad(double deg) => deg * (math.pi / 180.0);
+
+  double? _haversineKm(HospitalRow h) {
+    final double? lat1 = widget.latitude;
+    final double? lon1 = widget.longitude;
+    final double? lat2 = h.latitude;
+    final double? lon2 = h.longitude;
+    if (!_hasValidCoords(lat1, lon1) || !_hasValidCoords(lat2, lon2)) {
+      return null;
+    }
+
+    const double earthRadiusKm = 6371.0;
+    final double dLat = _degToRad(lat2! - lat1!);
+    final double dLon = _degToRad(lon2! - lon1!);
+    final double a =
+        math.sin(dLat / 2) * math.sin(dLat / 2) +
+        math.cos(_degToRad(lat1)) *
+            math.cos(_degToRad(lat2)) *
+            math.sin(dLon / 2) *
+            math.sin(dLon / 2);
+    final double c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
+    return earthRadiusKm * c;
+  }
+
+  /// Distancia unificada en km para ordenar de forma estricta de más cercano a más lejano
+  double? _effectiveDistanceKm(HospitalRow h) {
+    return _roadRoutes[h.id]?.distanceKm ?? _haversineKm(h);
+  }
+
+  String? _formatHospitalDistanceAndEta(HospitalRow h) {
+    final _RouteEstimate? road = _roadRoutes[h.id];
+    if (road != null) {
+      final String distText = road.distanceKm < 1.0
+          ? '${(road.distanceKm * 1000).round()} m'
+          : '${road.distanceKm.toStringAsFixed(1)} km';
+      return '$distText · ${road.durationMinutes} min';
+    }
+
+    final double? fallbackKm = _haversineKm(h);
+    if (fallbackKm == null) return null;
+
+    final int mins = ((fallbackKm / 45.0) * 60.0).round();
+    final int safeMins = mins < 1 ? 1 : mins;
+    final String distText = fallbackKm < 1.0
+        ? '${(fallbackKm * 1000).round()} m'
+        : '${fallbackKm.toStringAsFixed(1)} km';
+    return '~$distText · ~$safeMins min';
+  }
+
+  List<HospitalRow> get _sortedHospitals {
+    final List<HospitalRow> hList = List<HospitalRow>.of(widget.hospitals);
+    if (!_hasValidCoords(widget.latitude, widget.longitude)) {
+      return hList;
+    }
+
+    hList.sort((HospitalRow a, HospitalRow b) {
+      final double? distA = _effectiveDistanceKm(a);
+      final double? distB = _effectiveDistanceKm(b);
+      if (distA != null && distB != null) {
+        final int byDist = distA.compareTo(distB);
+        return byDist != 0 ? byDist : a.name.compareTo(b.name);
+      }
+      if (distA != null) return -1;
+      if (distB != null) return 1;
+      return a.name.compareTo(b.name);
+    });
+    return hList;
   }
 
   String get _stepSubtitle {
@@ -299,7 +492,7 @@ class _AssignTransferSheetState extends State<AssignTransferSheet> {
 
   // --- PASO 2: SELECCIÓN DE HOSPITAL (HospitalRow) ---
   Widget _buildStep2Hospital() {
-    final List<HospitalRow> hospitalList = widget.hospitals;
+    final List<HospitalRow> hospitalList = _sortedHospitals;
     final List<HospitalRow> filtered = hospitalList.where((HospitalRow h) {
       final String q = _searchQuery.toLowerCase();
       final String name = h.name.toLowerCase();
@@ -353,8 +546,11 @@ class _AssignTransferSheetState extends State<AssignTransferSheet> {
               else
                 ...filtered.map((HospitalRow h) {
                   final bool isSelected = _selectedHospital?.id == h.id;
-                  final bool hasCoords =
-                      h.latitude != null && h.longitude != null;
+                  final bool hasCoords = _hasValidCoords(
+                    h.latitude,
+                    h.longitude,
+                  );
+                  final String? etaLabel = _formatHospitalDistanceAndEta(h);
 
                   return Padding(
                     padding: const EdgeInsets.only(bottom: TriageSpacing.md),
@@ -363,7 +559,10 @@ class _AssignTransferSheetState extends State<AssignTransferSheet> {
                       borderColor: isSelected
                           ? TriageColors.hospitalAccent
                           : TriageColors.borderMedium,
-                      onTap: () => setState(() => _selectedHospital = h),
+                      onTap: () => setState(() {
+                        _userPickedHospital = true;
+                        _selectedHospital = h;
+                      }),
                       child: Row(
                         children: [
                           Container(
@@ -395,33 +594,21 @@ class _AssignTransferSheetState extends State<AssignTransferSheet> {
                                           ? 'Sin dirección especificada'
                                           : 'Sin coordenadas en base de datos'),
                                   style: TriageTextStyles.bodySmall.copyWith(
-                                    color: hasCoords
-                                        ? TriageColors.textSecondary
-                                        : TriageColors.textSecondary,
+                                    color: TriageColors.textSecondary,
                                   ),
                                 ),
                                 const SizedBox(height: TriageSpacing.xs),
-                                Row(
-                                  children: [
-                                    Text(
-                                      hasCoords
-                                          ? 'Disponible'
-                                          : 'Sin ubicación',
-                                      style: TriageTextStyles.labelSmall
-                                          .copyWith(
-                                            color: TriageColors.textSecondary,
-                                          ),
-                                    ),
-                                    const SizedBox(
-                                      width: TriageSpacing.sm,
-                                    ), // pendiente a disponibilidad
-                                    const TriageStatusBadge(
-                                      label: 'Activo',
-                                      dotColor: TriageColors.success,
-                                      textColor: TriageColors.successText,
-                                      background: TriageColors.surface,
-                                    ),
-                                  ],
+                                Text(
+                                  etaLabel != null
+                                      ? (_loadingRoutes
+                                            ? '$etaLabel (calculando ruta...)'
+                                            : etaLabel)
+                                      : (hasCoords
+                                            ? 'Distancia no disponible'
+                                            : 'Sin ubicación'),
+                                  style: TriageTextStyles.labelSmall.copyWith(
+                                    color: TriageColors.textSecondary,
+                                  ),
                                 ),
                               ],
                             ),
@@ -554,16 +741,16 @@ class _AssignTransferSheetState extends State<AssignTransferSheet> {
                 Container(
                   padding: const EdgeInsets.all(TriageSpacing.md),
                   decoration: BoxDecoration(
-                    color: TriageColors.surface,
+                    color: const Color(0xFFFEF2F2),
                     borderRadius: BorderRadius.circular(TriageRadii.md),
-                    border: Border.all(color: TriageColors.dangerOnInverse),
+                    border: Border.all(color: const Color(0xFFFECACA)),
                   ),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Icon(
                         Icons.error_outline,
-                        color: TriageColors.paramedicAccent,
+                        color: Color(0xFFB91C1C),
                         size: 20,
                       ),
                       const SizedBox(width: TriageSpacing.sm),
@@ -574,14 +761,14 @@ class _AssignTransferSheetState extends State<AssignTransferSheet> {
                             Text(
                               'No se pudo confirmar el traslado',
                               style: TriageTextStyles.labelLarge.copyWith(
-                                color: TriageColors.paramedicAccent,
+                                color: const Color(0xFF991B1B),
                               ),
                             ),
                             const SizedBox(height: 2),
                             Text(
                               _submitError!,
                               style: TriageTextStyles.bodySmall.copyWith(
-                                color: TriageColors.paramedicAccent,
+                                color: const Color(0xFF7F1D1D),
                               ),
                             ),
                           ],
@@ -692,15 +879,45 @@ class _AssignTransferSheetState extends State<AssignTransferSheet> {
             ],
           ),
         ),
-        TriageActionBar(
-          primary: TriageButton(
-            label: 'Volver al incidente',
-            onPressed: () => Navigator.pop(context, 'incident'),
+        Container(
+          padding: const EdgeInsets.fromLTRB(
+            TriageSpacing.xl,
+            TriageSpacing.md,
+            TriageSpacing.xl,
+            TriageSpacing.xl,
           ),
-          secondary: TriageButton(
-            label: 'Ver ficha del paciente',
-            variant: TriageButtonVariant.subtle,
-            onPressed: () => Navigator.pop(context),
+          decoration: const BoxDecoration(
+            border: Border(top: BorderSide(color: TriageColors.borderSubtle)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              TriageButton(
+                label: 'Volver al incidente',
+                onPressed: () => Navigator.pop(context, 'incident'),
+              ),
+              const SizedBox(height: TriageSpacing.sm),
+              Center(
+                child: TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: TriageSpacing.md,
+                      vertical: TriageSpacing.xs,
+                    ),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  child: Text(
+                    'Ver ficha del paciente',
+                    style: TriageTextStyles.labelSmall.copyWith(
+                      color: TriageColors.textSecondary,
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ],

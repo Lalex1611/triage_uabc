@@ -629,6 +629,16 @@ class PatientDetailsController extends ChangeNotifier {
         ? rawUnitCode.trim()
         : 'Unidad asignada';
 
+    final coords = patientMapCoords(d);
+    final regLat = (d.demographics['registration_lat'] as num?)?.toDouble();
+    final regLng = (d.demographics['registration_lng'] as num?)?.toDouble();
+    final double patientLat = (d.status == 'trasladando' && regLat != null)
+        ? regLat
+        : coords.$1;
+    final double patientLng = (d.status == 'trasladando' && regLng != null)
+        ? regLng
+        : coords.$2;
+
     bool transferApplied = false;
 
     final String rawDescription =
@@ -645,6 +655,8 @@ class PatientDetailsController extends ChangeNotifier {
           : d.id,
       triageLevel: _mapTriageLevel(d.triageColor),
       conditionSummary: conditionSummary,
+      latitude: patientLat,
+      longitude: patientLng,
       hospitals: hospitals,
       ambulanceUnits: <String>[unitDisplay],
       onSubmit: (Map<String, dynamic> data) async {
