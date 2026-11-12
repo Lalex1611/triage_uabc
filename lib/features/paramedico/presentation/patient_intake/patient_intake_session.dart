@@ -78,11 +78,14 @@ class PatientIntakeSession {
     _prepared = true;
   }
 
+  /// Guarda un paciente. [details] se añade a `demographics` (datos del
+  /// Registro extendido); sin [mode], el registro no se marca como de START.
   Future<RegisteredPatient> register({
     required TriageLevel level,
     String? name,
     List<String> photos = const [],
-    StartTriageTabOption mode = StartTriageTabOption.asignacionRapida,
+    StartTriageTabOption? mode = StartTriageTabOption.asignacionRapida,
+    Map<String, Object?> details = const {},
   }) async {
     await prepare();
     final point = await _devicePoint() ?? _incidentPoint;
@@ -104,9 +107,12 @@ class PatientIntakeSession {
               locationKey: _placeKey ?? _coords(point),
             ),
       demographics: {
+        ...details,
         'photo_local_paths': List<String>.from(photos),
-        'registered_from_start': true,
-        'start_triage_mode': mode.name,
+        if (mode != null) ...{
+          'registered_from_start': true,
+          'start_triage_mode': mode.name,
+        },
       },
       locationLat: point.lat,
       locationLng: point.lng,
