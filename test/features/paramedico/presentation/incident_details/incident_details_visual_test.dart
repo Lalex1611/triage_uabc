@@ -13,7 +13,11 @@ import 'package:sistema_triage/features/paramedico/presentation/incident_details
 import 'package:sistema_triage/features/paramedico/presentation/incident_details/widgets/incident_details_map_tab_widget.dart';
 import 'package:sistema_triage/features/paramedico/presentation/incident_details/widgets/incident_details_photos_tab_widget.dart';
 import 'package:sistema_triage/features/paramedico/presentation/incident_details/widgets/incident_details_stats_tab_widget.dart';
+import 'package:sistema_triage/features/paramedico/presentation/patient_intake/patient_intake_flow.dart';
+import 'package:sistema_triage/features/paramedico/presentation/patient_intake/patient_intake_session.dart';
 import 'package:sistema_triage/shared/widgets/triage_ui.dart';
+
+import '../patient_intake/fake_intake_repository.dart';
 
 /*
   COMANDO PARA PROBAR EL ENSAMBLE COMPLETO (SANDBOX):
@@ -170,6 +174,21 @@ class _IncidentDetailsVisualTestState extends State<IncidentDetailsVisualTest> {
         onBack: () {},
         onMoreTap: () {},
         onCloseIncidentTap: () {},
+        // Registro con datos simulados: no guarda nada en Supabase
+        onRegisterTap: () => startPatientIntake(
+          context,
+          incidentId: 'a1b2c3d4',
+          subtitle: 'INC-A1B2C3 · Accidente vehicular',
+          onPatientsChanged: () {},
+          openGuidedStart: () async {},
+          openExtendedRegistration: () async {},
+          session: PatientIntakeSession(
+            incidentId: 'a1b2c3d4',
+            repository: FakeIntakeRepository(),
+            currentPosition: () async => null,
+            placeLabel: (_, _) async => 'Blvd. 2000',
+          ),
+        ),
         tabSelectorData: IncidentTabSelectorData(
           activeTab: _activeTab,
           availableTabs: IncidentTabType.values,

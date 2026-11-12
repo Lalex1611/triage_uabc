@@ -406,7 +406,7 @@ class PatientRegistrationController extends ChangeNotifier {
           'emergency_contact': contactNumber.trim(),
         'photo_local_paths': List<String>.from(photos),
       };
-      final code = await _repo.registerPatientFull(
+      final (patientId: _, :code) = await _repo.registerPatientFull(
         incidentId: effectiveIncidentId,
         triageColor: triageCategory!.sqlValue,
         displayName: resolvedName,

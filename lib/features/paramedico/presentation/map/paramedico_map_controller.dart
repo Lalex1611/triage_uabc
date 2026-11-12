@@ -64,6 +64,7 @@ class ParamedicoMapController extends ChangeNotifier {
   int? _visibilityEpoch;
   bool _mapReady = false;
   VoidCallback? _pendingWhenMapReady;
+  int _focusGeneration = 0;
 
   StreamSubscription<Position>? _positionSub;
 
@@ -206,7 +207,7 @@ class ParamedicoMapController extends ChangeNotifier {
     _positionSub = null;
   }
 
-  Future<void> load() async {
+  Future<void> load({bool silent = false}) async {
     if (!SupabaseEnv.isConfigured) {
       loading = false;
       error = 'Supabase no configurado.';
@@ -215,9 +216,11 @@ class ParamedicoMapController extends ChangeNotifier {
       notifyListeners();
       return;
     }
-    loading = true;
-    error = null;
-    notifyListeners();
+    if(!silent) {
+      loading = true;
+      error = null;
+      notifyListeners();
+    }
 
     try {
       final list = await _repo.listOpenIncidents();
@@ -248,12 +251,18 @@ class ParamedicoMapController extends ChangeNotifier {
       counts = loadedCounts;
       patientsByIncident = grouped;
       radiusMetersByIncident = radii;
+      incidents = list;
+      counts = loadedCounts;
+      patientsByIncident = grouped;
+      radiusMetersByIncident = radii;
       loading = false;
       notifyListeners();
     } catch (e) {
-      error = e.toString();
-      loading = false;
-      notifyListeners();
+      if(!silent){
+        error = e.toString();
+        loading = false;
+        notifyListeners();
+      }
     }
   }
 
@@ -293,6 +302,13 @@ class ParamedicoMapController extends ChangeNotifier {
     if (selectedIncidentId == null) return null;
     for (final e in incidents) {
       if (e.id == selectedIncidentId) return e;
+    }
+    return null;
+  }
+
+  ParamedicoIncidentSummary? _incidentById(String id) {
+    for (final e in incidents) {
+      if (e.id == id) return e;
     }
     return null;
   }
@@ -364,16 +380,17 @@ class ParamedicoMapController extends ChangeNotifier {
     final patientId = pendingFocusPatientId;
     pendingFocusId = null;
     pendingFocusPatientId = null;
+    final generation = ++_focusGeneration;
 
-    ParamedicoIncidentSummary? inc;
-    for (final e in incidents) {
-      if (e.id == id) {
-        inc = e;
-        break;
-      }
+    var found = _incidentById(id);
+    if (found == null) {
+      await load(silent: true);
+      if (generation != _focusGeneration) return;
+      found = _incidentById(id);
     }
     if (!context.mounted) return;
-    if (inc == null) {
+
+    if (found == null) {
       showAppSnackBar(
         context,
         'El incidente no está activo o no aparece en el mapa.',
@@ -381,6 +398,9 @@ class ParamedicoMapController extends ChangeNotifier {
       );
       return;
     }
+
+    final ParamedicoIncidentSummary inc = found;
+
     if (inc.latitude == null || inc.longitude == null) {
       showAppSnackBar(
         context,
@@ -523,6 +543,7 @@ class ParamedicoMapController extends ChangeNotifier {
 
   void clearSelection() {
     if (selectedIncidentId == null) return;
+    _focusGeneration++;
     _stopPositionStream();
     selectedIncidentId = null;
     forceShowPatientsIncidentId = null;

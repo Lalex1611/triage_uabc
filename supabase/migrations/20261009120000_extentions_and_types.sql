@@ -16,9 +16,13 @@ create type public.incident_status as enum ('activo', 'cerrado');
 
 create type public.emergency_type as enum (
   'accidente_vehicular',
+  'atropellamiento',
+  'caida',
+  'violencia',
+  'incendio_quemadura',
+  'emergencia_medica',
   'derrumbe',
   'incidente_masivo',
-  'violencia',
   'otro'
 );
 
