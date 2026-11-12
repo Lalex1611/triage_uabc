@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sistema_triage/features/paramedico/presentation/patient_intake/patient_intake_flow.dart';
@@ -188,6 +190,48 @@ void main() {
     expect(find.byType(TriageSheet), findsNothing);
   });
 
+  testWidgets('Registro extendido: el error al guardar queda a la vista', (
+    tester,
+  ) async {
+    final h = _Harness(repo: FakeIntakeRepository()..failWith = 'Sin red');
+    await tester.pumpWidget(h.app());
+    await _open(tester);
+    await _choose(tester, 'Registro extendido');
+    await _choose(tester, 'Leve');
+    await _choose(tester, 'Guardar paciente');
+    expect(
+      find.text('No se pudo registrar al paciente').hitTestable(),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('Registro extendido: mientras guarda no se puede editar', (
+    tester,
+  ) async {
+    final hold = Completer<void>();
+    final h = _Harness(repo: FakeIntakeRepository()..hold = hold);
+    await tester.pumpWidget(h.app());
+    await _open(tester);
+    await _choose(tester, 'Registro extendido');
+    await _choose(tester, 'Leve');
+    await _type(tester, 'Nombre o alias', 'Ana');
+    await tester.tap(find.text('Guardar paciente'));
+    await tester.pump();
+
+    final name = _field('Nombre o alias', find.byType(TextFormField));
+    expect(tester.widget<TextFormField>(name).enabled, isFalse);
+    final chip = find.widgetWithText(TriageChip, 'Hemorragia');
+    expect(tester.widget<TriageChip>(chip).onTap, isNull);
+    await tester.ensureVisible(find.text('Inmediato'));
+    await tester.tap(find.text('Inmediato'));
+    await tester.pump();
+
+    hold.complete();
+    await tester.pumpAndSettle();
+    expect(h.repo.registered.single['triage'], 'verde');
+    expect(h.repo.registered.single['name'], 'Ana');
+  });
+
   testWidgets('START guiado: cinco respuestas, registro y diálogo', (
     tester,
   ) async {
@@ -284,6 +328,49 @@ void main() {
     await _choose(tester, 'Guardar paciente');
     expect(h.repo.registered.single['triage'], 'verde');
     expect(find.text('PAC-ABCDEF quedó registrado'), findsOneWidget);
+  });
+
+  testWidgets('START guiado: el error al guardar queda a la vista', (
+    tester,
+  ) async {
+    final h = _Harness(repo: FakeIntakeRepository()..failWith = 'Sin red');
+    await tester.pumpWidget(h.app());
+    await _open(tester);
+    await _choose(tester, 'START guiado');
+    await _choose(tester, 'Sí, camina');
+    await _choose(tester, 'Guardar paciente');
+    expect(
+      find.text('No se pudo registrar al paciente').hitTestable(),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('START guiado: mientras guarda no se puede editar', (
+    tester,
+  ) async {
+    final hold = Completer<void>();
+    final h = _Harness(repo: FakeIntakeRepository()..hold = hold);
+    await tester.pumpWidget(h.app());
+    await _open(tester);
+    await _choose(tester, 'START guiado');
+    await _choose(tester, 'Sí, camina');
+    await tester.tap(find.text('Guardar paciente'));
+    await tester.pump();
+
+    final name = _field(
+      'Nombre o alias (opcional)',
+      find.byType(TextFormField),
+    );
+    expect(tester.widget<TextFormField>(name).enabled, isFalse);
+    final change = find.text('No estoy de acuerdo · cambiar el color');
+    await tester.ensureVisible(change);
+    await tester.tap(change);
+    await tester.pump();
+    expect(find.text('Inmediato'), findsNothing);
+
+    hold.complete();
+    await tester.pumpAndSettle();
+    expect(h.repo.registered.single['triage'], 'verde');
   });
 
   testWidgets('Asignar color sin conexión avisa y no abre el panel', (
