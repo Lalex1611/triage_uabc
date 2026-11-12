@@ -180,7 +180,6 @@ class _IncidentDetailsVisualTestState extends State<IncidentDetailsVisualTest> {
           incidentId: 'a1b2c3d4',
           subtitle: 'INC-A1B2C3 · Accidente vehicular',
           onPatientsChanged: () {},
-          openExtendedRegistration: () async {},
           session: PatientIntakeSession(
             incidentId: 'a1b2c3d4',
             repository: FakeIntakeRepository(),

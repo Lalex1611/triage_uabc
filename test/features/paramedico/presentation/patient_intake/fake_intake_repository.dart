@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:sistema_triage/features/paramedico/data/repositories/paramedico_incidents_repository.dart';
 
 /// Repositorio en memoria para probar el registro sin Supabase
@@ -12,6 +14,9 @@ class FakeIntakeRepository extends ParamedicoIncidentsRepository {
 
   /// Si no es `null`, leer el incidente falla con este error (sin conexión)
   Object? incidentError;
+
+  /// Si no es `null`, guardar espera a que se complete (red lenta)
+  Completer<void>? hold;
 
   @override
   Future<ParamedicoIncidentSummary?> getIncident(String incidentId) async {
@@ -41,6 +46,7 @@ class FakeIntakeRepository extends ParamedicoIncidentsRepository {
     required double locationLat,
     required double locationLng,
   }) async {
+    await hold?.future;
     final error = failWith;
     if (error != null) throw error;
     registered.add({
