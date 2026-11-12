@@ -1,9 +1,6 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
-import 'package:sistema_triage/core/layout/app_responsive.dart';
 import 'package:sistema_triage/features/paramedico/presentation/patient_intake/patient_intake_session.dart';
+import 'package:sistema_triage/features/paramedico/presentation/patient_intake/patient_intake_widgets.dart';
 import 'package:sistema_triage/shared/widgets/triage_ui.dart';
 
 /// Panel «Asignar color»
@@ -54,8 +51,6 @@ class AssignColorForm extends StatefulWidget {
 }
 
 class _AssignColorFormState extends State<AssignColorForm> {
-  static const double _photoSize = 96;
-
   TriageLevel? _level;
   String _name = '';
   final List<String> _photos = [];
@@ -65,19 +60,6 @@ class _AssignColorFormState extends State<AssignColorForm> {
 
   /// Cambia al vaciar el formulario para reiniciar el campo de nombre
   int _formSerial = 0;
-
-  Future<void> _takePhoto() async {
-    try {
-      final image = await ImagePicker().pickImage(
-        source: ImageSource.camera,
-        imageQuality: 80,
-        maxWidth: 1920,
-      );
-      if (image != null && mounted) setState(() => _photos.add(image.path));
-    } catch (e) {
-      debugPrint('No se pudo tomar la foto: $e');
-    }
-  }
 
   Future<void> _save() async {
     final level = _level;
@@ -117,28 +99,10 @@ class _AssignColorFormState extends State<AssignColorForm> {
     widget.onUseGuided?.call();
   }
 
-  Widget _levelPair(TriageLevel first, TriageLevel second) {
-    Widget button(TriageLevel level) => Expanded(
-      child: TriageLevelButton.start(
-        level,
-        selected: _level == level,
-        onTap: () => setState(() => _level = level),
-      ),
-    );
-    return IntrinsicHeight(
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        spacing: TriageSpacing.sm,
-        children: [button(first), button(second)],
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final last = _last;
     final error = _error;
-    final photoSize = context.rDim(_photoSize);
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(
@@ -177,12 +141,9 @@ class _AssignColorFormState extends State<AssignColorForm> {
               onChanged: (value) => _name = value,
             ),
           ),
-          Column(
-            spacing: TriageSpacing.sm,
-            children: [
-              _levelPair(TriageLevel.red, TriageLevel.yellow),
-              _levelPair(TriageLevel.green, TriageLevel.black),
-            ],
+          StartLevelGrid(
+            selected: _level,
+            onSelected: (level) => setState(() => _level = level),
           ),
           if (widget.onUseGuided != null)
             TriageTapCard(
@@ -213,46 +174,11 @@ class _AssignColorFormState extends State<AssignColorForm> {
                 ],
               ),
             ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            spacing: TriageSpacing.sm,
-            children: [
-              Text(
-                'Fotografía (opcional)',
-                style: TriageTextStyles.labelMedium.copyWith(
-                  color: TriageColors.textSecondary,
-                ),
-              ),
-              Wrap(
-                spacing: TriageSpacing.sm,
-                runSpacing: TriageSpacing.sm,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: [
-                  for (final (index, path) in _photos.indexed)
-                    SizedBox.square(
-                      dimension: photoSize,
-                      child: TriagePhoto(
-                        image: FileImage(File(path)),
-                        semanticLabel: 'Fotografía ${index + 1}',
-                      ),
-                    ),
-                  SizedBox.square(
-                    dimension: photoSize,
-                    child: TriagePhoto(
-                      onTap: _takePhoto,
-                      semanticLabel: 'Tomar fotografía',
-                    ),
-                  ),
-                  if (_photos.isEmpty)
-                    Text(
-                      'Ayuda a identificar al paciente si no trae documentos.',
-                      style: TriageTextStyles.bodySmall.copyWith(
-                        color: TriageColors.textSecondary,
-                      ),
-                    ),
-                ],
-              ),
-            ],
+          IntakePhotos(
+            photos: _photos,
+            onAdded: (path) {
+              if (mounted) setState(() => _photos.add(path));
+            },
           ),
           if (error != null)
             TriageAlert(

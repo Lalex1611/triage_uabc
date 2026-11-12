@@ -22,6 +22,29 @@ Future<T?> showTriageSheet<T>(
   bool showClose = true,
   bool dismissible = true,
 }) {
+  return showTriageSheetWith<T>(
+    context,
+    dismissible: dismissible,
+    sheetBuilder: (sheetContext) => TriageSheet(
+      title: title,
+      subtitle: subtitle,
+      steps: steps,
+      onClose: showClose ? () => Navigator.pop(sheetContext) : null,
+      showGrip: dismissible,
+      child: SingleChildScrollView(child: builder(sheetContext)),
+    ),
+  );
+}
+
+/// Como [showTriageSheet], pero [sheetBuilder] construye la [TriageSheet]
+/// completa: para hojas cuya cabecera cambia mientras están abiertas (los pasos
+/// de START guiado). [dismissible] funciona igual; con `false`, la hoja debería
+/// ocultar el agarre (`showGrip: false`).
+Future<T?> showTriageSheetWith<T>(
+  BuildContext context, {
+  required WidgetBuilder sheetBuilder,
+  bool dismissible = true,
+}) {
   return showModalBottomSheet<T>(
     context: context,
     isScrollControlled: true,
@@ -36,14 +59,7 @@ Future<T?> showTriageSheet<T>(
         padding: EdgeInsets.only(
           bottom: MediaQuery.viewInsetsOf(sheetContext).bottom,
         ),
-        child: TriageSheet(
-          title: title,
-          subtitle: subtitle,
-          steps: steps,
-          onClose: showClose ? () => Navigator.pop(sheetContext) : null,
-          showGrip: dismissible,
-          child: SingleChildScrollView(child: builder(sheetContext)),
-        ),
+        child: sheetBuilder(sheetContext),
       ),
     ),
   );

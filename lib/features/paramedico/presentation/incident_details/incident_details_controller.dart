@@ -282,14 +282,8 @@ class IncidentDetailsController extends ChangeNotifier {
       incidentId: incidentId,
       subtitle: '${header.id} · ${header.title}',
       onPatientsChanged: () => unawaited(load(showLoader: false)),
-      openGuidedStart: () => openTriageAndRefresh(context),
       openExtendedRegistration: () => openRegisterAndRefresh(context),
     );
-  }
-
-  Future<void> openTriageAndRefresh(BuildContext context) async {
-    await pushParamedicoFullScreen(context, '$routeBase/triage');
-    await load();
   }
 
   Future<void> openRegisterAndRefresh(BuildContext context) async {
