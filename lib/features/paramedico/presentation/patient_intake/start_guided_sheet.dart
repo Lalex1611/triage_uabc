@@ -250,34 +250,35 @@ class _StartGuidedPanelState extends State<StartGuidedPanel> {
                   child: TriageSectionAction(
                     icon: TriageIcons.pencil,
                     label: 'No estoy de acuerdo · cambiar el color',
-                    onTap: () =>
-                        setState(() => _changingColor = !_changingColor),
+                    onTap: () {
+                      if (!_saving) {
+                        setState(() => _changingColor = !_changingColor);
+                      }
+                    },
                   ),
                 ),
                 if (_changingColor)
                   StartLevelGrid(
                     selected: level,
-                    onSelected: (picked) =>
-                        setState(() => _chosenLevel = picked),
+                    onSelected: (picked) {
+                      if (!_saving) setState(() => _chosenLevel = picked);
+                    },
                   ),
                 TriageField(
                   label: 'Nombre o alias (opcional)',
                   hint: 'Si lo conoces',
+                  enabled: !_saving,
                   textInputAction: TextInputAction.done,
                   onChanged: (value) => _name = value,
                 ),
                 IntakePhotos(
                   photos: _photos,
+                  enabled: !_saving,
                   onAdded: (path) {
                     if (mounted) setState(() => _photos.add(path));
                   },
                 ),
-                if (error != null)
-                  TriageAlert(
-                    tone: TriageTone.danger,
-                    title: 'No se pudo registrar al paciente',
-                    message: error,
-                  ),
+                if (error != null) IntakeSaveError(error),
               ],
             ),
           ),
