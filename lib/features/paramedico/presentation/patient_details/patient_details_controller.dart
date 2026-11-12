@@ -623,7 +623,13 @@ class PatientDetailsController extends ChangeNotifier {
       return;
     }
 
-    Map<String, dynamic>? transferResult;
+    final rawUnitCode = await _repo.currentAmbulanceUnitCode();
+    if (!context.mounted) return;
+    final unitDisplay = (rawUnitCode != null && rawUnitCode.trim().isNotEmpty)
+        ? rawUnitCode.trim()
+        : 'Unidad asignada';
+
+    bool transferApplied = false;
 
     final String rawDescription =
         (d.demographics['description'] as String?) ?? '';
@@ -631,7 +637,6 @@ class PatientDetailsController extends ChangeNotifier {
         ? rawDescription.trim()
         : 'Sin observaciones clínicas';
 
-    // Despliega la hoja modal unificada de 4 pasos reutilizando la lista de `HospitalRow`
     final String? postAction = await showAssignTransferSheet(
       context,
       patientName: d.displayName,
@@ -641,42 +646,43 @@ class PatientDetailsController extends ChangeNotifier {
       triageLevel: _mapTriageLevel(d.triageColor),
       conditionSummary: conditionSummary,
       hospitals: hospitals,
-      ambulanceUnits: <String>[unitId],
-      onSubmit: (Map<String, dynamic> data) {
-        transferResult = data;
+      ambulanceUnits: <String>[unitDisplay],
+      onSubmit: (Map<String, dynamic> data) async {
+        final pickedHospital = data['picked_hospital'] as HospitalRow?;
+        if (pickedHospital == null) {
+          throw StateError('Selecciona un hospital de destino.');
+        }
+
+        final rawFolio = data['regulation_folio'] as String?;
+        final insuranceInfo = data['insurance'] as String?;
+        final hasInsurance =
+            insuranceInfo != null &&
+            insuranceInfo != 'No tiene seguro' &&
+            insuranceInfo != 'No lo sé';
+
+        await _repo.applyPatientTransfer(
+          patientId: d.id,
+          newStatus: 'trasladando',
+          hospitalId: pickedHospital.id,
+          regulationFolio: (rawFolio == null || rawFolio.trim().isEmpty)
+              ? null
+              : rawFolio.trim(),
+          demographicsExtras: {
+            'has_medical_insurance': hasInsurance,
+            'medical_insurance_institution': insuranceInfo,
+            'transfer_destination_hospital_name': pickedHospital.name,
+            'ambulance_unit_id': unitId,
+          },
+          patientLocationLat: pickedHospital.latitude,
+          patientLocationLng: pickedHospital.longitude,
+        );
+
+        transferApplied = true;
+        await load();
       },
     );
 
-    if (!context.mounted || transferResult == null) return;
-
-    final pickedHospital = transferResult!['picked_hospital'] as HospitalRow?;
-    if (pickedHospital == null) return;
-
-    final rawFolio = transferResult!['regulation_folio'] as String?;
-    final insuranceInfo = transferResult!['insurance'] as String?;
-    final hasInsurance =
-        insuranceInfo != null &&
-        insuranceInfo != 'No tiene seguro' &&
-        insuranceInfo != 'No lo sé';
-
-    await _repo.applyPatientTransfer(
-      patientId: d.id,
-      newStatus: 'trasladando',
-      hospitalId: pickedHospital.id,
-      regulationFolio: (rawFolio == null || rawFolio.trim().isEmpty)
-          ? null
-          : rawFolio.trim(),
-      demographicsExtras: {
-        'has_medical_insurance': hasInsurance,
-        'medical_insurance_institution': insuranceInfo,
-        'transfer_destination_hospital_name': pickedHospital.name,
-      },
-      patientLocationLat: pickedHospital.latitude,
-      patientLocationLng: pickedHospital.longitude,
-    );
-
-    if (!context.mounted) return;
-    await load();
+    if (!context.mounted || !transferApplied) return;
 
     if (postAction == 'incident' && d.incidentId.isNotEmpty) {
       context.go('/paramedico/incident/${d.incidentId}');
@@ -684,13 +690,12 @@ class PatientDetailsController extends ChangeNotifier {
   }
 
   void onBack(BuildContext context) {
-    final d = detail;
-    if (d == null) return;
     if (isEditing) {
       cancelEdit();
       return;
     }
-    if (d.incidentId.isNotEmpty) {
+    final d = detail;
+    if (d != null && d.incidentId.isNotEmpty) {
       context.go('/paramedico/incident/${d.incidentId}');
     } else {
       context.pop();

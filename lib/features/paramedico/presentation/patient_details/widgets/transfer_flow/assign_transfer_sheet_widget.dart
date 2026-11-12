@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:sistema_triage/features/paramedico/data/repositories/paramedico_incidents_repository.dart';
 import 'package:sistema_triage/shared/widgets/triage_ui.dart';
 
-/// Callback para el envío de datos de traslado
-typedef OnSubmitTransfer = void Function(Map<String, dynamic> data);
+/// Callback asíncrono para el envío de datos de traslado
+typedef OnSubmitTransfer = Future<void> Function(Map<String, dynamic> data);
 
 /// Función global para desplegar la hoja modal de traslado
 Future<String?> showAssignTransferSheet(
@@ -79,6 +79,8 @@ class AssignTransferSheet extends StatefulWidget {
 
 class _AssignTransferSheetState extends State<AssignTransferSheet> {
   int _currentStep = 1;
+  bool _submitting = false;
+  String? _submitError;
 
   // Paso 1: Seguro médico
   int _insuranceOptionIndex = 0; // 0: Sí, 1: No, 2: No sé
@@ -142,7 +144,8 @@ class _AssignTransferSheetState extends State<AssignTransferSheet> {
     }
   }
 
-  void _finishTransfer() {
+  Future<void> _finishTransfer() async {
+    if (_submitting) return;
     final HospitalRow? picked = _selectedHospital;
     final Map<String, dynamic> payload = <String, dynamic>{
       'picked_hospital': picked,
@@ -155,8 +158,27 @@ class _AssignTransferSheetState extends State<AssignTransferSheet> {
           : _folioController.text.trim(),
     };
 
-    widget.onSubmit?.call(payload);
-    setState(() => _currentStep = 4);
+    setState(() {
+      _submitting = true;
+      _submitError = null;
+    });
+
+    try {
+      if (widget.onSubmit != null) {
+        await widget.onSubmit!(payload);
+      }
+      if (!mounted) return;
+      setState(() {
+        _submitting = false;
+        _currentStep = 4;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _submitting = false;
+        _submitError = e.toString().replaceFirst('Exception: ', '');
+      });
+    }
   }
 
   @override
@@ -168,6 +190,7 @@ class _AssignTransferSheetState extends State<AssignTransferSheet> {
       subtitle: _stepSubtitle,
       steps: isConfirmed ? null : TriageSteps(current: _currentStep, total: 3),
       onClose: () {
+        if (_submitting) return;
         Navigator.pop(context);
         widget.onCancel?.call();
       },
@@ -458,7 +481,13 @@ class _AssignTransferSheetState extends State<AssignTransferSheet> {
               TriageSectionCard(
                 trailing: TriageSectionAction(
                   label: 'Cambiar',
-                  onTap: () => setState(() => _currentStep = 2),
+                  onTap: () {
+                    if (_submitting) return;
+                    setState(() {
+                      _submitError = null;
+                      _currentStep = 2;
+                    });
+                  },
                 ),
                 child: Row(
                   children: [
@@ -509,8 +538,10 @@ class _AssignTransferSheetState extends State<AssignTransferSheet> {
                   value: _selectedUnit,
                   options: unitsList,
                   optionLabel: (String val) => val,
-                  onChanged: (String? val) =>
-                      setState(() => _selectedUnit = val),
+                  onChanged: (String? val) {
+                    if (_submitting) return;
+                    setState(() => _selectedUnit = val);
+                  },
                 ),
               const SizedBox(height: TriageSpacing.lg),
               TriageField(
@@ -519,6 +550,48 @@ class _AssignTransferSheetState extends State<AssignTransferSheet> {
                 controller: _folioController,
               ),
               const SizedBox(height: TriageSpacing.xl),
+              if (_submitError != null) ...[
+                Container(
+                  padding: const EdgeInsets.all(TriageSpacing.md),
+                  decoration: BoxDecoration(
+                    color: TriageColors.surface,
+                    borderRadius: BorderRadius.circular(TriageRadii.md),
+                    border: Border.all(color: TriageColors.dangerOnInverse),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(
+                        Icons.error_outline,
+                        color: TriageColors.paramedicAccent,
+                        size: 20,
+                      ),
+                      const SizedBox(width: TriageSpacing.sm),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'No se pudo confirmar el traslado',
+                              style: TriageTextStyles.labelLarge.copyWith(
+                                color: TriageColors.paramedicAccent,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              _submitError!,
+                              style: TriageTextStyles.bodySmall.copyWith(
+                                color: TriageColors.paramedicAccent,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: TriageSpacing.md),
+              ],
               const TriageAlert(
                 tone: TriageTone.warning,
                 title: 'Al confirmar, el hospital recibe el aviso',
@@ -530,13 +603,18 @@ class _AssignTransferSheetState extends State<AssignTransferSheet> {
         ),
         TriageActionBar(
           primary: TriageButton(
-            label: 'Confirmar traslado',
-            onPressed: _finishTransfer,
+            label: _submitting ? 'Confirmando...' : 'Confirmar traslado',
+            onPressed: _submitting ? null : _finishTransfer,
           ),
           secondary: TriageButton(
             label: 'Atrás',
             variant: TriageButtonVariant.subtle,
-            onPressed: () => setState(() => _currentStep = 2),
+            onPressed: _submitting
+                ? null
+                : () => setState(() {
+                    _submitError = null;
+                    _currentStep = 2;
+                  }),
           ),
         ),
       ],
