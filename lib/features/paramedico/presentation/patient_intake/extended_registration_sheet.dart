@@ -156,10 +156,13 @@ class _ExtendedRegistrationPanelState extends State<ExtendedRegistrationPanel> {
                     _SectionTitle('Clasificación TRIAGE'),
                     StartLevelGrid(
                       selected: _level,
-                      onSelected: (level) => setState(() => _level = level),
+                      onSelected: (level) {
+                        if (!_saving) setState(() => _level = level);
+                      },
                     ),
                     IntakePhotos(
                       photos: _photos,
+                      enabled: !_saving,
                       onAdded: (path) {
                         if (mounted) setState(() => _photos.add(path));
                       },
@@ -173,6 +176,7 @@ class _ExtendedRegistrationPanelState extends State<ExtendedRegistrationPanel> {
                           TriageField(
                             label: 'Nombre o alias',
                             hint: 'Si lo conoces, escríbelo',
+                            enabled: !_saving,
                             textInputAction: TextInputAction.next,
                             onChanged: (value) => setState(() => _name = value),
                           ),
@@ -180,6 +184,7 @@ class _ExtendedRegistrationPanelState extends State<ExtendedRegistrationPanel> {
                             label: 'Edad',
                             hint: 'Años',
                             keyboardType: TextInputType.number,
+                            enabled: !_saving,
                             textInputAction: TextInputAction.next,
                             errorText: _ageError,
                             onChanged: (value) => setState(() => _age = value),
@@ -190,6 +195,7 @@ class _ExtendedRegistrationPanelState extends State<ExtendedRegistrationPanel> {
                             options: PatientGender.values,
                             optionLabel: _genderLabel,
                             value: _gender,
+                            enabled: !_saving,
                             onChanged: (value) =>
                                 setState(() => _gender = value),
                           ),
@@ -199,6 +205,7 @@ class _ExtendedRegistrationPanelState extends State<ExtendedRegistrationPanel> {
                             options: PatientBloodType.values,
                             optionLabel: (blood) => blood.label,
                             value: _bloodType,
+                            enabled: !_saving,
                             onChanged: (value) =>
                                 setState(() => _bloodType = value),
                           ),
@@ -206,6 +213,7 @@ class _ExtendedRegistrationPanelState extends State<ExtendedRegistrationPanel> {
                             label: 'Teléfono de contacto',
                             hint: 'Familiar o persona a avisar',
                             keyboardType: TextInputType.phone,
+                            enabled: !_saving,
                             textInputAction: TextInputAction.done,
                             onChanged: (value) =>
                                 setState(() => _phone = value),
@@ -222,6 +230,7 @@ class _ExtendedRegistrationPanelState extends State<ExtendedRegistrationPanel> {
                           TriageField.area(
                             label: 'Descripción',
                             hint: 'Qué observas: lesiones, consciencia…',
+                            enabled: !_saving,
                             onChanged: (value) =>
                                 setState(() => _description = value),
                           ),
@@ -232,23 +241,20 @@ class _ExtendedRegistrationPanelState extends State<ExtendedRegistrationPanel> {
                                 TriageChip(
                                   label: injury.label,
                                   selected: _injuries.contains(injury),
-                                  onTap: () => setState(
-                                    () => _injuries.contains(injury)
-                                        ? _injuries.remove(injury)
-                                        : _injuries.add(injury),
-                                  ),
+                                  onTap: _saving
+                                      ? null
+                                      : () => setState(
+                                          () => _injuries.contains(injury)
+                                              ? _injuries.remove(injury)
+                                              : _injuries.add(injury),
+                                        ),
                                 ),
                             ],
                           ),
                         ],
                       ),
                     ),
-                    if (error != null)
-                      TriageAlert(
-                        tone: TriageTone.danger,
-                        title: 'No se pudo registrar al paciente',
-                        message: error,
-                      ),
+                    if (error != null) IntakeSaveError(error),
                   ],
                 ),
               ),
