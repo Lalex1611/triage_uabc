@@ -98,6 +98,8 @@ class ParamedicoMapPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final selected = selectedCard;
+    // Alto de la barra de navegación flotante (o del sistema) bajo el mapa
+    final bottomInset = MediaQuery.paddingOf(context).bottom;
 
     return ColoredBox(
       color: TriageColors.surface,
@@ -194,7 +196,7 @@ class ParamedicoMapPage extends StatelessWidget {
             Positioned(
               left: 0,
               right: 0,
-              bottom: 72,
+              bottom: bottomInset + 72,
               child: Center(
                 child: ResumeNavigationChip(onResume: onResumeNavigation),
               ),
@@ -202,7 +204,7 @@ class ParamedicoMapPage extends StatelessWidget {
           if (!isLoading)
             Positioned(
               right: 12,
-              bottom: 12,
+              bottom: bottomInset + 12,
               child: MapFloatingControls(
                 onZoomIn: onZoomIn,
                 onZoomOut: onZoomOut,
