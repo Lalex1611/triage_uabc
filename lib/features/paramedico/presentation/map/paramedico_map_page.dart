@@ -27,7 +27,6 @@ class ParamedicoMapPage extends StatelessWidget {
     required this.followUser,
     required this.routing,
     required this.selectedCard,
-    required this.onBack,
     required this.onMapBackgroundTap,
     required this.onMapPositionChanged,
     required this.onPinTap,
@@ -44,7 +43,6 @@ class ParamedicoMapPage extends StatelessWidget {
     this.showHospitals = true,
     this.unreadNotifications = 0,
     this.onOpenNotifications,
-    this.showBackButton = false,
     this.coverageRings = const [],
     this.patientPins = const [],
     this.highlightedPatientId,
@@ -65,7 +63,6 @@ class ParamedicoMapPage extends StatelessWidget {
   final bool followUser;
   final bool routing;
   final IncidentForCards? selectedCard;
-  final VoidCallback onBack;
   final VoidCallback onMapBackgroundTap;
   final void Function(MapCamera camera, bool hasGesture) onMapPositionChanged;
   final void Function(ParamedicoIncidentSummary inc) onPinTap;
@@ -88,10 +85,6 @@ class ParamedicoMapPage extends StatelessWidget {
   /// Sin [onOpenNotifications] no se muestra la campana
   final int unreadNotifications;
   final VoidCallback? onOpenNotifications;
-
-  /// Botón de volver junto al buscador. Solo para el mapa a pantalla completa
-  /// (sin barra inferior); en la pestaña Mapa va en false.
-  final bool showBackButton;
   final List<({LatLng center, double radiusMeters})> coverageRings;
   final List<MapPatientPin> patientPins;
   final String? highlightedPatientId;
@@ -147,15 +140,6 @@ class ParamedicoMapPage extends StatelessWidget {
                   children: [
                     Row(
                       children: [
-                        if (showBackButton) ...[
-                          TriageIconButton(
-                            icon: TriageIcons.arrowLeft,
-                            tooltip: 'Volver',
-                            onPressed: onBack,
-                            variant: TriageIconButtonVariant.surface,
-                          ),
-                          const SizedBox(width: TriageSpacing.sm),
-                        ],
                         Expanded(
                           child: TriageSearchBar(
                             hint: 'Buscar dirección',

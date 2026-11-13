@@ -71,7 +71,6 @@ class _ParamedicoMapTabPageState extends State<ParamedicoMapTabPage> {
       followUser: c.followUser,
       routing: c.routing,
       selectedCard: selected != null ? c.toCard(selected, uid) : null,
-      onBack: () => c.goHome(context),
       onMapBackgroundTap: c.onMapBackgroundTap,
       onMapPositionChanged: c.onMapPositionChanged,
       onPinTap: (inc) => unawaited(c.onPinTap(context, inc)),
