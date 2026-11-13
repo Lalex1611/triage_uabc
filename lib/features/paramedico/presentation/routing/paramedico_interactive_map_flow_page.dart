@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:sistema_triage/core/theme/app_theme.dart';
 import 'package:sistema_triage/features/paramedico/presentation/map/paramedico_map_controller.dart';
 import 'package:sistema_triage/features/paramedico/presentation/map/paramedico_map_page.dart';
-import 'package:sistema_triage/features/paramedico/presentation/shared/paramedico_session_actions.dart';
+import 'package:sistema_triage/features/paramedico/presentation/map/widgets/map_layers_sheet.dart';
 
 /// Mapa interactivo en pantalla completa con opción de retorno
 class ParamedicoInteractiveMapFlowPage extends StatefulWidget {
@@ -36,7 +36,6 @@ class _ParamedicoInteractiveMapFlowPageState
       initialFocusIncidentId: widget.initialFocusIncidentId,
       initialFocusPatientId: widget.initialFocusPatientId,
     );
-    _controller.searchController.addListener(_controller.onSearchChanged);
     _controller.addListener(_onController);
     _controller.init();
   }
@@ -49,7 +48,6 @@ class _ParamedicoInteractiveMapFlowPageState
 
   @override
   void dispose() {
-    _controller.searchController.removeListener(_controller.onSearchChanged);
     _controller.removeListener(_onController);
     _controller.dispose();
     super.dispose();
@@ -76,6 +74,8 @@ class _ParamedicoInteractiveMapFlowPageState
         color: Colors.white,
         child: ParamedicoMapPage(
           searchController: c.searchController,
+          onSearchSubmitted: (query) =>
+              unawaited(c.searchAddress(context, query)),
           mapController: c.mapController,
           errorMessage: c.error,
           isLoading: c.loading,
@@ -88,22 +88,23 @@ class _ParamedicoInteractiveMapFlowPageState
           selectedCard: selected != null ? c.toCard(selected, uid) : null,
           onMapReady: c.markMapReady,
           onBack: () => c.navigateBack(context, returnTo: widget.returnTo),
-          onSignOut: () => ParamedicoSessionActions.openProfileSheet(context),
           onMapBackgroundTap: c.onMapBackgroundTap,
           onMapPositionChanged: c.onMapPositionChanged,
           onPinTap: (inc) => unawaited(c.onPinTap(context, inc)),
           onClearSelection: c.clearSelection,
           onResumeNavigation: c.enableFollowNavigation,
-          onZoomIn: c.zoomIn,
-          onZoomOut: c.zoomOut,
           onLocateMe: () => unawaited(c.centerOnUser(context)),
+          onOpenLayers: () => unawaited(showMapLayersSheet(context, c)),
           onOpenIncidentDetail: () {
             final id = c.selectedIncidentId;
             if (id != null) c.openIncidentDetail(context, id);
           },
-          mineOnly: c.mineOnly,
-          onMineOnlyChanged: c.setMineOnly,
+          filter: c.filter,
+          onFilterChanged: (f) => unawaited(c.setFilter(context, f)),
           countsByIncident: c.counts,
+          hospitals: c.hospitals,
+          showIncidents: c.showIncidents,
+          showHospitals: c.showHospitals,
           showBackButton: true,
           coverageRings: c
               .visibleCoverageRings()

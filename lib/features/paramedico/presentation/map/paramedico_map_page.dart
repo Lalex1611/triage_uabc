@@ -1,26 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:sistema_triage/core/constants/app_colors.dart';
-import 'package:sistema_triage/core/constants/triage_icons.dart';
-import 'package:sistema_triage/core/theme/app_theme.dart';
-import 'package:sistema_triage/core/theme/triage_tokens.dart';
 import 'package:sistema_triage/features/paramedico/data/repositories/paramedico_incidents_repository.dart';
 import 'package:sistema_triage/features/paramedico/domain/entities/home/incident_for_cards.dart';
-import 'package:sistema_triage/features/paramedico/presentation/home/widgets/incident_card_widget.dart';
-import 'package:sistema_triage/features/paramedico/presentation/map/services/map_operational_region.dart';
 import 'package:sistema_triage/features/paramedico/domain/entities/map/map_patient_pin.dart';
-import 'package:sistema_triage/features/paramedico/presentation/map/widgets/map_floating_controls_widget.dart';
+import 'package:sistema_triage/features/paramedico/presentation/home/widgets/incident_card_widget.dart';
+import 'package:sistema_triage/features/paramedico/presentation/map/paramedico_map_controller.dart';
+import 'package:sistema_triage/features/paramedico/presentation/map/services/map_operational_region.dart';
 import 'package:sistema_triage/features/paramedico/presentation/map/widgets/navigation_user_marker_widget.dart';
-import 'package:sistema_triage/features/paramedico/presentation/map/widgets/patient_map_pin_widget.dart';
 import 'package:sistema_triage/features/paramedico/presentation/map/widgets/resume_navigation_chip_widget.dart';
 import 'package:sistema_triage/shared/widgets/triage_ui.dart';
 
-// Cascarón del mapa interactivo de incidentes (paramédico). Solo layout y callbacks
+// Cascarón del mapa en vivo de incidentes (paramédico, B01). Solo layout y callbacks
 class ParamedicoMapPage extends StatelessWidget {
   const ParamedicoMapPage({
     super.key,
     required this.searchController,
+    required this.onSearchSubmitted,
     required this.mapController,
     required this.errorMessage,
     required this.isLoading,
@@ -32,19 +28,22 @@ class ParamedicoMapPage extends StatelessWidget {
     required this.routing,
     required this.selectedCard,
     required this.onBack,
-    required this.onSignOut,
     required this.onMapBackgroundTap,
     required this.onMapPositionChanged,
     required this.onPinTap,
     required this.onClearSelection,
     required this.onResumeNavigation,
-    required this.onZoomIn,
-    required this.onZoomOut,
     required this.onLocateMe,
+    required this.onOpenLayers,
     required this.onOpenIncidentDetail,
-    required this.mineOnly,
-    required this.onMineOnlyChanged,
+    required this.filter,
+    required this.onFilterChanged,
     this.countsByIncident = const {},
+    this.hospitals = const [],
+    this.showIncidents = true,
+    this.showHospitals = true,
+    this.unreadNotifications = 0,
+    this.onOpenNotifications,
     this.showBackButton = false,
     this.coverageRings = const [],
     this.patientPins = const [],
@@ -53,9 +52,9 @@ class ParamedicoMapPage extends StatelessWidget {
     this.onMapReady,
   });
 
-  // searchController, onBack y onSignOut se conservan para no romper a quien
-  // construye esta página; el buscador nuevo aún no tiene funcionalidad.
+  /// Buscador de direcciones: [onSearchSubmitted] mueve el mapa al resultado
   final TextEditingController searchController;
+  final ValueChanged<String> onSearchSubmitted;
   final MapController mapController;
   final String? errorMessage;
   final bool isLoading;
@@ -67,21 +66,28 @@ class ParamedicoMapPage extends StatelessWidget {
   final bool routing;
   final IncidentForCards? selectedCard;
   final VoidCallback onBack;
-  final VoidCallback onSignOut;
   final VoidCallback onMapBackgroundTap;
   final void Function(MapCamera camera, bool hasGesture) onMapPositionChanged;
   final void Function(ParamedicoIncidentSummary inc) onPinTap;
   final VoidCallback onClearSelection;
   final VoidCallback onResumeNavigation;
-  final VoidCallback onZoomIn;
-  final VoidCallback onZoomOut;
   final VoidCallback onLocateMe;
+  final VoidCallback onOpenLayers;
   final VoidCallback onOpenIncidentDetail;
-  final bool mineOnly;
-  final ValueChanged<bool> onMineOnlyChanged;
+  final MapIncidentFilter filter;
+  final ValueChanged<MapIncidentFilter> onFilterChanged;
 
-  /// Conteo de pacientes por incidente (para el número rojo del marcador)
+  /// Conteo de pacientes por incidente (el total va en el marcador)
   final Map<String, IncidentPatientTriageCounts> countsByIncident;
+  final List<HospitalRow> hospitals;
+
+  /// Capas del mapa: incidentes (con sus pacientes y radios) y hospitales
+  final bool showIncidents;
+  final bool showHospitals;
+
+  /// Sin [onOpenNotifications] no se muestra la campana
+  final int unreadNotifications;
+  final VoidCallback? onOpenNotifications;
 
   /// Botón de volver junto al buscador. Solo para el mapa a pantalla completa
   /// (sin barra inferior); en la pestaña Mapa va en false.
@@ -95,9 +101,16 @@ class ParamedicoMapPage extends StatelessWidget {
   // Marcador de incidente: ancho para "88" con aire; alto = zona táctil
   static const double _incidentMarkerWidth = 88;
 
+  static const _filterLabels = {
+    MapIncidentFilter.mine: 'Mis incidentes',
+    MapIncidentFilter.all: 'Todos',
+    MapIncidentFilter.nearby: 'Cerca de mí',
+  };
+
   @override
   Widget build(BuildContext context) {
     final selected = selectedCard;
+    final onOpenNotifications = this.onOpenNotifications;
     // Alto de la barra de navegación flotante (o del sistema) bajo el mapa
     final bottomInset = MediaQuery.paddingOf(context).bottom;
 
@@ -109,10 +122,10 @@ class ParamedicoMapPage extends StatelessWidget {
             child: isLoading
                 ? const Center(
                     child: CircularProgressIndicator(
-                      color: AppColors.primaryParamedico,
+                      color: TriageColors.paramedicAccent,
                     ),
                   )
-                : _buildMap(selected),
+                : _buildMap(),
           ),
           // Buscador, filtros y tarjeta del incidente seleccionado flotan sobre el mapa
           Positioned(
@@ -143,10 +156,26 @@ class ParamedicoMapPage extends StatelessWidget {
                           ),
                           const SizedBox(width: TriageSpacing.sm),
                         ],
-                        // Sin controller: solo visual, no filtra incidentes
-                        const Expanded(
-                          child: TriageSearchBar(hint: 'Buscar dirección'),
+                        Expanded(
+                          child: TriageSearchBar(
+                            hint: 'Buscar dirección',
+                            controller: searchController,
+                            onSubmitted: onSearchSubmitted,
+                          ),
                         ),
+                        if (onOpenNotifications != null) ...[
+                          const SizedBox(width: TriageSpacing.sm),
+                          TriageIconButton(
+                            icon: TriageIcons.bell,
+                            tooltip: unreadNotifications > 0
+                                ? 'Notificaciones, $unreadNotifications sin leer'
+                                : 'Notificaciones',
+                            onPressed: onOpenNotifications,
+                            variant: TriageIconButtonVariant.surface,
+                            diameter: TriageSizes.touchTarget,
+                            showDot: unreadNotifications > 0,
+                          ),
+                        ],
                       ],
                     ),
                     const SizedBox(height: TriageSpacing.sm),
@@ -154,33 +183,20 @@ class ParamedicoMapPage extends StatelessWidget {
                       spacing: TriageSpacing.sm,
                       runSpacing: TriageSpacing.sm,
                       children: [
-                        TriageChip(
-                          label: 'Mis incidentes',
-                          selected: mineOnly,
-                          onTap: () => onMineOnlyChanged(true),
-                        ),
-                        TriageChip(
-                          label: 'Todos',
-                          selected: !mineOnly,
-                          onTap: () => onMineOnlyChanged(false),
-                        ),
+                        for (final entry in _filterLabels.entries)
+                          TriageChip(
+                            label: entry.value,
+                            selected: filter == entry.key,
+                            onTap: () => onFilterChanged(entry.key),
+                          ),
                       ],
                     ),
                     if (errorMessage != null) ...[
                       const SizedBox(height: TriageSpacing.sm),
-                      Container(
-                        padding: const EdgeInsets.all(TriageSpacing.sm),
-                        decoration: BoxDecoration(
-                          color: TriageColors.surface,
-                          borderRadius: BorderRadius.circular(TriageRadii.full),
-                        ),
-                        child: Text(
-                          errorMessage!,
-                          style: AppTextStyles.ESC_Regular_bodyMedium.copyWith(
-                            color: AppColors.primaryParamedico,
-                            fontSize: 12,
-                          ),
-                        ),
+                      TriageAlert(
+                        tone: TriageTone.danger,
+                        title: 'No se pudieron cargar los incidentes',
+                        message: errorMessage,
                       ),
                     ],
                     if (selected != null) ...[
@@ -202,14 +218,38 @@ class ParamedicoMapPage extends StatelessWidget {
               ),
             ),
           if (!isLoading)
-            Positioned(
-              right: 12,
-              bottom: bottomInset + 12,
-              child: MapFloatingControls(
-                onZoomIn: onZoomIn,
-                onZoomOut: onZoomOut,
-                onLocateMe: onLocateMe,
-                followActive: followUser && selected != null,
+            Positioned.fill(
+              child: Align(
+                alignment: AlignmentDirectional.centerEnd,
+                child: Padding(
+                  padding: const EdgeInsetsDirectional.only(
+                    end: TriageSpacing.lg,
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      TriageIconButton(
+                        icon: TriageIcons.target,
+                        tooltip: 'Centrar en mi ubicación',
+                        onPressed: onLocateMe,
+                        variant: TriageIconButtonVariant.surface,
+                        diameter: TriageSizes.touchTarget,
+                        // Siguiendo al usuario en la ruta: el botón lo indica
+                        color: followUser && selected != null
+                            ? TriageColors.paramedicAccent
+                            : TriageColors.textPrimary,
+                      ),
+                      const SizedBox(height: TriageSpacing.sm),
+                      TriageIconButton(
+                        icon: TriageIcons.layers,
+                        tooltip: 'Capas del mapa',
+                        onPressed: onOpenLayers,
+                        variant: TriageIconButtonVariant.surface,
+                        diameter: TriageSizes.touchTarget,
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ),
         ],
@@ -217,7 +257,9 @@ class ParamedicoMapPage extends StatelessWidget {
     );
   }
 
-  Widget _buildMap(IncidentForCards? selected) {
+  Widget _buildMap() {
+    final user = userPosition;
+
     return FlutterMap(
       mapController: mapController,
       options: MapOptions(
@@ -233,21 +275,18 @@ class ParamedicoMapPage extends StatelessWidget {
         ),
       ),
       children: [
-        TileLayer(
-          urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-          userAgentPackageName: 'sistema_triage',
-        ),
+        const TriageMapTiles(),
         if (routePoints.length >= 2)
           PolylineLayer(
             polylines: [
               Polyline(
                 points: routePoints,
-                color: AppColors.primaryParamedico.withValues(alpha: 0.82),
+                color: TriageColors.paramedicAccent,
                 strokeWidth: 4,
               ),
             ],
           ),
-        if (coverageRings.isNotEmpty)
+        if (showIncidents && coverageRings.isNotEmpty)
           CircleLayer(
             optimizeRadiusInMeters: true,
             circles: [
@@ -256,42 +295,54 @@ class ParamedicoMapPage extends StatelessWidget {
                   point: ring.center,
                   radius: ring.radiusMeters,
                   useRadiusInMeter: true,
-                  color: AppColors.primaryParamedico.withValues(alpha: 0.10),
-                  borderColor: AppColors.primaryParamedico,
-                  borderStrokeWidth: 1.5,
+                  color: TriageColors.paramedicAccent.withValues(
+                    alpha: TriageOpacity.hover,
+                  ),
+                  borderColor: TriageColors.paramedicAccent,
+                  borderStrokeWidth: TriageSizes.strokeStrong,
                 ),
             ],
           ),
-        if (userPosition != null)
+        if (showHospitals && hospitals.isNotEmpty)
           MarkerLayer(
             markers: [
-              Marker(
-                point: userPosition!,
-                width: followUser ? 40 : 28,
-                height: followUser ? 40 : 28,
-                child: followUser
-                    ? const NavigationUserMarker()
-                    : Container(
-                        decoration: BoxDecoration(
-                          color: AppColors.primaryMedico,
-                          shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white, width: 3),
-                        ),
-                      ),
-              ),
+              for (final h in hospitals)
+                Marker(
+                  point: LatLng(h.latitude!, h.longitude!),
+                  width: TriageSizes.touchTarget,
+                  height: TriageSizes.touchTarget,
+                  child: TriageHospitalMarker(semanticLabel: h.name),
+                ),
             ],
           ),
-        if (patientPins.isNotEmpty)
+        if (user != null)
+          MarkerLayer(
+            markers: [
+              followUser
+                  ? Marker(
+                      point: user,
+                      width: 40,
+                      height: 40,
+                      child: const NavigationUserMarker(),
+                    )
+                  : Marker(
+                      point: user,
+                      width: TriageUserMarker.haloDiameter,
+                      height: TriageUserMarker.haloDiameter,
+                      child: const TriageUserMarker(showHalo: true),
+                    ),
+            ],
+          ),
+        if (showIncidents && patientPins.isNotEmpty)
           MarkerLayer(
             markers: [
               for (final p in patientPins)
                 Marker(
                   point: LatLng(p.latitude, p.longitude),
-                  width: 44,
-                  height: 44,
-                  alignment: Alignment.bottomCenter,
-                  child: PatientMapPin(
-                    triageColor: p.triageColor,
+                  width: TriageSizes.touchTarget,
+                  height: TriageSizes.touchTarget,
+                  child: TriagePatientMarker(
+                    TriageLevel.fromDb(p.triageColor) ?? TriageLevel.yellow,
                     highlighted: p.id == highlightedPatientId,
                     onTap: onPatientPinTap != null
                         ? () => onPatientPinTap!(p)
@@ -300,26 +351,28 @@ class ParamedicoMapPage extends StatelessWidget {
                 ),
             ],
           ),
-        MarkerLayer(
-          markers: [
-            for (final e in mappableIncidents)
-              Marker(
-                point: LatLng(e.latitude!, e.longitude!),
-                width: _incidentMarkerWidth,
-                height: TriageSizes.touchTarget,
-                alignment: Alignment.center,
-                child: TriageIncidentMarker(
-                  redCount: countsByIncident[e.id]?.red ?? 0,
-                  selected: e.id == selectedIncidentId,
-                  onTap: () => onPinTap(e),
+        if (showIncidents)
+          MarkerLayer(
+            markers: [
+              for (final e in mappableIncidents)
+                Marker(
+                  point: LatLng(e.latitude!, e.longitude!),
+                  width: _incidentMarkerWidth,
+                  height: TriageSizes.touchTarget,
+                  alignment: Alignment.center,
+                  child: TriageIncidentMarker(
+                    patientCount: countsByIncident[e.id]?.total ?? 0,
+                    selected: e.id == selectedIncidentId,
+                    onTap: () => onPinTap(e),
+                  ),
                 ),
-              ),
-          ],
-        ),
+            ],
+          ),
       ],
     );
   }
 
+  // shortcut: tarjeta antigua del incidente seleccionado; se migra con B03
   Widget _buildSelectedCard(IncidentForCards selected) {
     return Material(
       color: Colors.transparent,
@@ -330,7 +383,7 @@ class ParamedicoMapPage extends StatelessWidget {
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(13),
           border: Border.all(
-            color: AppColors.primaryParamedico.withValues(alpha: 0.55),
+            color: TriageColors.paramedicAccent.withValues(alpha: 0.55),
             width: 1,
           ),
         ),
@@ -347,7 +400,7 @@ class ParamedicoMapPage extends StatelessWidget {
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                 icon: const Icon(Icons.close, size: 22),
-                color: AppColors.primaryParamedico,
+                color: TriageColors.paramedicAccent,
                 tooltip: 'Salir de navegación',
                 onPressed: onClearSelection,
               ),
