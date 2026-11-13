@@ -10,7 +10,8 @@ import 'package:sistema_triage/shared/widgets/triage_option_text_widget.dart';
 ///
 /// - Por defecto, una acción ("Editar incidente").
 /// - [TriageOptionRow.check]: elegir un criterio ("Ordenar incidentes").
-/// - [TriageOptionRow.toggle]: encender o apagar algo ("Capas del mapa").
+/// - [TriageOptionRow.toggle]: encender o apagar algo ("Capas del mapa"). Sin
+///   `onChanged` se muestra desactivada.
 ///
 /// Toda la fila responde al toque, con alto mínimo táctil, y crece con el texto.
 class TriageOptionRow extends StatelessWidget {
@@ -38,16 +39,18 @@ class TriageOptionRow extends StatelessWidget {
     required this.title,
     required this.detail,
     required bool value,
-    required ValueChanged<bool> onChanged,
+    required ValueChanged<bool>? onChanged,
   }) : selected = null,
        toggled = value,
-       onTap = (() => onChanged(!value));
+       onTap = onChanged == null ? null : (() => onChanged(!value));
 
   /// Ruta de [TriageIcons]
   final String icon;
   final String title;
   final String detail;
-  final VoidCallback onTap;
+
+  /// Nulo solo en [TriageOptionRow.toggle] desactivada
+  final VoidCallback? onTap;
 
   /// Solo en [TriageOptionRow.check]
   final bool? selected;
@@ -65,54 +68,58 @@ class TriageOptionRow extends StatelessWidget {
     return MergeSemantics(
       child: Semantics(
         button: toggled == null,
+        enabled: onTap != null,
         selected: selected,
         toggled: toggled,
         child: InkWell(
           onTap: onTap,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(
-              minHeight: TriageSizes.touchTarget,
-            ),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: TriageSpacing.xl,
-                vertical: TriageSpacing.md,
+          child: Opacity(
+            opacity: onTap == null ? TriageOpacity.disabled : 1,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(
+                minHeight: TriageSizes.touchTarget,
               ),
-              child: Row(
-                children: [
-                  TriageIcon(
-                    icon,
-                    size: TriageSizes.icon,
-                    color: isSelected ? accent : TriageColors.textSecondary,
-                  ),
-                  const SizedBox(width: TriageSpacing.md),
-                  Expanded(
-                    child: TriageOptionText(
-                      title: title,
-                      detail: detail,
-                      titleColor: isSelected
-                          ? accent
-                          : TriageColors.textPrimary,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: TriageSpacing.xl,
+                  vertical: TriageSpacing.md,
+                ),
+                child: Row(
+                  children: [
+                    TriageIcon(
+                      icon,
+                      size: TriageSizes.icon,
+                      color: isSelected ? accent : TriageColors.textSecondary,
                     ),
-                  ),
-                  if (toggled != null) ...[
                     const SizedBox(width: TriageSpacing.md),
-                    _SwitchIndicator(value: toggled, accent: accent),
-                  ] else if (selected != null) ...[
-                    const SizedBox(width: TriageSpacing.md),
-                    // Espacio reservado: elegir no cambia cómo parte el texto
-                    SizedBox.square(
-                      dimension: TriageSizes.icon,
-                      child: selected
-                          ? TriageIcon(
-                              TriageIcons.check,
-                              size: TriageSizes.icon,
-                              color: accent,
-                            )
-                          : null,
+                    Expanded(
+                      child: TriageOptionText(
+                        title: title,
+                        detail: detail,
+                        titleColor: isSelected
+                            ? accent
+                            : TriageColors.textPrimary,
+                      ),
                     ),
+                    if (toggled != null) ...[
+                      const SizedBox(width: TriageSpacing.md),
+                      _SwitchIndicator(value: toggled, accent: accent),
+                    ] else if (selected != null) ...[
+                      const SizedBox(width: TriageSpacing.md),
+                      // Espacio reservado: elegir no cambia cómo parte el texto
+                      SizedBox.square(
+                        dimension: TriageSizes.icon,
+                        child: selected
+                            ? TriageIcon(
+                                TriageIcons.check,
+                                size: TriageSizes.icon,
+                                color: accent,
+                              )
+                            : null,
+                      ),
+                    ],
                   ],
-                ],
+                ),
               ),
             ),
           ),

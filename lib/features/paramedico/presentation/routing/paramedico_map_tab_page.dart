@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:sistema_triage/features/paramedico/presentation/map/paramedico_map_controller.dart';
 import 'package:sistema_triage/features/paramedico/presentation/map/paramedico_map_page.dart';
-import 'package:sistema_triage/features/paramedico/presentation/shared/paramedico_session_actions.dart';
+import 'package:sistema_triage/features/paramedico/presentation/map/widgets/map_layers_sheet.dart';
 
 /// Vista principal del mapa paramédico
 class ParamedicoMapTabPage extends StatefulWidget {
@@ -26,7 +26,6 @@ class _ParamedicoMapTabPageState extends State<ParamedicoMapTabPage> {
     _controller = ParamedicoMapController(
       initialFocusIncidentId: widget.initialFocusIncidentId,
     );
-    _controller.searchController.addListener(_controller.onSearchChanged);
     _controller.addListener(_onController);
     _controller.init();
   }
@@ -39,7 +38,6 @@ class _ParamedicoMapTabPageState extends State<ParamedicoMapTabPage> {
 
   @override
   void dispose() {
-    _controller.searchController.removeListener(_controller.onSearchChanged);
     _controller.removeListener(_onController);
     _controller.dispose();
     super.dispose();
@@ -62,6 +60,7 @@ class _ParamedicoMapTabPageState extends State<ParamedicoMapTabPage> {
 
     return ParamedicoMapPage(
       searchController: c.searchController,
+      onSearchSubmitted: (query) => unawaited(c.searchAddress(context, query)),
       mapController: c.mapController,
       errorMessage: c.error,
       isLoading: c.loading,
@@ -73,22 +72,25 @@ class _ParamedicoMapTabPageState extends State<ParamedicoMapTabPage> {
       routing: c.routing,
       selectedCard: selected != null ? c.toCard(selected, uid) : null,
       onBack: () => c.goHome(context),
-      onSignOut: () => ParamedicoSessionActions.openProfileSheet(context),
       onMapBackgroundTap: c.onMapBackgroundTap,
       onMapPositionChanged: c.onMapPositionChanged,
       onPinTap: (inc) => unawaited(c.onPinTap(context, inc)),
       onClearSelection: c.clearSelection,
       onResumeNavigation: c.enableFollowNavigation,
-      onZoomIn: c.zoomIn,
-      onZoomOut: c.zoomOut,
       onLocateMe: () => unawaited(c.centerOnUser(context)),
+      onOpenLayers: () => unawaited(showMapLayersSheet(context, c)),
       onOpenIncidentDetail: () {
         final id = c.selectedIncidentId;
         if (id != null) c.openIncidentDetail(context, id);
       },
-      mineOnly: c.mineOnly,
-      onMineOnlyChanged: c.setMineOnly,
+      filter: c.filter,
+      onFilterChanged: (f) => unawaited(c.setFilter(context, f)),
       countsByIncident: c.counts,
+      hospitals: c.hospitals,
+      showIncidents: c.showIncidents,
+      showHospitals: c.showHospitals,
+      unreadNotifications: c.unreadNotifications,
+      onOpenNotifications: () => unawaited(c.openNotifications(context)),
       coverageRings: c
           .visibleCoverageRings()
           .map((r) => (center: r.center, radiusMeters: r.radiusMeters))

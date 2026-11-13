@@ -2,9 +2,10 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:sistema_triage/core/router/paramedico_stack_nav.dart';
+import 'package:sistema_triage/core/ui/app_snackbar.dart';
 import 'package:sistema_triage/features/paramedico/data/repositories/paramedic_notifications_repository.dart';
 import 'package:sistema_triage/features/paramedico/domain/entities/notifications/paramedic_notification.dart';
-import 'package:sistema_triage/features/paramedico/presentation/notifications/widgets/paramedic_notifications_sheet_widget.dart';
+import 'package:sistema_triage/features/paramedico/presentation/notifications/widgets/paramedic_notifications_modal_widget.dart';
 
 class ParamedicoNotificationsAction {
   ParamedicoNotificationsAction._();
@@ -17,6 +18,8 @@ class ParamedicoNotificationsAction {
     }
   }
 
+  /// Abre el "Modal - Notificaciones". Tocar una la marca como leída y, si es
+  /// de un paciente, cierra el modal y abre su detalle.
   static Future<void> open(
     BuildContext context, {
     required ParamedicNotificationsRepository repository,
@@ -26,10 +29,12 @@ class ParamedicoNotificationsAction {
     try {
       items = await repository.listRecent();
       onUnreadChanged?.call(items.where((n) => n.isUnread).length);
-    } catch (e) {
+    } catch (_) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('No se pudieron cargar notificaciones: $e')),
+        showAppSnackBar(
+          context,
+          'No se pudieron cargar las notificaciones.',
+          isError: true,
         );
       }
       return;
@@ -37,59 +42,31 @@ class ParamedicoNotificationsAction {
 
     if (!context.mounted) return;
 
-    await showModalBottomSheet<void>(
+    await showDialog<void>(
       context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
-      builder: (ctx) {
-        return ParamedicNotificationsSheet(
-          notifications: items,
-          onClose: () => Navigator.pop(ctx),
-          onNotificationTap: (n) async {
-            if (n.isUnread) {
-              await repository.markRead(n.id);
-            }
-            if (!ctx.mounted) return;
-            Navigator.pop(ctx);
-            if (!context.mounted) return;
-            _showNotificationToast(context, n);
+      builder: (modalContext) => ParamedicNotificationsModal(
+        notifications: items,
+        onNotificationTap: (n) async {
+          // Si falla, el modal lo avisa y deja la notificación sin leer
+          if (n.isUnread) {
+            await repository.markRead(n.id);
             onUnreadChanged?.call(await unreadCount(repository));
-          },
-        );
-      },
+          }
+          final patientId = n.patientId;
+          if (patientId == null || patientId.isEmpty) return;
+          // Si lo cerraron mientras se marcaba, no se navega por sorpresa
+          if (!modalContext.mounted) return;
+          Navigator.pop(modalContext);
+          if (context.mounted) {
+            unawaited(
+              pushParamedicoFullScreen(
+                context,
+                '/paramedico/patient/$patientId',
+              ),
+            );
+          }
+        },
+      ),
     );
-  }
-
-  static void _showNotificationToast(BuildContext context, ParamedicNotification n) {
-    final messenger = ScaffoldMessenger.maybeOf(context);
-    if (messenger == null) return;
-    final patientLabel = n.patientDisplayName?.trim();
-    final message = [
-      if (patientLabel != null && patientLabel.isNotEmpty) patientLabel,
-      n.body,
-    ].where((s) => s.trim().isNotEmpty).join('\n');
-
-    messenger
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          duration: const Duration(seconds: 7),
-          content: Text(message.isEmpty ? n.title : message),
-          action: n.patientId == null || n.patientId!.isEmpty
-              ? null
-              : SnackBarAction(
-                  label: 'Ir a paciente',
-                  onPressed: () {
-                    if (!context.mounted) return;
-                    unawaited(
-                      pushParamedicoFullScreen(
-                        context,
-                        '/paramedico/patient/${n.patientId}',
-                      ),
-                    );
-                  },
-                ),
-        ),
-      );
   }
 }

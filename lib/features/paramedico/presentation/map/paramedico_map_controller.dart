@@ -8,16 +8,22 @@ import 'package:latlong2/latlong.dart';
 import 'package:sistema_triage/core/config/supabase_env.dart';
 import 'package:sistema_triage/core/router/paramedico_stack_nav.dart';
 import 'package:sistema_triage/core/ui/app_snackbar.dart';
+import 'package:sistema_triage/features/paramedico/data/repositories/paramedic_notifications_repository.dart';
 import 'package:sistema_triage/features/paramedico/data/repositories/paramedico_incidents_repository.dart';
 import 'package:sistema_triage/features/paramedico/domain/entities/home/incident_for_cards.dart';
 import 'package:sistema_triage/features/paramedico/domain/entities/map/map_patient_pin.dart';
 import 'package:sistema_triage/features/paramedico/domain/services/incident_for_cards_mapper.dart';
 import 'package:sistema_triage/features/paramedico/domain/services/map_incident_coverage_service.dart';
 import 'package:sistema_triage/features/paramedico/presentation/create_incident/services/incident_location_service.dart';
+import 'package:sistema_triage/features/paramedico/presentation/map/services/map_geocoding_service.dart';
 import 'package:sistema_triage/features/paramedico/presentation/map/services/map_navigation_helpers.dart';
 import 'package:sistema_triage/features/paramedico/presentation/map/services/map_operational_region.dart';
 import 'package:sistema_triage/features/paramedico/presentation/map/services/map_route_service.dart';
+import 'package:sistema_triage/features/paramedico/presentation/shared/paramedico_notifications_action.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
+/// Filtros del mapa en vivo (B01)
+enum MapIncidentFilter { mine, all, nearby }
 
 // Orquestador del mapa interactivo de incidentes: carga, rutas, GPS y selección de pin
 class ParamedicoMapController extends ChangeNotifier {
@@ -25,26 +31,48 @@ class ParamedicoMapController extends ChangeNotifier {
     this.initialFocusIncidentId,
     this.initialFocusPatientId,
     ParamedicoIncidentsRepository? repository,
+    ParamedicNotificationsRepository? notificationsRepository,
     MapRouteService? routeService,
+    MapGeocodingService? geocodingService,
     MapController? mapController,
     TextEditingController? searchController,
-  })  : _repo = repository ?? ParamedicoIncidentsRepository(),
-        _routeService = routeService ?? MapRouteService(),
-        mapController = mapController ?? MapController(),
-        searchController = searchController ?? TextEditingController();
+  }) : _repo = repository ?? ParamedicoIncidentsRepository(),
+       _notificationsRepo =
+           notificationsRepository ?? ParamedicNotificationsRepository(),
+       _routeService = routeService ?? MapRouteService(),
+       _geocoding = geocodingService ?? MapGeocodingService(),
+       mapController = mapController ?? MapController(),
+       searchController = searchController ?? TextEditingController();
+
+  /// Radio del filtro "Cerca de mí"
+  static const double nearbyRadiusMeters = 5000;
+
+  static bool isNearby(LatLng user, LatLng point) =>
+      const Distance().as(LengthUnit.Meter, user, point) <= nearbyRadiusMeters;
 
   final String? initialFocusIncidentId;
   final String? initialFocusPatientId;
   final ParamedicoIncidentsRepository _repo;
+  final ParamedicNotificationsRepository _notificationsRepo;
   final MapRouteService _routeService;
+  final MapGeocodingService _geocoding;
   final MapController mapController;
+
+  /// Buscador de direcciones (no filtra incidentes)
   final TextEditingController searchController;
 
   List<ParamedicoIncidentSummary> incidents = [];
   Map<String, IncidentPatientTriageCounts> counts = {};
   Map<String, List<MapPatientPin>> patientsByIncident = {};
   Map<String, double> radiusMetersByIncident = {};
-  String searchQuery = '';
+
+  /// Hospitales activos con coordenadas
+  List<HospitalRow> hospitals = [];
+  int unreadNotifications = 0;
+
+  // Capas del mapa (panel "Capas del mapa")
+  bool showIncidents = true;
+  bool showHospitals = true;
   String? selectedIncidentId;
   List<LatLng> routePoints = [];
   LatLng? userPosition;
@@ -52,7 +80,7 @@ class ParamedicoMapController extends ChangeNotifier {
   double? userHeading;
   List<LatLng> fullRoutePoints = [];
   bool followUser = false;
-  bool mineOnly = false;
+  MapIncidentFilter filter = MapIncidentFilter.all;
   bool loading = true;
   bool routing = false;
   String? error;
@@ -65,25 +93,48 @@ class ParamedicoMapController extends ChangeNotifier {
   bool _mapReady = false;
   VoidCallback? _pendingWhenMapReady;
   int _focusGeneration = 0;
+  // Solo cuenta la última elección de filtro o búsqueda: una respuesta lenta
+  // (GPS, geocodificador) no pisa lo que el usuario eligió después
+  int _filterGeneration = 0;
+  int _searchGeneration = 0;
+  bool _disposed = false;
 
   StreamSubscription<Position>? _positionSub;
 
+  // Las cargas en curso pueden terminar con la pantalla ya cerrada
+  @override
+  void notifyListeners() {
+    if (!_disposed) super.notifyListeners();
+  }
+
   @override
   void dispose() {
+    _disposed = true;
     _positionSub?.cancel();
     searchController.dispose();
     mapController.dispose();
     super.dispose();
   }
 
-  void onSearchChanged() {
-    searchQuery = searchController.text.trim().toLowerCase();
-    notifyListeners();
-  }
-
-  void setMineOnly(bool value) {
-    if (mineOnly == value) return;
-    mineOnly = value;
+  /// "Cerca de mí" necesita la ubicación: si no se consigue, avisa y no cambia
+  Future<void> setFilter(BuildContext context, MapIncidentFilter value) async {
+    final generation = ++_filterGeneration;
+    if (filter == value) return;
+    if (value == MapIncidentFilter.nearby && userPosition == null) {
+      final pos = await IncidentLocationService.getCurrentPosition();
+      if (!context.mounted || generation != _filterGeneration) return;
+      if (pos == null) {
+        showAppSnackBar(
+          context,
+          IncidentLocationService.errorMessageForNullResult() ??
+              'Sin ubicación GPS.',
+          isError: true,
+        );
+        return;
+      }
+      userPosition = LatLng(pos.lat, pos.lng);
+    }
+    filter = value;
     if (selectedIncidentId != null &&
         !visibleIncidents.any((e) => e.id == selectedIncidentId)) {
       _stopPositionStream();
@@ -97,7 +148,99 @@ class ParamedicoMapController extends ChangeNotifier {
       previousUserPosition = null;
     }
     notifyListeners();
-    goToRegionOverview();
+    if (value == MapIncidentFilter.nearby) {
+      _fitNearbyArea();
+    } else {
+      goToRegionOverview();
+    }
+  }
+
+  /// Encuadra el círculo de "Cerca de mí" alrededor del usuario
+  void _fitNearbyArea() {
+    final user = userPosition;
+    if (user == null) return;
+    const distance = Distance();
+    _safeMapOp(() {
+      mapController.rotate(0);
+      mapController.fitCamera(
+        CameraFit.bounds(
+          bounds: LatLngBounds.fromPoints([
+            for (final bearing in const [0.0, 90.0, 180.0, 270.0])
+              distance.offset(user, nearbyRadiusMeters, bearing),
+          ]),
+          padding: const EdgeInsets.all(56),
+        ),
+      );
+    });
+  }
+
+  void setShowIncidents(bool value) {
+    showIncidents = value;
+    notifyListeners();
+  }
+
+  void setShowHospitals(bool value) {
+    showHospitals = value;
+    notifyListeners();
+  }
+
+  /// Mueve el mapa a la dirección buscada, priorizando la zona del usuario
+  Future<void> searchAddress(BuildContext context, String query) async {
+    final text = query.trim();
+    if (text.isEmpty) return;
+    final generation = ++_searchGeneration;
+    final found = await _geocoding.search(
+      text,
+      near: userPosition ?? MapOperationalRegion.overviewCenter,
+    );
+    if (!context.mounted || generation != _searchGeneration) return;
+    if (found == null) {
+      showAppSnackBar(
+        context,
+        'No encontramos esa dirección. Prueba con calle y colonia.',
+        isError: true,
+      );
+      return;
+    }
+    // Seguir al usuario devolvería la cámara a su posición
+    if (followUser) {
+      followUser = false;
+      notifyListeners();
+    }
+    _safeMapOp(() => mapController.move(found, 16));
+  }
+
+  Future<void> refreshUnreadNotifications() async {
+    if (!SupabaseEnv.isConfigured) return;
+    unreadNotifications = await ParamedicoNotificationsAction.unreadCount(
+      _notificationsRepo,
+    );
+    notifyListeners();
+  }
+
+  Future<void> openNotifications(BuildContext context) {
+    return ParamedicoNotificationsAction.open(
+      context,
+      repository: _notificationsRepo,
+      onUnreadChanged: (count) {
+        unreadNotifications = count;
+        notifyListeners();
+      },
+    );
+  }
+
+  Future<void> _loadHospitals() async {
+    if (!SupabaseEnv.isConfigured) return;
+    try {
+      final list = await _repo.listActiveHospitals();
+      hospitals = [
+        for (final h in list)
+          if (h.latitude != null && h.longitude != null) h,
+      ];
+      notifyListeners();
+    } catch (_) {
+      // Capa secundaria: sin hospitales el mapa de incidentes sigue sirviendo
+    }
   }
 
   /// Llamar desde [MapOptions.onMapReady] cuando [FlutterMap] ya está montado
@@ -134,6 +277,8 @@ class ParamedicoMapController extends ChangeNotifier {
     pendingFocusPatientId = initialFocusPatientId;
     unawaited(load());
     unawaited(_initUserPosition());
+    unawaited(_loadHospitals());
+    unawaited(refreshUnreadNotifications());
   }
 
   void syncFocusFromRoute(BuildContext context) {
@@ -216,7 +361,7 @@ class ParamedicoMapController extends ChangeNotifier {
       notifyListeners();
       return;
     }
-    if(!silent) {
+    if (!silent) {
       loading = true;
       error = null;
       notifyListeners();
@@ -224,7 +369,9 @@ class ParamedicoMapController extends ChangeNotifier {
 
     try {
       final list = await _repo.listOpenIncidents();
-      final loadedCounts = await _repo.patientTriageCountsByIncident(list.map((e) => e.id));
+      final loadedCounts = await _repo.patientTriageCountsByIncident(
+        list.map((e) => e.id),
+      );
       final incidentCenters = <String, LatLng>{
         for (final inc in list)
           if (inc.latitude != null && inc.longitude != null)
@@ -258,7 +405,7 @@ class ParamedicoMapController extends ChangeNotifier {
       loading = false;
       notifyListeners();
     } catch (e) {
-      if(!silent){
+      if (!silent) {
         error = e.toString();
         loading = false;
         notifyListeners();
@@ -282,21 +429,26 @@ class ParamedicoMapController extends ChangeNotifier {
 
   List<ParamedicoIncidentSummary> get visibleIncidents {
     final uid = currentUserId;
-    final filteredByOwner = mineOnly && uid.isNotEmpty
-        ? incidents.where((e) => e.createdBy == uid)
-        : incidents;
-    if (searchQuery.isEmpty) return filteredByOwner.toList();
-    return filteredByOwner
-        .where(
-          (e) =>
-              e.generatedTitle.toLowerCase().contains(searchQuery) ||
-              e.id.toLowerCase().contains(searchQuery),
-        )
-        .toList();
+    final user = userPosition;
+    return switch (filter) {
+      MapIncidentFilter.mine when uid.isNotEmpty =>
+        incidents.where((e) => e.createdBy == uid).toList(),
+      MapIncidentFilter.nearby when user != null =>
+        incidents
+            .where(
+              (e) =>
+                  e.latitude != null &&
+                  e.longitude != null &&
+                  isNearby(user, LatLng(e.latitude!, e.longitude!)),
+            )
+            .toList(),
+      _ => incidents,
+    };
   }
 
-  List<ParamedicoIncidentSummary> get mappableIncidents =>
-      visibleIncidents.where((e) => e.latitude != null && e.longitude != null).toList();
+  List<ParamedicoIncidentSummary> get mappableIncidents => visibleIncidents
+      .where((e) => e.latitude != null && e.longitude != null)
+      .toList();
 
   ParamedicoIncidentSummary? get selectedIncident {
     if (selectedIncidentId == null) return null;
@@ -317,7 +469,9 @@ class ParamedicoMapController extends ChangeNotifier {
     _safeMapOp(() {
       mapController.rotate(0);
       final inRegion = mappableIncidents
-          .where((e) => MapOperationalRegion.contains(e.latitude!, e.longitude!))
+          .where(
+            (e) => MapOperationalRegion.contains(e.latitude!, e.longitude!),
+          )
           .toList();
 
       if (inRegion.length >= 2) {
@@ -336,7 +490,8 @@ class ParamedicoMapController extends ChangeNotifier {
         final inc = inRegion.first;
         final center = LatLng(inc.latitude!, inc.longitude!);
         final patients = patientsByIncident[inc.id] ?? const [];
-        final radius = radiusMetersByIncident[inc.id] ??
+        final radius =
+            radiusMetersByIncident[inc.id] ??
             MapIncidentCoverageService.radiusMeters(center, patients);
         final points = MapIncidentCoverageService.boundsPointsForIncident(
           incidentCenter: center,
@@ -372,7 +527,8 @@ class ParamedicoMapController extends ChangeNotifier {
     );
   }
 
-  String get currentUserId => Supabase.instance.client.auth.currentUser?.id ?? '';
+  String get currentUserId =>
+      Supabase.instance.client.auth.currentUser?.id ?? '';
 
   Future<void> applyPendingFocus(BuildContext context) async {
     final id = pendingFocusId;
@@ -437,7 +593,8 @@ class ParamedicoMapController extends ChangeNotifier {
     if (inc.latitude == null || inc.longitude == null) return;
     final center = LatLng(inc.latitude!, inc.longitude!);
     final patients = patientsByIncident[inc.id] ?? const [];
-    final radius = radiusMetersByIncident[inc.id] ??
+    final radius =
+        radiusMetersByIncident[inc.id] ??
         MapIncidentCoverageService.radiusMeters(center, patients);
     final points = MapIncidentCoverageService.boundsPointsForIncident(
       incidentCenter: center,
@@ -464,7 +621,8 @@ class ParamedicoMapController extends ChangeNotifier {
     for (final inc in inRegion) {
       final center = LatLng(inc.latitude!, inc.longitude!);
       final patients = patientsByIncident[inc.id] ?? const [];
-      final radius = radiusMetersByIncident[inc.id] ??
+      final radius =
+          radiusMetersByIncident[inc.id] ??
           MapIncidentCoverageService.radiusMeters(center, patients);
       points.addAll(
         MapIncidentCoverageService.boundsPointsForIncident(
@@ -485,7 +643,8 @@ class ParamedicoMapController extends ChangeNotifier {
     final visible = <MapPatientPin>[];
     for (final inc in mappableIncidents) {
       if (inc.latitude == null || inc.longitude == null) continue;
-      final radius = radiusMetersByIncident[inc.id] ??
+      final radius =
+          radiusMetersByIncident[inc.id] ??
           MapIncidentCoverageService.defaultRadiusMeters;
       final incidentCenter = LatLng(inc.latitude!, inc.longitude!);
       final show = MapIncidentCoverageService.shouldShowPatients(
@@ -503,7 +662,8 @@ class ParamedicoMapController extends ChangeNotifier {
     return visible;
   }
 
-  List<({String incidentId, LatLng center, double radiusMeters})> visibleCoverageRings() {
+  List<({String incidentId, LatLng center, double radiusMeters})>
+  visibleCoverageRings() {
     if (!_mapReady) return const [];
     final zoom = mapController.camera.zoom;
     final rings = <({String incidentId, LatLng center, double radiusMeters})>[];
@@ -519,14 +679,18 @@ class ParamedicoMapController extends ChangeNotifier {
       rings.add((
         incidentId: inc.id,
         center: LatLng(inc.latitude!, inc.longitude!),
-        radiusMeters: radiusMetersByIncident[inc.id] ??
+        radiusMeters:
+            radiusMetersByIncident[inc.id] ??
             MapIncidentCoverageService.defaultRadiusMeters,
       ));
     }
     return rings;
   }
 
-  Future<void> onPinTap(BuildContext context, ParamedicoIncidentSummary inc) async {
+  Future<void> onPinTap(
+    BuildContext context,
+    ParamedicoIncidentSummary inc,
+  ) async {
     selectedIncidentId = inc.id;
     forceShowPatientsIncidentId = inc.id;
     routePoints = [];
@@ -574,7 +738,8 @@ class ParamedicoMapController extends ChangeNotifier {
       followUser = false;
       shouldNotify = true;
     }
-    final epoch = (camera.zoom * 4).floor() +
+    final epoch =
+        (camera.zoom * 4).floor() +
         (camera.center.latitude * 1000).floor() +
         (camera.center.longitude * 1000).floor();
     if (_visibilityEpoch != epoch) {
@@ -588,7 +753,9 @@ class ParamedicoMapController extends ChangeNotifier {
     final pos = userPosition;
     if (pos == null || !followUser || !_mapReady) return;
 
-    final rotation = MapNavigationHelpers.mapRotationForHeading(userHeading ?? 0);
+    final rotation = MapNavigationHelpers.mapRotationForHeading(
+      userHeading ?? 0,
+    );
     const zoom = MapNavigationHelpers.navigationZoom;
     const offset = MapNavigationHelpers.userScreenOffset;
 
@@ -640,7 +807,8 @@ class ParamedicoMapController extends ChangeNotifier {
       if (context != null && context.mounted) {
         showAppSnackBar(
           context,
-          IncidentLocationService.errorMessageForNullResult() ?? 'Sin ubicación GPS.',
+          IncidentLocationService.errorMessageForNullResult() ??
+              'Sin ubicación GPS.',
           isError: true,
         );
       }
@@ -660,7 +828,10 @@ class ParamedicoMapController extends ChangeNotifier {
     routing = false;
     fullRoutePoints = points;
     routePoints = userPosition != null && points.length >= 2
-        ? MapNavigationHelpers.trimRouteAhead(route: points, user: userPosition!)
+        ? MapNavigationHelpers.trimRouteAhead(
+            route: points,
+            user: userPosition!,
+          )
         : points;
     notifyListeners();
 
@@ -678,7 +849,8 @@ class ParamedicoMapController extends ChangeNotifier {
     if (pos == null) {
       showAppSnackBar(
         context,
-        IncidentLocationService.errorMessageForNullResult() ?? 'No se pudo obtener GPS.',
+        IncidentLocationService.errorMessageForNullResult() ??
+            'No se pudo obtener GPS.',
         isError: true,
       );
       return;
@@ -693,20 +865,6 @@ class ParamedicoMapController extends ChangeNotifier {
     } else {
       _safeMapOp(() => mapController.move(p, 15));
     }
-  }
-
-  void zoomIn() {
-    _safeMapOp(() {
-      final z = mapController.camera.zoom;
-      mapController.move(mapController.camera.center, (z + 1).clamp(3, 18));
-    });
-  }
-
-  void zoomOut() {
-    _safeMapOp(() {
-      final z = mapController.camera.zoom;
-      mapController.move(mapController.camera.center, (z - 1).clamp(3, 18));
-    });
   }
 
   void openIncidentDetail(BuildContext context, String incidentId) {

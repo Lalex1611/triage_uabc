@@ -5,6 +5,7 @@ import 'package:sistema_triage/core/constants/triage_icons.dart';
 import 'package:sistema_triage/core/router/paramedico_stack_nav.dart';
 import 'package:sistema_triage/core/theme/triage_role_theme.dart';
 import 'package:sistema_triage/core/theme/triage_tokens.dart';
+import 'package:sistema_triage/core/util/time_ago.dart';
 import 'package:sistema_triage/features/paramedico/data/repositories/paramedico_incidents_repository.dart';
 import 'package:sistema_triage/features/paramedico/domain/constants/incident_sorting_options.dart';
 import 'package:sistema_triage/features/paramedico/domain/entities/home/incident_for_cards.dart';
@@ -273,7 +274,7 @@ class _IncidentsSheetBodyState extends State<_IncidentsSheetBody> {
                 final card = _controller.toCard(incident, _uid);
                 return TriageIncidentCard(
                   folio: card.id,
-                  timeAgo: _timeAgo(card.dateTime),
+                  timeAgo: timeAgo(card.dateTime),
                   title: card.name_card,
                   location: _coordinates(card),
                   counts: {
@@ -289,14 +290,6 @@ class _IncidentsSheetBodyState extends State<_IncidentsSheetBody> {
               },
             ),
     );
-  }
-
-  static String _timeAgo(DateTime dt) {
-    final diff = DateTime.now().difference(dt);
-    if (diff.inMinutes < 1) return 'ahora';
-    if (diff.inMinutes < 60) return 'hace ${diff.inMinutes} min';
-    if (diff.inHours < 24) return 'hace ${diff.inHours} h';
-    return 'hace ${diff.inDays} d';
   }
 
   // Aún no hay dirección en los datos: se muestran las coordenadas

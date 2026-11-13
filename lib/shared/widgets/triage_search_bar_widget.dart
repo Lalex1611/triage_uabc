@@ -8,18 +8,21 @@ import 'package:sistema_triage/shared/widgets/triage_icon_widget.dart';
 ///
 /// Misma interfaz que los buscadores actuales (`controller`, `onChanged`) para
 /// migrarlos directo. Con texto muestra una ✕ que lo borra y llama a
-/// `onChanged('')`. Sin [controller] usa uno interno.
+/// `onChanged('')`. Sin [controller] usa uno interno. [onSubmitted] recibe el
+/// texto al pulsar "Buscar" en el teclado.
 class TriageSearchBar extends StatefulWidget {
   const TriageSearchBar({
     super.key,
     required this.hint,
     this.controller,
     this.onChanged,
+    this.onSubmitted,
   });
 
   final String hint;
   final TextEditingController? controller;
   final ValueChanged<String>? onChanged;
+  final ValueChanged<String>? onSubmitted;
 
   @override
   State<TriageSearchBar> createState() => _TriageSearchBarState();
@@ -71,6 +74,7 @@ class _TriageSearchBarState extends State<TriageSearchBar> {
             child: TextField(
               controller: _controller,
               onChanged: widget.onChanged,
+              onSubmitted: widget.onSubmitted,
               textInputAction: TextInputAction.search,
               style: TriageTextStyles.bodyMedium.copyWith(
                 color: TriageColors.textPrimary,

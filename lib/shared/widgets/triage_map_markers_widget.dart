@@ -112,32 +112,54 @@ class TriageUnitMarker extends StatelessWidget {
 }
 
 /// Marcador de la posición del usuario. Azul en los dos roles, como en Figma
+///
+/// [showHalo] añade el círculo translúcido del mapa en vivo (B01); entonces el
+/// `Marker` necesita [haloDiameter] de lado.
 class TriageUserMarker extends StatelessWidget {
-  const TriageUserMarker({super.key});
+  const TriageUserMarker({super.key, this.showHalo = false});
+
+  final bool showHalo;
+
+  static const double haloDiameter = 78;
 
   @override
   Widget build(BuildContext context) {
-    return _MarkerTarget(
-      label: 'Tu ubicación',
-      onTap: null,
-      child: SizedBox.square(
-        dimension: _placeMarkerSize,
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: TriageColors.hospitalAccent,
-            shape: BoxShape.circle,
-            border: Border.all(color: TriageColors.surface, width: _whiteRing),
-            boxShadow: TriageShadows.marker,
-          ),
-          child: const Center(
-            child: TriageIcon(
-              TriageIcons.navigation,
-              size: TriageSizes.icon,
-              color: TriageColors.textInverse,
-            ),
+    final marker = SizedBox.square(
+      dimension: _placeMarkerSize,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: TriageColors.hospitalAccent,
+          shape: BoxShape.circle,
+          border: Border.all(color: TriageColors.surface, width: _whiteRing),
+          boxShadow: TriageShadows.marker,
+        ),
+        child: const Center(
+          child: TriageIcon(
+            TriageIcons.navigation,
+            size: TriageSizes.icon,
+            color: TriageColors.textInverse,
           ),
         ),
       ),
+    );
+
+    return _MarkerTarget(
+      label: 'Tu ubicación',
+      onTap: null,
+      child: !showHalo
+          ? marker
+          : Container(
+              width: haloDiameter,
+              height: haloDiameter,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: TriageColors.hospitalAccent.withValues(
+                  alpha: TriageOpacity.pressed,
+                ),
+                shape: BoxShape.circle,
+              ),
+              child: marker,
+            ),
     );
   }
 }
