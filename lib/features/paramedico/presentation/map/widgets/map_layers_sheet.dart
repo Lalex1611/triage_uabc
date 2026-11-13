@@ -4,12 +4,15 @@ import 'package:sistema_triage/shared/widgets/triage_ui.dart';
 
 /// Abre el panel "Capas del mapa" (Figma B01). Los interruptores cambian el
 /// mapa al momento, sin esperar a cerrar.
+///
+/// Se abre en el navegador raíz para quedar por delante de la barra de
+/// navegación del shell, que flota sobre la rama del mapa.
 Future<void> showMapLayersSheet(
   BuildContext context,
   ParamedicoMapController controller,
 ) {
   return showTriageSheet<void>(
-    context,
+    Navigator.of(context, rootNavigator: true).context,
     title: 'Capas del mapa',
     subtitle: 'Decide qué se dibuja encima.',
     showClose: false,
