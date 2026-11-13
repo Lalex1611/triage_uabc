@@ -3,7 +3,8 @@ import 'package:sistema_triage/core/constants/triage_icons.dart';
 import 'package:sistema_triage/core/theme/triage_tokens.dart';
 import 'package:sistema_triage/shared/widgets/app_module_bottom_nav.dart';
 
-// Barra de navegación inferior del módulo médico
+
+// Barra de navegación inferior del módulo médico (mockup 01, sin botón central)
 class MedicoNavbar extends StatelessWidget {
   final int currentIndex;
   final ValueChanged<int> onTap;
@@ -14,19 +15,25 @@ class MedicoNavbar extends StatelessWidget {
     required this.onTap,
   });
 
-  static const _tabs = [
-    AppModuleBottomNavTab(iconPath: TriageIcons.home, label: 'Home'),
-    AppModuleBottomNavTab(iconPath: TriageIcons.plus, label: 'Registro'),
-  ];
-
   @override
   Widget build(BuildContext context) {
+    final activeColor = const Color(0xFF005AA0);
+    final inactiveColor = TriageColors.textSecondary;
+
     return AppModuleBottomNav(
-      tabs: _tabs,
+      tabs: const [
+        AppModuleBottomNavTab(
+          iconPath: TriageIcons.ambulance,
+          label: 'Entrantes',
+        ),
+        AppModuleBottomNavTab(iconPath: TriageIcons.hospital, label: 'Sala'),
+        AppModuleBottomNavTab(iconPath: TriageIcons.plus, label: 'Registrar'),
+        AppModuleBottomNavTab(iconPath: TriageIcons.user, label: 'Perfil'),
+      ],
       currentIndex: currentIndex,
       onTap: onTap,
-      activeColor: TriageColors.hospitalAccent,
-      inactiveColor: TriageColors.textSecondary,
+      activeColor: activeColor,
+      inactiveColor: inactiveColor,
     );
   }
 }
