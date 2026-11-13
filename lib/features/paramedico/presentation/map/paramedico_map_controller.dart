@@ -93,11 +93,23 @@ class ParamedicoMapController extends ChangeNotifier {
   bool _mapReady = false;
   VoidCallback? _pendingWhenMapReady;
   int _focusGeneration = 0;
+  // Solo cuenta la última elección de filtro o búsqueda: una respuesta lenta
+  // (GPS, geocodificador) no pisa lo que el usuario eligió después
+  int _filterGeneration = 0;
+  int _searchGeneration = 0;
+  bool _disposed = false;
 
   StreamSubscription<Position>? _positionSub;
 
+  // Las cargas en curso pueden terminar con la pantalla ya cerrada
+  @override
+  void notifyListeners() {
+    if (!_disposed) super.notifyListeners();
+  }
+
   @override
   void dispose() {
+    _disposed = true;
     _positionSub?.cancel();
     searchController.dispose();
     mapController.dispose();
@@ -106,10 +118,11 @@ class ParamedicoMapController extends ChangeNotifier {
 
   /// "Cerca de mí" necesita la ubicación: si no se consigue, avisa y no cambia
   Future<void> setFilter(BuildContext context, MapIncidentFilter value) async {
+    final generation = ++_filterGeneration;
     if (filter == value) return;
     if (value == MapIncidentFilter.nearby && userPosition == null) {
       final pos = await IncidentLocationService.getCurrentPosition();
-      if (!context.mounted) return;
+      if (!context.mounted || generation != _filterGeneration) return;
       if (pos == null) {
         showAppSnackBar(
           context,
@@ -175,11 +188,12 @@ class ParamedicoMapController extends ChangeNotifier {
   Future<void> searchAddress(BuildContext context, String query) async {
     final text = query.trim();
     if (text.isEmpty) return;
+    final generation = ++_searchGeneration;
     final found = await _geocoding.search(
       text,
       near: userPosition ?? MapOperationalRegion.overviewCenter,
     );
-    if (!context.mounted) return;
+    if (!context.mounted || generation != _searchGeneration) return;
     if (found == null) {
       showAppSnackBar(
         context,
