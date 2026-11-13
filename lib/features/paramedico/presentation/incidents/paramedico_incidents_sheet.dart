@@ -18,10 +18,16 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 /// Abre la hoja de "Incidentes activos" (B02) sobre la pantalla actual
 ///
 /// Altura fija (proporción de la pantalla): el encabezado y el buscador quedan
-/// fijos y solo la lista se desplaza.
-Future<void> showParamedicoIncidentsSheet(BuildContext context) async {
+/// fijos y solo la lista se desplaza. La hoja se abre en el navegador de
+/// [host] (por defecto [context]): el shell pasa el de la rama del mapa para
+/// que la barra de navegación quede por delante, como en Figma. Lo que se abre
+/// al elegir algo usa [context].
+Future<void> showParamedicoIncidentsSheet(
+  BuildContext context, {
+  BuildContext? host,
+}) async {
   final path = await showTriageSheet<String>(
-    context,
+    host ?? context,
     showClose: false,
     builder: (_) => const _IncidentsSheetBody(),
   );
@@ -226,7 +232,8 @@ class _IncidentsSheetBodyState extends State<_IncidentsSheetBody> {
     }
 
     final error = _controller.error;
-    final message = error ??
+    final message =
+        error ??
         (visible.isEmpty
             ? (_controller.items.isEmpty
                   ? 'No hay incidentes activos.'
