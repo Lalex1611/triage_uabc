@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sistema_triage/features/paramedico/domain/entities/notifications/paramedic_notification.dart';
@@ -93,11 +95,34 @@ void main() {
     expect(find.text('Todas leídas'), findsOneWidget);
   });
 
-  testWidgets('si no se pudo marcar, sigue sin leer', (tester) async {
+  testWidgets('si no se pudo marcar, sigue sin leer y avisa en el modal', (
+    tester,
+  ) async {
     await _open(tester, [_notification('a')], (_) async => throw Exception());
     await tester.tap(find.byType(TriageNotificationCard));
     await tester.pump();
     expect(find.text('1 sin leer'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: _modal,
+        matching: find.text('No se pudo marcar como leída.'),
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('un doble toque solo la abre una vez', (tester) async {
+    final pending = Completer<void>();
+    var calls = 0;
+    await _open(tester, [_notification('a')], (_) {
+      calls++;
+      return pending.future;
+    });
+    await tester.tap(find.byType(TriageNotificationCard));
+    await tester.tap(find.byType(TriageNotificationCard));
+    pending.complete();
+    await tester.pump();
+    expect(calls, 1);
   });
 
   testWidgets('la X lo cierra', (tester) async {

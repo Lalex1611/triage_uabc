@@ -47,24 +47,16 @@ class ParamedicoNotificationsAction {
       builder: (modalContext) => ParamedicNotificationsModal(
         notifications: items,
         onNotificationTap: (n) async {
+          // Si falla, el modal lo avisa y deja la notificación sin leer
           if (n.isUnread) {
-            try {
-              await repository.markRead(n.id);
-            } catch (_) {
-              if (modalContext.mounted) {
-                showAppSnackBar(
-                  modalContext,
-                  'No se pudo marcar como leída.',
-                  isError: true,
-                );
-              }
-              rethrow;
-            }
+            await repository.markRead(n.id);
             onUnreadChanged?.call(await unreadCount(repository));
           }
           final patientId = n.patientId;
           if (patientId == null || patientId.isEmpty) return;
-          if (modalContext.mounted) Navigator.pop(modalContext);
+          // Si lo cerraron mientras se marcaba, no se navega por sorpresa
+          if (!modalContext.mounted) return;
+          Navigator.pop(modalContext);
           if (context.mounted) {
             unawaited(
               pushParamedicoFullScreen(

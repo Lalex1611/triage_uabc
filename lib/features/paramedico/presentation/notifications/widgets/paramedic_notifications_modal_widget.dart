@@ -8,7 +8,8 @@ import 'package:sistema_triage/shared/widgets/triage_ui.dart';
 /// desplaza dentro de la ventana si no cabe.
 ///
 /// Al tocar una notificación espera a [onNotificationTap] (la marca como leída)
-/// y entonces la pinta leída; si falla, se queda como estaba.
+/// y entonces la pinta leída; si falla, se queda como estaba y el modal avisa
+/// dentro de la ventana (un aviso de la app quedaría detrás del fondo oscuro).
 class ParamedicNotificationsModal extends StatefulWidget {
   const ParamedicNotificationsModal({
     super.key,
@@ -28,6 +29,9 @@ class ParamedicNotificationsModal extends StatefulWidget {
 class _ParamedicNotificationsModalState
     extends State<ParamedicNotificationsModal> {
   final _readIds = <String>{};
+  // Evita marcar o navegar dos veces con un doble toque
+  final _pendingIds = <String>{};
+  bool _markFailed = false;
 
   // Medidas del modal en Figma; en pantallas más bajas manda el margen del diálogo
   static const _maxWidth = 416.0;
@@ -38,12 +42,20 @@ class _ParamedicNotificationsModalState
       n.isUnread && !_readIds.contains(n.id);
 
   Future<void> _open(ParamedicNotification n) async {
+    if (!_pendingIds.add(n.id)) return;
     try {
       await widget.onNotificationTap(n);
     } catch (_) {
-      return; // El aviso del error lo da quien abre el modal
+      _pendingIds.remove(n.id); // Se puede reintentar
+      if (mounted) setState(() => _markFailed = true);
+      return;
     }
-    if (mounted) setState(() => _readIds.add(n.id));
+    if (mounted) {
+      setState(() {
+        _readIds.add(n.id);
+        _markFailed = false;
+      });
+    }
   }
 
   // shortcut: el backend solo emite 'transfer_cancelled'; el resto de tipos de
@@ -136,6 +148,19 @@ class _ParamedicNotificationsModalState
                   thickness: TriageSizes.hairline,
                   color: TriageColors.borderSubtle,
                 ),
+                if (_markFailed)
+                  const Padding(
+                    padding: EdgeInsets.fromLTRB(
+                      TriageSpacing.sm,
+                      TriageSpacing.md,
+                      TriageSpacing.sm,
+                      0,
+                    ),
+                    child: TriageAlert(
+                      tone: TriageTone.danger,
+                      title: 'No se pudo marcar como leída.',
+                    ),
+                  ),
                 Flexible(
                   child: items.isEmpty
                       ? Padding(
