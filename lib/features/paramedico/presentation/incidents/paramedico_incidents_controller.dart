@@ -4,28 +4,33 @@ import 'package:sistema_triage/features/paramedico/data/repositories/paramedico_
 import 'package:sistema_triage/features/paramedico/data/repositories/paramedic_notifications_repository.dart';
 import 'package:sistema_triage/features/paramedico/domain/entities/home/incident_for_cards.dart';
 import 'package:sistema_triage/features/paramedico/domain/services/incident_for_cards_mapper.dart';
+import 'package:sistema_triage/features/paramedico/presentation/shared/paramedico_incidents_store.dart';
 import 'package:sistema_triage/features/paramedico/presentation/shared/paramedico_notifications_action.dart';
 
 enum ParamedicoIncidentsShellMode { unconfigured, loading, ready }
 
+/// Lista de incidentes activos. Los datos son los del mapa
+/// ([ParamedicoIncidentsStore]): abrir la lista no vuelve a pedirlos
 class ParamedicoIncidentsController extends ChangeNotifier {
   ParamedicoIncidentsController({
-    ParamedicoIncidentsRepository? repository,
+    ParamedicoIncidentsStore? store,
     ParamedicNotificationsRepository? notificationsRepository,
     TextEditingController? searchController,
-  }) : _repo = repository ?? ParamedicoIncidentsRepository(),
+  }) : _store = store ?? ParamedicoIncidentsStore.instance,
        _notificationsRepo =
            notificationsRepository ?? ParamedicNotificationsRepository(),
-       searchController = searchController ?? TextEditingController();
+       searchController = searchController ?? TextEditingController() {
+    _store.addListener(notifyListeners);
+  }
 
-  final ParamedicoIncidentsRepository _repo;
+  final ParamedicoIncidentsStore _store;
   final ParamedicNotificationsRepository _notificationsRepo;
   final TextEditingController searchController;
 
-  List<ParamedicoIncidentSummary> items = [];
-  Map<String, IncidentPatientTriageCounts> counts = {};
-  bool loading = true;
-  String? error;
+  List<ParamedicoIncidentSummary> get items => _store.incidents;
+  Map<String, IncidentPatientTriageCounts> get counts => _store.counts;
+  bool get loading => !_store.loaded && _store.error == null;
+  String? get error => _store.error;
   int unreadNotifications = 0;
   String searchQuery = '';
 
@@ -37,8 +42,18 @@ class ParamedicoIncidentsController extends ChangeNotifier {
     return ParamedicoIncidentsShellMode.ready;
   }
 
+  bool _disposed = false;
+
+  // Una recarga puede terminar con la lista ya cerrada
+  @override
+  void notifyListeners() {
+    if (!_disposed) super.notifyListeners();
+  }
+
   @override
   void dispose() {
+    _disposed = true;
+    _store.removeListener(notifyListeners);
     searchController.dispose();
     super.dispose();
   }
@@ -62,35 +77,13 @@ class ParamedicoIncidentsController extends ChangeNotifier {
         .toList();
   }
 
+  /// Fuerza una recarga (deslizar para actualizar) y el contador de avisos
   Future<void> load() async {
-    if (!SupabaseEnv.isConfigured) {
-      loading = false;
-      error = 'Supabase no configurado.';
-      items = [];
-      notifyListeners();
-      return;
-    }
-    loading = true;
-    error = null;
+    await _store.refresh();
+    unreadNotifications = await ParamedicoNotificationsAction.unreadCount(
+      _notificationsRepo,
+    );
     notifyListeners();
-
-    try {
-      final list = await _repo.listOpenIncidents();
-      final countMap = await _repo.patientTriageCountsByIncident(
-        list.map((e) => e.id),
-      );
-      items = list;
-      counts = countMap;
-      loading = false;
-      unreadNotifications = await ParamedicoNotificationsAction.unreadCount(
-        _notificationsRepo,
-      );
-      notifyListeners();
-    } catch (e) {
-      loading = false;
-      error = e.toString();
-      notifyListeners();
-    }
   }
 
   IncidentForCards toCard(ParamedicoIncidentSummary s, String uid) {
