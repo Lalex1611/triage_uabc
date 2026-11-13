@@ -3,14 +3,12 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:sistema_triage/core/constants/app_icons.dart';
 import 'package:sistema_triage/core/theme/app_theme.dart';
 import 'package:sistema_triage/features/medico/domain/entities/home/medico_patient_card_data.dart';
-import 'package:sistema_triage/shared/widgets/patient_lifecycle_status_badge.dart';
+import 'package:sistema_triage/features/paramedico/domain/constants/triage_catalog.dart';
+import 'package:sistema_triage/shared/widgets/triage_pressable_widget.dart';
 
-/// Tarjeta del incidente en el Home del médico (solo el panel superior)
-/// Para traslado en curso, los botones van en [MedicoPatientIncomingTransferShell]
+/// Tarjeta de paciente en Home Entradas (mockup 01)
 class MedicoPatientCard extends StatelessWidget {
   final MedicoPatientCardData data;
-
-  /// Sin marco propio: va dentro de otro contenedor (p. eje. shell con botones debajo)
   final bool panelOnly;
 
   const MedicoPatientCard({
@@ -19,271 +17,152 @@ class MedicoPatientCard extends StatelessWidget {
     this.panelOnly = false,
   });
 
-  static const double _radius = 13.2;
+  Color _badgeColor(TriageCategory c) {
+    switch (c) {
+      case TriageCategory.rojo:
+        return const Color(0xFFB6070A);
+      case TriageCategory.naranja:
+        return const Color(0xFFF39223);
+      case TriageCategory.amarillo:
+        return const Color(0xFFF5C518);
+      case TriageCategory.verde:
+        return const Color(0xFF2FA835);
+      case TriageCategory.azul:
+        return const Color(0xFF1D71B8);
+      default:
+        return c.color;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final panel = SizedBox(
-      height: 77,
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+    final inner = Padding(
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildTriageBand(),
-          Expanded(child: _buildCardContent()),
-        ],
-      ),
-    );
-
-    final note = data.footerNote;
-    final inner = Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        panel,
-        if (note != null && note.isNotEmpty)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(14, 0, 14, 8),
-            child: Text(
-              note,
-              maxLines: 3,
-              overflow: TextOverflow.ellipsis,
-              style: AppTextStyles.ESC_Regular_bodyMedium.copyWith(
-                fontSize: 8,
-                color: Colors.black54,
-                height: 1.25,
-              ),
-            ),
-          ),
-      ],
-    );
-
-    if (panelOnly) {
-      return inner;
-    }
-
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(_radius),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.1),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: inner,
-    );
-  }
-
-  Widget _buildCardContent() {
-    return GestureDetector(
-      onTap: data.onCardTap,
-      behavior: HitTestBehavior.opaque,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(10, 8, 15, 8),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            /* FILA 1: Nombre y Fecha */
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          // Acento de color (abarca nombre + identificadores) + badge de triage
+          IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Expanded(
-                  child: Text(
-                    data.name,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: AppTextStyles.ESC_ExtraBold_titleLarge.copyWith(
-                      fontSize: 10,
-                      color: Colors.black,
-                      height: 1.1,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Flexible(
-                  child: Text(
-                    data.dateStr,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.end,
-                    style: AppTextStyles.ESC_Medium_bodyMedium.copyWith(
-                      fontSize: 7.92,
-                      color: Colors.black.withValues(alpha: 0.45),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-
-            /* FILA 2: Coordenadas, ETA, Ambulancia */
-            Row(
-              children: [
-                SvgPicture.asset(
-                  AppIcons.paramedicoIncidenteLocation,
-                  width: 10,
-                  height: 12,
-                ),
-                const SizedBox(width: 4),
-                Expanded(
-                  flex: 3,
-                  child: Text(
-                    data.coordinates,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: AppTextStyles.ESC_Regular_bodyMedium.copyWith(
-                      fontSize: 8,
-                      color: Colors.black.withValues(alpha: 0.45),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 4),
-                Flexible(
-                  child: Text(
-                    data.eta,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: AppTextStyles.ESC_Bold_titleSmall.copyWith(
-                      fontSize: 8,
-                      color: Colors.black.withValues(alpha: 0.45),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 6),
-                SvgPicture.asset(
-                  AppIcons.medicoHomeAmbulance,
-                  width: 12,
-                  height: 12,
-                ),
-                const SizedBox(width: 4),
-                Expanded(
-                  flex: 2,
-                  child: Text(
-                    data.ambulanceUnit,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: AppTextStyles.ESC_Bold_titleSmall.copyWith(
-                      fontSize: 8,
-                      color: Colors.black.withValues(alpha: 0.45),
-                    ),
-                  ),
-                ),
-                Icon(
-                  Icons.arrow_forward_ios_rounded,
-                  size: 14,
-                  color: Colors.black.withValues(alpha: 0.15),
-                ),
-              ],
-            ),
-
-            // FILA 3: Estado
-            Row(
-              children: [
-                Text(
-                  'ESTADO:',
-                  style: AppTextStyles.ESC_SemiBold_bodyMedium.copyWith(
-                    fontSize: 10,
-                    color: Colors.black,
-                  ),
-                ),
-                const Spacer(),
-                Flexible(child: _buildStatusBadge()),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildStatusBadge() {
-    return PatientLifecycleStatusBadge(
-      status: data.status,
-      isRejected: data.isRejectedTransfer,
-    );
-  }
-
-  Widget _buildTriageBand() {
-    return SizedBox(
-      width: 62,
-      height: 77,
-      child: Stack(
-        children: [
-          Container(
-            width: 62,
-            height: 77,
-            decoration: BoxDecoration(
-              color: data.triageCategory.color,
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(MedicoPatientCard._radius),
-                bottomLeft: Radius.circular(MedicoPatientCard._radius),
-              ),
-            ),
-          ),
-          Positioned(
-            left: 0,
-            top: 0,
-            bottom: 0,
-            child: Column(
-              children: [
-                RotatedBox(
-                  quarterTurns: 3,
-                  child: Container(
-                    width: 60,
-                    height: 21,
-                    decoration: BoxDecoration(
-                      color: data.triageCategory.color,
-                      border: Border.all(color: Colors.white, width: 0.2),
-                      borderRadius: const BorderRadius.only(
-                        topRight: Radius.circular(MedicoPatientCard._radius),
-                      ),
-                    ),
-                    alignment: Alignment.center,
-                    child: Text(
-                      data.id,
-                      style: AppTextStyles.ESC_SemiBold_titleMedium.copyWith(
-                        color: Colors.white,
-                        fontSize: 9,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                  ),
-                ),
                 Container(
-                  width: 21,
-                  height: 17,
+                  width: 4,
+                  margin: const EdgeInsets.only(right: 8),
                   decoration: BoxDecoration(
-                    color: data.triageCategory.color,
-                    border: Border.all(color: Colors.white, width: 0.2),
-                    borderRadius: const BorderRadius.only(
-                      bottomLeft: Radius.circular(MedicoPatientCard._radius),
-                    ),
+                    color: _badgeColor(data.triageCategory),
+                    borderRadius: BorderRadius.circular(2),
                   ),
-                  alignment: Alignment.center,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 2),
-                    child: FittedBox(
-                      fit: BoxFit.scaleDown,
-                      child: Text(
-                        data.number.toString(),
+                ),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              data.name,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: AppTextStyles.ESC_Bold_titleLarge.copyWith(
+                                fontSize: 15,
+                                color: Colors.black,
+                                height: 1.2,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: _badgeColor(data.triageCategory),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              data.triageCategory.label,
+                              style: AppTextStyles.ESC_Bold_titleSmall.copyWith(
+                                fontSize: 11,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '${data.id} · ${data.ambulanceUnit}',
                         maxLines: 1,
-                        style: AppTextStyles.ESC_Bold_titleSmall.copyWith(
-                          color: Colors.white,
-                          fontSize: 10,
-                          height: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTextStyles.ESC_Regular_bodyMedium.copyWith(
+                          fontSize: 11,
+                          color: Colors.black54,
                         ),
                       ),
-                    ),
+                    ],
                   ),
                 ),
               ],
             ),
           ),
+          const SizedBox(height: 8),
+          // Fila 3: unidad / tiempo de llegada (chip)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1D71B8).withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SvgPicture.asset(
+                    AppIcons.medicoHomeAmbulance,
+                    width: 14,
+                    height: 14,
+                    colorFilter: const ColorFilter.mode(
+                      Color(0xFF1D71B8),
+                      BlendMode.srcIn,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Flexible(
+                    child: Text(
+                      '${data.ambulanceUnit.replaceFirst('Unidad: ', 'Unidad ')} · llega en ${data.eta.replaceFirst('A ', '').replaceAll('…', ' min')}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTextStyles.ESC_SemiBold_bodyMedium.copyWith(
+                        fontSize: 12,
+                        color: const Color(0xFF1D71B8),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
         ],
+      ),
+    );
+
+    if (panelOnly) return inner;
+
+    return TriagePressable(
+      onTap: data.onCardTap,
+      builder: (context, pressed) => Container(
+        width: double.infinity,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(13.2),
+          boxShadow: triagePressedShadow(pressed: pressed),
+        ),
+        child: inner,
       ),
     );
   }

@@ -32,7 +32,7 @@ class MedicoTriageFiltersVisualTest extends StatelessWidget {
               const SizedBox(height: 40),
               MedicoTriageFilters(
                 data: MedicoTriageFiltersData(
-                  activeFilter: MedicoPatientFilter.enCamino,
+                  activeFilter: MedicoPatientFilter.todos,
                   onFilterChanged: (_) {},
                 ),
               ),

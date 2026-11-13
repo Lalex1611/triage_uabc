@@ -29,7 +29,7 @@ class MedicoHomeController extends ChangeNotifier {
   bool loading = true;
   String? error;
   int navIndex = 0;
-  MedicoPatientFilter activeFilter = MedicoPatientFilter.enCamino;
+  MedicoPatientFilter activeFilter = MedicoPatientFilter.todos;
   String searchQuery = '';
 
   static const Duration _notificationPollInterval = Duration(seconds: 8);
@@ -112,22 +112,37 @@ class MedicoHomeController extends ChangeNotifier {
     );
   }
 
-  bool matchesChip(MedicoPatientFilter f, PatientStatus s) {
+  bool _matchesColor(MedicoPatientFilter f, MedicoPatientCardData p) {
     switch (f) {
-      case MedicoPatientFilter.enCamino:
-        return s == PatientStatus.trasladando ||
-            s == PatientStatus.enEspera;
-      case MedicoPatientFilter.recibidos:
-        return s == PatientStatus.recibido;
-      case MedicoPatientFilter.independientes:
-        return s == PatientStatus.enEspera;
-      case MedicoPatientFilter.triageHospitalario:
+      case MedicoPatientFilter.todos:
         return true;
+      case MedicoPatientFilter.rojo:
+        return p.triageCategory == TriageCategory.rojo;
+      case MedicoPatientFilter.naranja:
+        return p.triageCategory == TriageCategory.naranja;
+      case MedicoPatientFilter.amarillo:
+        return p.triageCategory == TriageCategory.amarillo;
+      case MedicoPatientFilter.verde:
+        return p.triageCategory == TriageCategory.verde;
     }
   }
 
   List<MedicoPatientCardData> filteredByChip() {
-    return patients.where((p) => matchesChip(activeFilter, p.status)).toList();
+    return patients.where((p) => _matchesColor(activeFilter, p)).toList();
+  }
+
+  /// Pacientes aún no recibidos por el hospital, filtrados por color de triage
+  List<MedicoPatientCardData> incomingPatientsFiltered() {
+    final rejectedIds = _rejectedPatientIds();
+    return patients
+        .where(
+          (p) =>
+              (p.status == PatientStatus.trasladando ||
+                  p.status == PatientStatus.enEspera) &&
+              !rejectedIds.contains(p.patientRecordId) &&
+              _matchesColor(activeFilter, p),
+        )
+        .toList();
   }
 
   List<MedicoPatientCardData> visiblePatients(int navIdx) {
@@ -157,7 +172,8 @@ class MedicoHomeController extends ChangeNotifier {
     return list
         .where(
           (p) =>
-              matchesChip(MedicoPatientFilter.enCamino, p.status) &&
+              (p.status == PatientStatus.trasladando ||
+                  p.status == PatientStatus.enEspera) &&
               !rejectedIds.contains(p.patientRecordId),
         )
         .toList();
@@ -216,7 +232,7 @@ class MedicoHomeController extends ChangeNotifier {
   }
 
   void setNavIndex(int index) {
-    navIndex = index.clamp(0, 1);
+    navIndex = index.clamp(0, 3);
     notifyListeners();
   }
 

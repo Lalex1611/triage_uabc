@@ -1,18 +1,14 @@
 import 'package:flutter/material.dart';
-import 'package:sistema_triage/core/constants/app_colors.dart';
-import 'package:sistema_triage/core/constants/app_icons.dart';
 import 'package:sistema_triage/core/layout/app_responsive.dart';
 import 'package:sistema_triage/features/medico/domain/constants/medico_patient_filter.dart';
-import 'package:sistema_triage/features/medico/domain/entities/home/medico_patient_list_header_data.dart';
 import 'package:sistema_triage/features/medico/domain/entities/home/medico_triage_filters_data.dart';
 import 'package:sistema_triage/features/medico/domain/entities/home/medico_user_stats.dart';
 import 'package:sistema_triage/features/medico/presentation/home/widgets/medico_minidash_widget.dart';
-import 'package:sistema_triage/features/medico/presentation/home/widgets/medico_patient_list_header_widget.dart';
 import 'package:sistema_triage/features/medico/presentation/home/widgets/medico_search_bar_widget.dart';
 import 'package:sistema_triage/features/medico/presentation/home/widgets/medico_triage_filters_widget.dart';
 import 'package:sistema_triage/features/medico/presentation/navigation/medico_navbar_widget.dart';
-import 'package:sistema_triage/shared/widgets/app_header.dart';
 import 'package:sistema_triage/shared/widgets/home_screen_body.dart';
+import 'package:sistema_triage/features/medico/presentation/home/widgets/medico_home_header_widget.dart';
 
 // Cascarón del home médico: layout según Figma; sin lógica de negocio
 class MedicoHomePage extends StatelessWidget {
@@ -26,7 +22,6 @@ class MedicoHomePage extends StatelessWidget {
     required this.userStats,
     required this.searchController,
     required this.onSearchChanged,
-    required this.patientCount,
     required this.activeFilter,
     required this.onFilterChanged,
     required this.showTriageFilters,
@@ -46,7 +41,6 @@ class MedicoHomePage extends StatelessWidget {
   final MedicoUserStats userStats;
   final TextEditingController searchController;
   final ValueChanged<String> onSearchChanged;
-  final int patientCount;
   final MedicoPatientFilter activeFilter;
   final ValueChanged<MedicoPatientFilter> onFilterChanged;
   final bool showTriageFilters;
@@ -69,7 +63,7 @@ class MedicoHomePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (navIndex == 1) {
+    if (navIndex == 2) {
       return Scaffold(
         backgroundColor: Colors.white,
         resizeToAvoidBottomInset: false,
@@ -112,26 +106,13 @@ class MedicoHomePage extends StatelessWidget {
       body: HomeScreenBody(
         header: [
           _header(),
-          Stack(
-            clipBehavior: Clip.none,
-            children: [
-              MedicoMinidash(userstats: userStats),
-              Positioned(
-                left: 0,
-                right: 0,
-                bottom: -30.5,
-                child: MedicoSearchBar(
-                  controller: searchController,
-                  onChanged: onSearchChanged,
-                ),
-              ),
-            ],
+          MedicoMinidash(userstats: userStats),
+          const SizedBox(height: 18),
+          MedicoSearchBar(
+            controller: searchController,
+            onChanged: onSearchChanged,
           ),
-          const SizedBox(height: 40.5),
-          MedicoPatientListHeader(
-            data: MedicoPatientListHeaderData(patientCount: patientCount),
-          ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 18),
           if (showTriageFilters)
             MedicoTriageFilters(
               data: MedicoTriageFiltersData(
@@ -159,16 +140,11 @@ class MedicoHomePage extends StatelessWidget {
     );
   }
 
-  PreferredSizeWidget _header() {
-    return AppHeader(
-      type: HeaderType.home,
-      color: AppColors.primaryMedico,
-      isConnected: isConnected,
+  Widget _header() {
+    return MedicoHomeHeader(
+      userName: userStats.userName,
+      hospitalLabel: 'Hospital General de Tijuana · Urgencias',
       hasNotifications: hasUnreadNotifications,
-      subtitle: 'Cruz Roja - Tijuana',
-      logoPath: AppIcons.medicoHeaderLogo,
-      notificationIconPath: AppIcons.medicoHeaderNotification,
-      profileIconPath: AppIcons.medicoHeaderProfile,
       onNotificationTap: onNotificationTap,
       onProfileTap: onProfileTap,
     );
