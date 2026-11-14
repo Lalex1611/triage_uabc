@@ -19,6 +19,7 @@ import 'package:sistema_triage/features/paramedico/presentation/map/services/map
 import 'package:sistema_triage/features/paramedico/presentation/map/services/map_navigation_helpers.dart';
 import 'package:sistema_triage/features/paramedico/presentation/map/services/map_operational_region.dart';
 import 'package:sistema_triage/features/paramedico/presentation/map/services/map_route_service.dart';
+import 'package:sistema_triage/features/paramedico/presentation/shared/paramedico_incidents_store.dart';
 import 'package:sistema_triage/features/paramedico/presentation/shared/paramedico_notifications_action.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -36,7 +37,9 @@ class ParamedicoMapController extends ChangeNotifier {
     MapGeocodingService? geocodingService,
     MapController? mapController,
     TextEditingController? searchController,
-  }) : _repo = repository ?? ParamedicoIncidentsRepository(),
+    ParamedicoIncidentsStore? store,
+  }) : _store = store ?? ParamedicoIncidentsStore.instance,
+       _repo = repository ?? ParamedicoIncidentsRepository(),
        _notificationsRepo =
            notificationsRepository ?? ParamedicNotificationsRepository(),
        _routeService = routeService ?? MapRouteService(),
@@ -52,6 +55,7 @@ class ParamedicoMapController extends ChangeNotifier {
 
   final String? initialFocusIncidentId;
   final String? initialFocusPatientId;
+  final ParamedicoIncidentsStore _store;
   final ParamedicoIncidentsRepository _repo;
   final ParamedicNotificationsRepository _notificationsRepo;
   final MapRouteService _routeService;
@@ -61,10 +65,15 @@ class ParamedicoMapController extends ChangeNotifier {
   /// Buscador de direcciones (no filtra incidentes)
   final TextEditingController searchController;
 
-  List<ParamedicoIncidentSummary> incidents = [];
-  Map<String, IncidentPatientTriageCounts> counts = {};
-  Map<String, List<MapPatientPin>> patientsByIncident = {};
-  Map<String, double> radiusMetersByIncident = {};
+  // Datos compartidos con la hoja de incidentes, al día por tiempo real
+  List<ParamedicoIncidentSummary> get incidents => _store.incidents;
+  Map<String, IncidentPatientTriageCounts> get counts => _store.counts;
+  Map<String, List<MapPatientPin>> get patientsByIncident =>
+      _store.patientsByIncident;
+  Map<String, double> get radiusMetersByIncident =>
+      _store.radiusMetersByIncident;
+  bool get loading => !_store.loaded && _store.error == null;
+  String? get error => _store.error;
 
   /// Hospitales activos con coordenadas
   List<HospitalRow> hospitals = [];
@@ -81,18 +90,18 @@ class ParamedicoMapController extends ChangeNotifier {
   List<LatLng> fullRoutePoints = [];
   bool followUser = false;
   MapIncidentFilter filter = MapIncidentFilter.all;
-  bool loading = true;
   bool routing = false;
-  String? error;
   String? pendingFocusId;
   String? pendingFocusPatientId;
-  String? lastAppliedFocusId;
+  String? _lastRouteUri;
   String? highlightedPatientId;
   String? forceShowPatientsIncidentId;
   int? _visibilityEpoch;
   bool _mapReady = false;
   VoidCallback? _pendingWhenMapReady;
   int _focusGeneration = 0;
+  // Solo la última petición de ruta se pinta; soltar la selección las anula
+  int _routeGeneration = 0;
   // Solo cuenta la última elección de filtro o búsqueda: una respuesta lenta
   // (GPS, geocodificador) no pisa lo que el usuario eligió después
   int _filterGeneration = 0;
@@ -110,6 +119,7 @@ class ParamedicoMapController extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    _store.removeListener(_onStoreChanged);
     _positionSub?.cancel();
     searchController.dispose();
     mapController.dispose();
@@ -275,22 +285,39 @@ class ParamedicoMapController extends ChangeNotifier {
   void init() {
     pendingFocusId = initialFocusIncidentId;
     pendingFocusPatientId = initialFocusPatientId;
-    unawaited(load());
+    // Escucharlo pone en marcha su carga y el tiempo real si aún no lo estaban
+    _store.addListener(_onStoreChanged);
     unawaited(_initUserPosition());
     unawaited(_loadHospitals());
     unawaited(refreshUnreadNotifications());
   }
 
+  /// Si el incidente elegido se cerró o borró (aquí o en otro dispositivo),
+  /// se suelta en vez de seguir mostrándolo
+  void _onStoreChanged() {
+    final selected = selectedIncidentId;
+    if (selected != null && _store.byId(selected) == null) {
+      clearSelection();
+    } else {
+      notifyListeners();
+    }
+  }
+
+  /// Enfoca lo que pida la ruta (`?focus=` y opcionalmente `&focusPatient=`)
+  /// cada vez que cambia, también si se vuelve a pedir el mismo incidente
+  /// para resaltar otro paciente
   void syncFocusFromRoute(BuildContext context) {
-    final params = GoRouterState.of(context).uri.queryParameters;
-    final q = params['focus'];
-    if (q != null && q.isNotEmpty && q != lastAppliedFocusId) {
-      pendingFocusId = q;
-    }
-    final patient = params['focusPatient'];
-    if (patient != null && patient.isNotEmpty) {
-      pendingFocusPatientId = patient;
-    }
+    final uri = GoRouterState.of(context).uri;
+    final key = uri.toString();
+    if (key == _lastRouteUri) return;
+    _lastRouteUri = key;
+    final focus = uri.queryParameters['focus'];
+    if (focus == null || focus.isEmpty) return;
+    final patient = uri.queryParameters['focusPatient'];
+    pendingFocusId = focus;
+    pendingFocusPatientId = patient != null && patient.isNotEmpty
+        ? patient
+        : null;
   }
 
   void onDependenciesChanged(BuildContext context) {
@@ -352,67 +379,6 @@ class ParamedicoMapController extends ChangeNotifier {
     _positionSub = null;
   }
 
-  Future<void> load({bool silent = false}) async {
-    if (!SupabaseEnv.isConfigured) {
-      loading = false;
-      error = 'Supabase no configurado.';
-      incidents = [];
-      counts = {};
-      notifyListeners();
-      return;
-    }
-    if (!silent) {
-      loading = true;
-      error = null;
-      notifyListeners();
-    }
-
-    try {
-      final list = await _repo.listOpenIncidents();
-      final loadedCounts = await _repo.patientTriageCountsByIncident(
-        list.map((e) => e.id),
-      );
-      final incidentCenters = <String, LatLng>{
-        for (final inc in list)
-          if (inc.latitude != null && inc.longitude != null)
-            inc.id: LatLng(inc.latitude!, inc.longitude!),
-      };
-      final pins = await _repo.listMapPatientPinsForIncidents(
-        list.map((e) => e.id),
-        incidentCentersById: incidentCenters,
-      );
-      final grouped = <String, List<MapPatientPin>>{};
-      for (final pin in pins) {
-        grouped.putIfAbsent(pin.incidentId, () => []).add(pin);
-      }
-      final radii = <String, double>{};
-      for (final inc in list) {
-        if (inc.latitude == null || inc.longitude == null) continue;
-        final center = LatLng(inc.latitude!, inc.longitude!);
-        radii[inc.id] = MapIncidentCoverageService.radiusMeters(
-          center,
-          grouped[inc.id] ?? const [],
-        );
-      }
-      incidents = list;
-      counts = loadedCounts;
-      patientsByIncident = grouped;
-      radiusMetersByIncident = radii;
-      incidents = list;
-      counts = loadedCounts;
-      patientsByIncident = grouped;
-      radiusMetersByIncident = radii;
-      loading = false;
-      notifyListeners();
-    } catch (e) {
-      if (!silent) {
-        error = e.toString();
-        loading = false;
-        notifyListeners();
-      }
-    }
-  }
-
   Future<void> onLoadComplete(BuildContext context) async {
     _runWhenMapReady(() {
       unawaited(_runInitialCamera(context));
@@ -454,13 +420,6 @@ class ParamedicoMapController extends ChangeNotifier {
     if (selectedIncidentId == null) return null;
     for (final e in incidents) {
       if (e.id == selectedIncidentId) return e;
-    }
-    return null;
-  }
-
-  ParamedicoIncidentSummary? _incidentById(String id) {
-    for (final e in incidents) {
-      if (e.id == id) return e;
     }
     return null;
   }
@@ -538,11 +497,12 @@ class ParamedicoMapController extends ChangeNotifier {
     pendingFocusPatientId = null;
     final generation = ++_focusGeneration;
 
-    var found = _incidentById(id);
+    // Recién creado puede no haber llegado aún por tiempo real
+    var found = _store.byId(id);
     if (found == null) {
-      await load(silent: true);
+      await _store.refresh();
       if (generation != _focusGeneration) return;
-      found = _incidentById(id);
+      found = _store.byId(id);
     }
     if (!context.mounted) return;
 
@@ -566,7 +526,6 @@ class ParamedicoMapController extends ChangeNotifier {
       return;
     }
 
-    lastAppliedFocusId = id;
     if (patientId != null && patientId.isNotEmpty) {
       await focusIncidentForView(context, inc, highlightPatientId: patientId);
       return;
@@ -708,6 +667,8 @@ class ParamedicoMapController extends ChangeNotifier {
   void clearSelection() {
     if (selectedIncidentId == null) return;
     _focusGeneration++;
+    _routeGeneration++;
+    routing = false;
     _stopPositionStream();
     selectedIncidentId = null;
     forceShowPatientsIncidentId = null;
@@ -794,6 +755,11 @@ class ParamedicoMapController extends ChangeNotifier {
     BuildContext? context,
   }) async {
     if (inc.latitude == null || inc.longitude == null) return;
+    final generation = ++_routeGeneration;
+    // Una respuesta tardía no pinta la ruta ni mueve la cámara si ya se pidió
+    // otra o se soltó este incidente
+    bool superseded() =>
+        generation != _routeGeneration || selectedIncidentId != inc.id;
     var from = userPosition;
     if (from == null) {
       final pos = await IncidentLocationService.getCurrentPosition();
@@ -803,6 +769,7 @@ class ParamedicoMapController extends ChangeNotifier {
         notifyListeners();
       }
     }
+    if (superseded()) return;
     if (from == null) {
       if (context != null && context.mounted) {
         showAppSnackBar(
@@ -824,6 +791,7 @@ class ParamedicoMapController extends ChangeNotifier {
       toLat: inc.latitude!,
       toLng: inc.longitude!,
     );
+    if (superseded()) return;
 
     routing = false;
     fullRoutePoints = points;
@@ -873,21 +841,5 @@ class ParamedicoMapController extends ChangeNotifier {
 
   void openPatientDetail(BuildContext context, String patientId) {
     pushParamedicoFullScreen(context, '/paramedico/patient/$patientId');
-  }
-
-  void goHome(BuildContext context) {
-    context.go('/paramedico/home');
-  }
-
-  void navigateBack(BuildContext context, {String? returnTo}) {
-    if (returnTo != null && returnTo.isNotEmpty) {
-      context.go(returnTo);
-      return;
-    }
-    if (context.canPop()) {
-      context.pop();
-      return;
-    }
-    goHome(context);
   }
 }

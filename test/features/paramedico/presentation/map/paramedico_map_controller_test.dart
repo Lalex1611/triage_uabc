@@ -4,7 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:sistema_triage/features/paramedico/presentation/map/paramedico_map_controller.dart';
+import 'package:sistema_triage/features/paramedico/data/repositories/paramedico_incidents_repository.dart';
 import 'package:sistema_triage/features/paramedico/presentation/map/services/map_geocoding_service.dart';
+import 'package:sistema_triage/features/paramedico/presentation/map/services/map_route_service.dart';
 
 /// Geocodificador que responde cuando el test lo decide
 class _ManualGeocoding extends MapGeocodingService {
@@ -13,6 +15,19 @@ class _ManualGeocoding extends MapGeocodingService {
   @override
   Future<LatLng?> search(String query, {LatLng? near}) =>
       (requests[query] = Completer<LatLng?>()).future;
+}
+
+/// Servicio de rutas que responde cuando el test lo decide
+class _ManualRoutes extends MapRouteService {
+  final reply = Completer<List<LatLng>>();
+
+  @override
+  Future<List<LatLng>> fetchDrivingRoute({
+    required double fromLat,
+    required double fromLng,
+    required double toLat,
+    required double toLng,
+  }) => reply.future;
 }
 
 void main() {
@@ -54,6 +69,32 @@ void main() {
 
     // Si se aplicara la vieja, avisaría de que no encontró la dirección
     expect(find.textContaining('No encontramos'), findsNothing);
+  });
+
+  test('una ruta que llega tras soltar el incidente no se pinta', () async {
+    final routes = _ManualRoutes();
+    final c = ParamedicoMapController(routeService: routes);
+    addTearDown(c.dispose);
+    c.userPosition = const LatLng(32.5, -117);
+    c.selectedIncidentId = 'a';
+
+    final pending = c.loadRouteTo(
+      ParamedicoIncidentSummary(
+        id: 'a',
+        generatedTitle: 'a',
+        emergencyType: 'otro',
+        createdAt: null,
+        createdBy: 'u',
+        latitude: 32.51,
+        longitude: -117.01,
+      ),
+    );
+    c.clearSelection();
+    routes.reply.complete(const [LatLng(32.5, -117), LatLng(32.51, -117.01)]);
+    await pending;
+
+    expect(c.routePoints, isEmpty);
+    expect(c.routing, isFalse);
   });
 
   test('tras dispose, lo que termine tarde no avisa', () {

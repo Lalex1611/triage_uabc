@@ -61,9 +61,9 @@ class _IncidentsSheetBodyState extends State<_IncidentsSheetBody> {
   @override
   void initState() {
     super.initState();
+    // Los datos ya los tiene el mapa y se mantienen al día: no se recargan
     _controller = ParamedicoIncidentsController();
     _controller.addListener(_onController);
-    unawaited(_controller.load());
   }
 
   @override
