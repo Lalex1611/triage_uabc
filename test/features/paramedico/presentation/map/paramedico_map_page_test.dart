@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -53,6 +54,7 @@ Widget _page({
         onMapBackgroundTap: () {},
         onMapPositionChanged: (_, _) {},
         onPinTap: (_) {},
+        onClearSelection: () => tap('cerrar'),
         onDirections: () => tap('google maps'),
         onReturnToPatient: fromPatient ? () => tap('paciente') : null,
         onLocateMe: () {},
@@ -111,6 +113,48 @@ void main() {
     await tester.pumpWidget(_page(taps: taps, fromPatient: true));
     await tester.tap(find.text('Volver al paciente'));
     expect(taps, ['paciente']);
+  });
+
+  testWidgets('arrastrar el panel hacia abajo suelta el incidente', (
+    tester,
+  ) async {
+    final taps = <String>[];
+    await tester.pumpWidget(_page(taps: taps));
+
+    await tester.drag(find.text('Accidente vehicular'), const Offset(0, 400));
+    // El cargador del mapa no para: se avanza el reloj en vez de esperar
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(taps, ['cerrar']);
+  });
+
+  testWidgets('un arrastre corto devuelve el panel a su sitio', (tester) async {
+    final taps = <String>[];
+    await tester.pumpWidget(_page(taps: taps));
+    final top = tester.getTopLeft(find.text('Accidente vehicular')).dy;
+
+    await tester.timedDrag(
+      find.text('Accidente vehicular'),
+      const Offset(0, 40),
+      const Duration(seconds: 1),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(taps, isEmpty);
+    expect(tester.getTopLeft(find.text('Accidente vehicular')).dy, top);
+  });
+
+  testWidgets('el lector de pantalla puede descartar el panel', (tester) async {
+    final taps = <String>[];
+    final semantics = tester.ensureSemantics();
+    await tester.pumpWidget(_page(taps: taps));
+
+    tester.semantics.performAction(
+      find.semantics.byAction(SemanticsAction.dismiss),
+      SemanticsAction.dismiss,
+    );
+    expect(taps, ['cerrar']);
+    semantics.dispose();
   });
 
   for (final width in [280.0, 393.0]) {

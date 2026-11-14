@@ -26,6 +26,7 @@ class ParamedicoMapPage extends StatelessWidget {
     required this.onMapBackgroundTap,
     required this.onMapPositionChanged,
     required this.onPinTap,
+    required this.onClearSelection,
     required this.onDirections,
     required this.onLocateMe,
     required this.onOpenLayers,
@@ -62,6 +63,9 @@ class ParamedicoMapPage extends StatelessWidget {
   final VoidCallback onMapBackgroundTap;
   final void Function(MapCamera camera, bool hasGesture) onMapPositionChanged;
   final void Function(ParamedicoIncidentSummary inc) onPinTap;
+
+  /// Arrastrar el panel hacia abajo suelta el incidente
+  final VoidCallback onClearSelection;
 
   /// "Cómo llegar": abre la ruta en Google Maps
   final VoidCallback onDirections;
@@ -229,7 +233,12 @@ class ParamedicoMapPage extends StatelessWidget {
             Positioned.fill(
               child: Align(
                 alignment: Alignment.bottomCenter,
-                child: _buildIncidentPanel(selected),
+                // Otro incidente empieza sin arrastre a medias
+                child: _DragToDismiss(
+                  key: ValueKey(selectedIncidentId),
+                  onDismissed: onClearSelection,
+                  child: _buildIncidentPanel(selected),
+                ),
               ),
             ),
         ],
@@ -394,6 +403,83 @@ class ParamedicoMapPage extends StatelessWidget {
               ],
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// La hoja fija sigue al dedo hacia abajo y, si se suelta lejos o rápido, sale
+/// de la pantalla y llama a [onDismissed]; si no, vuelve a su sitio. Mismos
+/// umbrales que las hojas modales de Material
+class _DragToDismiss extends StatefulWidget {
+  const _DragToDismiss({
+    super.key,
+    required this.onDismissed,
+    required this.child,
+  });
+
+  final VoidCallback onDismissed;
+  final Widget child;
+
+  @override
+  State<_DragToDismiss> createState() => _DragToDismissState();
+}
+
+class _DragToDismissState extends State<_DragToDismiss> {
+  static const _closeFraction = 0.5;
+  static const _flingVelocity = 700.0;
+  static const _settle = Duration(milliseconds: 200);
+
+  double _offset = 0;
+  bool _dragging = false;
+  bool _dismissing = false;
+
+  double get _height => context.size?.height ?? 0;
+
+  void _onDragUpdate(DragUpdateDetails details) {
+    if (_dismissing) return;
+    setState(() {
+      _dragging = true;
+      _offset = (_offset + details.delta.dy).clamp(0.0, _height);
+    });
+  }
+
+  void _onDragEnd(DragEndDetails details) {
+    if (_dismissing) return;
+    final close =
+        details.velocity.pixelsPerSecond.dy > _flingVelocity ||
+        _offset > _height * _closeFraction;
+    // Ya está fuera del todo: no queda animación que lo avise
+    if (close && _offset >= _height) {
+      widget.onDismissed();
+      return;
+    }
+    setState(() {
+      _dragging = false;
+      _dismissing = close;
+      _offset = close ? _height : 0;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      // Quien no puede arrastrar la cierra con la acción de descartar
+      onDismiss: widget.onDismissed,
+      child: GestureDetector(
+        onVerticalDragUpdate: _onDragUpdate,
+        onVerticalDragEnd: _onDragEnd,
+        child: TweenAnimationBuilder<double>(
+          tween: Tween(end: _offset),
+          duration: _dragging ? Duration.zero : _settle,
+          curve: Curves.easeOut,
+          onEnd: () {
+            if (_dismissing) widget.onDismissed();
+          },
+          builder: (context, offset, child) =>
+              Transform.translate(offset: Offset(0, offset), child: child),
+          child: widget.child,
         ),
       ),
     );

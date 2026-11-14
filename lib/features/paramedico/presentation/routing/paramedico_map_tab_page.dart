@@ -85,6 +85,7 @@ class _ParamedicoMapTabPageState extends State<ParamedicoMapTabPage> {
         onMapBackgroundTap: c.onMapBackgroundTap,
         onMapPositionChanged: c.onMapPositionChanged,
         onPinTap: c.onPinTap,
+        onClearSelection: c.clearSelection,
         onDirections: () => unawaited(c.openDirections(context)),
         onReturnToPatient: c.returnToPatientId != null
             ? () => c.returnToPatient(context)
