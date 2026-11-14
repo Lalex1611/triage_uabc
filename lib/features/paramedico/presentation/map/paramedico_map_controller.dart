@@ -2,12 +2,12 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
-import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:sistema_triage/core/config/supabase_env.dart';
 import 'package:sistema_triage/core/router/paramedico_stack_nav.dart';
 import 'package:sistema_triage/core/ui/app_snackbar.dart';
+import 'package:sistema_triage/core/util/map_launcher.dart';
 import 'package:sistema_triage/features/paramedico/data/repositories/paramedic_notifications_repository.dart';
 import 'package:sistema_triage/features/paramedico/data/repositories/paramedico_incidents_repository.dart';
 import 'package:sistema_triage/features/paramedico/domain/entities/home/incident_for_cards.dart';
@@ -16,9 +16,7 @@ import 'package:sistema_triage/features/paramedico/domain/services/incident_for_
 import 'package:sistema_triage/features/paramedico/domain/services/map_incident_coverage_service.dart';
 import 'package:sistema_triage/features/paramedico/presentation/create_incident/services/incident_location_service.dart';
 import 'package:sistema_triage/features/paramedico/presentation/map/services/map_geocoding_service.dart';
-import 'package:sistema_triage/features/paramedico/presentation/map/services/map_navigation_helpers.dart';
 import 'package:sistema_triage/features/paramedico/presentation/map/services/map_operational_region.dart';
-import 'package:sistema_triage/features/paramedico/presentation/map/services/map_route_service.dart';
 import 'package:sistema_triage/features/paramedico/presentation/shared/paramedico_incidents_store.dart';
 import 'package:sistema_triage/features/paramedico/presentation/shared/paramedico_notifications_action.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -26,14 +24,14 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 /// Filtros del mapa en vivo (B01)
 enum MapIncidentFilter { mine, all, nearby }
 
-// Orquestador del mapa interactivo de incidentes: carga, rutas, GPS y selección de pin
+// Orquestador del mapa interactivo de incidentes: carga, filtros, búsqueda y
+// selección de pin. La ruta al incidente la da Google Maps
 class ParamedicoMapController extends ChangeNotifier {
   ParamedicoMapController({
     this.initialFocusIncidentId,
     this.initialFocusPatientId,
     ParamedicoIncidentsRepository? repository,
     ParamedicNotificationsRepository? notificationsRepository,
-    MapRouteService? routeService,
     MapGeocodingService? geocodingService,
     MapController? mapController,
     TextEditingController? searchController,
@@ -42,7 +40,6 @@ class ParamedicoMapController extends ChangeNotifier {
        _repo = repository ?? ParamedicoIncidentsRepository(),
        _notificationsRepo =
            notificationsRepository ?? ParamedicNotificationsRepository(),
-       _routeService = routeService ?? MapRouteService(),
        _geocoding = geocodingService ?? MapGeocodingService(),
        mapController = mapController ?? MapController(),
        searchController = searchController ?? TextEditingController();
@@ -58,7 +55,6 @@ class ParamedicoMapController extends ChangeNotifier {
   final ParamedicoIncidentsStore _store;
   final ParamedicoIncidentsRepository _repo;
   final ParamedicNotificationsRepository _notificationsRepo;
-  final MapRouteService _routeService;
   final MapGeocodingService _geocoding;
   final MapController mapController;
 
@@ -82,15 +78,14 @@ class ParamedicoMapController extends ChangeNotifier {
   // Capas del mapa (panel "Capas del mapa")
   bool showIncidents = true;
   bool showHospitals = true;
+
+  /// Incidente elegido: su panel abajo (B03)
   String? selectedIncidentId;
-  List<LatLng> routePoints = [];
+
+  /// Se llegó desde la ficha de este paciente: "Volver al paciente" la reabre
+  String? returnToPatientId;
   LatLng? userPosition;
-  LatLng? previousUserPosition;
-  double? userHeading;
-  List<LatLng> fullRoutePoints = [];
-  bool followUser = false;
   MapIncidentFilter filter = MapIncidentFilter.all;
-  bool routing = false;
   String? pendingFocusId;
   String? pendingFocusPatientId;
   String? _lastRouteUri;
@@ -100,15 +95,11 @@ class ParamedicoMapController extends ChangeNotifier {
   bool _mapReady = false;
   VoidCallback? _pendingWhenMapReady;
   int _focusGeneration = 0;
-  // Solo la última petición de ruta se pinta; soltar la selección las anula
-  int _routeGeneration = 0;
   // Solo cuenta la última elección de filtro o búsqueda: una respuesta lenta
   // (GPS, geocodificador) no pisa lo que el usuario eligió después
   int _filterGeneration = 0;
   int _searchGeneration = 0;
   bool _disposed = false;
-
-  StreamSubscription<Position>? _positionSub;
 
   // Las cargas en curso pueden terminar con la pantalla ya cerrada
   @override
@@ -120,7 +111,6 @@ class ParamedicoMapController extends ChangeNotifier {
   void dispose() {
     _disposed = true;
     _store.removeListener(_onStoreChanged);
-    _positionSub?.cancel();
     searchController.dispose();
     mapController.dispose();
     super.dispose();
@@ -147,15 +137,7 @@ class ParamedicoMapController extends ChangeNotifier {
     filter = value;
     if (selectedIncidentId != null &&
         !visibleIncidents.any((e) => e.id == selectedIncidentId)) {
-      _stopPositionStream();
-      selectedIncidentId = null;
-      forceShowPatientsIncidentId = null;
-      highlightedPatientId = null;
-      routePoints = [];
-      fullRoutePoints = [];
-      followUser = false;
-      userHeading = null;
-      previousUserPosition = null;
+      _dropSelection();
     }
     notifyListeners();
     if (value == MapIncidentFilter.nearby) {
@@ -211,11 +193,6 @@ class ParamedicoMapController extends ChangeNotifier {
         isError: true,
       );
       return;
-    }
-    // Seguir al usuario devolvería la cámara a su posición
-    if (followUser) {
-      followUser = false;
-      notifyListeners();
     }
     _safeMapOp(() => mapController.move(found, 16));
   }
@@ -334,51 +311,6 @@ class ParamedicoMapController extends ChangeNotifier {
     notifyListeners();
   }
 
-  void _startPositionStream() {
-    _positionSub?.cancel();
-    _positionSub = Geolocator.getPositionStream(
-      locationSettings: LocationSettings(
-        accuracy: LocationAccuracy.best,
-        distanceFilter: followUser ? 8 : 20,
-      ),
-    ).listen(_onPositionUpdate);
-  }
-
-  void _onPositionUpdate(Position pos) {
-    final current = LatLng(pos.latitude, pos.longitude);
-    final heading = MapNavigationHelpers.resolveHeading(
-      position: pos,
-      previous: previousUserPosition,
-      current: current,
-      lastHeading: userHeading,
-    );
-
-    previousUserPosition = userPosition;
-    userPosition = current;
-    userHeading = heading;
-    if (fullRoutePoints.length >= 2) {
-      routePoints = MapNavigationHelpers.trimRouteAhead(
-        route: fullRoutePoints,
-        user: current,
-      );
-    }
-    notifyListeners();
-
-    if (followUser) {
-      updateNavigationCamera(animated: true);
-    }
-
-    final sel = selectedIncident;
-    if (sel != null && sel.latitude != null && sel.longitude != null) {
-      unawaited(loadRouteTo(sel, moveCamera: false));
-    }
-  }
-
-  void _stopPositionStream() {
-    _positionSub?.cancel();
-    _positionSub = null;
-  }
-
   Future<void> onLoadComplete(BuildContext context) async {
     _runWhenMapReady(() {
       unawaited(_runInitialCamera(context));
@@ -422,6 +354,20 @@ class ParamedicoMapController extends ChangeNotifier {
       if (e.id == selectedIncidentId) return e;
     }
     return null;
+  }
+
+  /// Distancia en línea recta del usuario al incidente elegido
+  double? get distanceToSelectedMeters {
+    final user = userPosition;
+    final inc = selectedIncident;
+    if (user == null || inc?.latitude == null || inc?.longitude == null) {
+      return null;
+    }
+    return const Distance().as(
+      LengthUnit.Meter,
+      user,
+      LatLng(inc!.latitude!, inc.longitude!),
+    );
   }
 
   void goToRegionOverview() {
@@ -526,24 +472,24 @@ class ParamedicoMapController extends ChangeNotifier {
       return;
     }
 
-    if (patientId != null && patientId.isNotEmpty) {
-      await focusIncidentForView(context, inc, highlightPatientId: patientId);
-      return;
-    }
-    await onPinTap(context, inc);
+    focusIncidentForView(
+      inc,
+      highlightPatientId: patientId != null && patientId.isNotEmpty
+          ? patientId
+          : null,
+    );
   }
 
-  Future<void> focusIncidentForView(
-    BuildContext context,
+  /// Elige el incidente (vista previa, sin ruta) y lo encuadra con sus
+  /// pacientes. Con [highlightPatientId] se llegó desde su ficha
+  void focusIncidentForView(
     ParamedicoIncidentSummary inc, {
     String? highlightPatientId,
-  }) async {
+  }) {
     selectedIncidentId = inc.id;
     forceShowPatientsIncidentId = inc.id;
     highlightedPatientId = highlightPatientId;
-    routePoints = [];
-    fullRoutePoints = [];
-    followUser = false;
+    returnToPatientId = highlightPatientId;
     notifyListeners();
     _fitIncidentAndPatients(inc);
   }
@@ -646,168 +592,75 @@ class ParamedicoMapController extends ChangeNotifier {
     return rings;
   }
 
-  Future<void> onPinTap(
-    BuildContext context,
-    ParamedicoIncidentSummary inc,
-  ) async {
+  /// Tocar un incidente lo elige y muestra su panel (B03), sin mover el mapa
+  void onPinTap(ParamedicoIncidentSummary inc) {
+    if (selectedIncidentId != inc.id) {
+      highlightedPatientId = null;
+      returnToPatientId = null;
+    }
     selectedIncidentId = inc.id;
     forceShowPatientsIncidentId = inc.id;
-    routePoints = [];
-    fullRoutePoints = [];
-    followUser = false;
     notifyListeners();
-    _startPositionStream();
-    await loadRouteTo(inc, moveCamera: true, context: context);
-    if (selectedIncidentId != inc.id) return;
-    await Future<void>.delayed(const Duration(milliseconds: 1600));
-    if (selectedIncidentId != inc.id) return;
-    enableFollowNavigation();
+  }
+
+  /// "Cómo llegar": la ruta, el tiempo con tráfico y la navegación los da
+  /// Google Maps, que sale desde la posición actual del usuario
+  Future<void> openDirections(BuildContext context) async {
+    final inc = selectedIncident;
+    if (inc == null || inc.latitude == null || inc.longitude == null) return;
+    final opened = await launchDirectionsExternal(
+      inc.latitude!,
+      inc.longitude!,
+    );
+    if (opened || !context.mounted) return;
+    showAppSnackBar(context, 'No se pudo abrir Google Maps.', isError: true);
+  }
+
+  /// Reabre la ficha desde la que se llegó al mapa
+  void returnToPatient(BuildContext context) {
+    final id = returnToPatientId;
+    if (id == null) return;
+    clearSelection();
+    openPatientDetail(context, id);
+  }
+
+  /// Botón atrás del sistema con un incidente elegido: vuelve a la ficha del
+  /// paciente (si se vino de ella) o suelta el incidente
+  void back(BuildContext context) {
+    if (returnToPatientId != null) {
+      returnToPatient(context);
+    } else {
+      clearSelection();
+    }
   }
 
   void clearSelection() {
     if (selectedIncidentId == null) return;
+    _dropSelection();
+    notifyListeners();
+    goToRegionOverview();
+  }
+
+  void _dropSelection() {
     _focusGeneration++;
-    _routeGeneration++;
-    routing = false;
-    _stopPositionStream();
     selectedIncidentId = null;
     forceShowPatientsIncidentId = null;
     highlightedPatientId = null;
-    routePoints = [];
-    fullRoutePoints = [];
-    followUser = false;
-    userHeading = null;
-    previousUserPosition = null;
-    notifyListeners();
-    goToRegionOverview();
+    returnToPatientId = null;
   }
 
   void onMapBackgroundTap() {
     if (selectedIncidentId != null) clearSelection();
   }
 
-  void enableFollowNavigation() {
-    followUser = true;
-    _startPositionStream();
-    updateNavigationCamera(animated: false);
-    notifyListeners();
-  }
-
   void onMapPositionChanged(MapCamera camera, bool hasGesture) {
-    var shouldNotify = false;
-    if (hasGesture && followUser) {
-      followUser = false;
-      shouldNotify = true;
-    }
     final epoch =
         (camera.zoom * 4).floor() +
         (camera.center.latitude * 1000).floor() +
         (camera.center.longitude * 1000).floor();
     if (_visibilityEpoch != epoch) {
       _visibilityEpoch = epoch;
-      shouldNotify = true;
-    }
-    if (shouldNotify) notifyListeners();
-  }
-
-  void updateNavigationCamera({required bool animated}) {
-    final pos = userPosition;
-    if (pos == null || !followUser || !_mapReady) return;
-
-    final rotation = MapNavigationHelpers.mapRotationForHeading(
-      userHeading ?? 0,
-    );
-    const zoom = MapNavigationHelpers.navigationZoom;
-    const offset = MapNavigationHelpers.userScreenOffset;
-
-    final impl = mapController;
-    if (impl is! MapControllerImpl) {
-      mapController.moveAndRotate(pos, zoom, rotation);
-      return;
-    }
-
-    if (animated) {
-      impl.moveAndRotateAnimatedRaw(
-        pos,
-        zoom,
-        rotation,
-        offset: offset,
-        duration: const Duration(milliseconds: 400),
-        curve: Curves.easeOutCubic,
-        hasGesture: false,
-        source: MapEventSource.mapController,
-      );
-    } else {
-      impl.moveAndRotateRaw(
-        pos,
-        zoom,
-        rotation,
-        offset: offset,
-        hasGesture: false,
-        source: MapEventSource.mapController,
-      );
-    }
-  }
-
-  Future<void> loadRouteTo(
-    ParamedicoIncidentSummary inc, {
-    bool moveCamera = true,
-    BuildContext? context,
-  }) async {
-    if (inc.latitude == null || inc.longitude == null) return;
-    final generation = ++_routeGeneration;
-    // Una respuesta tardía no pinta la ruta ni mueve la cámara si ya se pidió
-    // otra o se soltó este incidente
-    bool superseded() =>
-        generation != _routeGeneration || selectedIncidentId != inc.id;
-    var from = userPosition;
-    if (from == null) {
-      final pos = await IncidentLocationService.getCurrentPosition();
-      if (pos != null) {
-        from = LatLng(pos.lat, pos.lng);
-        userPosition = from;
-        notifyListeners();
-      }
-    }
-    if (superseded()) return;
-    if (from == null) {
-      if (context != null && context.mounted) {
-        showAppSnackBar(
-          context,
-          IncidentLocationService.errorMessageForNullResult() ??
-              'Sin ubicación GPS.',
-          isError: true,
-        );
-      }
-      return;
-    }
-
-    routing = true;
-    notifyListeners();
-
-    final points = await _routeService.fetchDrivingRoute(
-      fromLat: from.latitude,
-      fromLng: from.longitude,
-      toLat: inc.latitude!,
-      toLng: inc.longitude!,
-    );
-    if (superseded()) return;
-
-    routing = false;
-    fullRoutePoints = points;
-    routePoints = userPosition != null && points.length >= 2
-        ? MapNavigationHelpers.trimRouteAhead(
-            route: points,
-            user: userPosition!,
-          )
-        : points;
-    notifyListeners();
-
-    if (moveCamera && points.length >= 2 && !followUser) {
-      final bounds = LatLngBounds.fromPoints(points);
-      mapController.fitCamera(
-        CameraFit.bounds(bounds: bounds, padding: const EdgeInsets.all(48)),
-      );
+      notifyListeners();
     }
   }
 
@@ -826,13 +679,7 @@ class ParamedicoMapController extends ChangeNotifier {
     final p = LatLng(pos.lat, pos.lng);
     userPosition = p;
     notifyListeners();
-    final sel = selectedIncident;
-    if (sel != null) {
-      enableFollowNavigation();
-      await loadRouteTo(sel, moveCamera: false);
-    } else {
-      _safeMapOp(() => mapController.move(p, 15));
-    }
+    _safeMapOp(() => mapController.move(p, 15));
   }
 
   void openIncidentDetail(BuildContext context, String incidentId) {
