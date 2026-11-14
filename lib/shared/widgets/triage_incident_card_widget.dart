@@ -53,9 +53,12 @@ class TriageIncidentCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          // Folio a la izquierda y tiempo pegado a la derecha; si no caben,
+          // cada uno se parte en su mitad
           Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Expanded(child: Text(folio, style: meta)),
+              Flexible(child: Text(folio, style: meta)),
               const SizedBox(width: TriageSpacing.sm),
               Flexible(
                 child: Text(timeAgo, style: meta, textAlign: TextAlign.end),
