@@ -81,7 +81,6 @@ class _ParamedicoMapTabPageState extends State<ParamedicoMapTabPage> {
         selectedIncidentId: c.selectedIncidentId,
         userPosition: c.userPosition,
         selectedCard: selected != null ? c.toCard(selected, uid) : null,
-        selectedDistanceMeters: c.distanceToSelectedMeters,
         onMapBackgroundTap: c.onMapBackgroundTap,
         onMapPositionChanged: c.onMapPositionChanged,
         onPinTap: c.onPinTap,

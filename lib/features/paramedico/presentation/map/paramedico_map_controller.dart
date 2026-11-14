@@ -356,20 +356,6 @@ class ParamedicoMapController extends ChangeNotifier {
     return null;
   }
 
-  /// Distancia en línea recta del usuario al incidente elegido
-  double? get distanceToSelectedMeters {
-    final user = userPosition;
-    final inc = selectedIncident;
-    if (user == null || inc?.latitude == null || inc?.longitude == null) {
-      return null;
-    }
-    return const Distance().as(
-      LengthUnit.Meter,
-      user,
-      LatLng(inc!.latitude!, inc.longitude!),
-    );
-  }
-
   void goToRegionOverview() {
     _safeMapOp(() {
       mapController.rotate(0);

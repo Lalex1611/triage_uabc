@@ -28,7 +28,6 @@ Widget _page({
   double textScale = 1,
   List<String>? taps,
   bool fromPatient = false,
-  double? distance = 1400,
 }) {
   void tap(String name) => taps?.add(name);
   return MaterialApp(
@@ -50,7 +49,6 @@ Widget _page({
         selectedIncidentId: 'a',
         userPosition: null,
         selectedCard: _card,
-        selectedDistanceMeters: distance,
         onMapBackgroundTap: () {},
         onMapPositionChanged: (_, _) {},
         onPinTap: (_) {},
@@ -89,21 +87,13 @@ void main() {
     await tester.pumpWidget(_page(taps: taps));
 
     expect(find.text('Accidente vehicular'), findsOneWidget);
-    expect(find.text('32.5300, -117.0200 · a 1.4 km'), findsOneWidget);
+    // Solo las coordenadas, sin distancia
+    expect(find.text('32.5300, -117.0200'), findsOneWidget);
+    expect(find.textContaining('km'), findsNothing);
     expect(find.text('Volver al paciente'), findsNothing);
     await tester.tap(find.text('Cómo llegar'));
     await tester.tap(find.text('Abrir incidente'));
     expect(taps, ['google maps', 'incidente']);
-  });
-
-  testWidgets('cerca se da en metros y sin GPS no se da distancia', (
-    tester,
-  ) async {
-    await tester.pumpWidget(_page(distance: 850));
-    expect(find.text('32.5300, -117.0200 · a 850 m'), findsOneWidget);
-
-    await tester.pumpWidget(_page(distance: null));
-    expect(find.text('32.5300, -117.0200'), findsOneWidget);
   });
 
   testWidgets('B03 desde la ficha de un paciente permite volver a ella', (

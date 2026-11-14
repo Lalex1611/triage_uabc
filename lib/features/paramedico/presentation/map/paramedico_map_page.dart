@@ -44,7 +44,6 @@ class ParamedicoMapPage extends StatelessWidget {
     this.highlightedPatientId,
     this.onPatientPinTap,
     this.onMapReady,
-    this.selectedDistanceMeters,
     this.onReturnToPatient,
   });
 
@@ -92,9 +91,6 @@ class ParamedicoMapPage extends StatelessWidget {
   final void Function(MapPatientPin pin)? onPatientPinTap;
   final VoidCallback? onMapReady;
 
-  /// En línea recta desde el usuario; sin GPS no se muestra
-  final double? selectedDistanceMeters;
-
   /// Se llegó desde la ficha de un paciente: botón para volver a ella
   final VoidCallback? onReturnToPatient;
 
@@ -106,11 +102,6 @@ class ParamedicoMapPage extends StatelessWidget {
     MapIncidentFilter.all: 'Todos',
     MapIncidentFilter.nearby: 'Cerca de mí',
   };
-
-  /// "850 m" o "1.4 km"
-  static String _formatDistance(double meters) => meters < 1000
-      ? '${meters.round()} m'
-      : '${(meters / 1000).toStringAsFixed(1)} km';
 
   @override
   Widget build(BuildContext context) {
@@ -341,7 +332,6 @@ class ParamedicoMapPage extends StatelessWidget {
 
   /// Panel del incidente elegido (B03)
   Widget _buildIncidentPanel(IncidentForCards incident) {
-    final distance = selectedDistanceMeters;
     final onReturnToPatient = this.onReturnToPatient;
 
     return TriageSheet(
@@ -360,10 +350,7 @@ class ParamedicoMapPage extends StatelessWidget {
               folio: incident.id,
               timeAgo: timeAgo(incident.dateTime),
               title: incident.name_card,
-              location: distance == null
-                  ? incident.coordinatesLabel
-                  : '${incident.coordinatesLabel} · a '
-                        '${_formatDistance(distance)}',
+              location: incident.coordinatesLabel,
               counts: {
                 TriageLevel.red: incident.red,
                 TriageLevel.yellow: incident.yellow,
