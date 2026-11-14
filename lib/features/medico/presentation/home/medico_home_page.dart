@@ -58,6 +58,15 @@ class MedicoHomePage extends StatelessWidget {
   final bool hasUnreadNotifications;
   final VoidCallback? onNotificationTap;
 
+  /// [navIndex] solo distingue Entrantes (0) y Registro (1); Sala y Perfil
+  /// aún no tienen pantalla y están desactivadas
+  Widget _navbar() => MedicoNavbar(
+    currentIndex: navIndex == 1
+        ? MedicoNavbar.registerTab
+        : MedicoNavbar.incomingTab,
+    onTap: (tab) => onNavTap(tab == MedicoNavbar.registerTab ? 1 : 0),
+  );
+
   @override
   Widget build(BuildContext context) {
     if (navIndex == 1) {
@@ -91,10 +100,7 @@ class MedicoHomePage extends StatelessWidget {
             ],
           ),
         ),
-        bottomNavigationBar: MedicoNavbar(
-          currentIndex: navIndex,
-          onTap: onNavTap,
-        ),
+        bottomNavigationBar: _navbar(),
       );
     }
 
@@ -149,10 +155,7 @@ class MedicoHomePage extends StatelessWidget {
         onRefresh: onRefresh,
         slivers: contentSlivers,
       ),
-      bottomNavigationBar: MedicoNavbar(
-        currentIndex: navIndex,
-        onTap: onNavTap,
-      ),
+      bottomNavigationBar: _navbar(),
     );
   }
 

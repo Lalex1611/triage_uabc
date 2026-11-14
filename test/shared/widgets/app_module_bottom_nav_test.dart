@@ -6,9 +6,13 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sistema_triage/features/medico/presentation/navigation/medico_navbar_widget.dart';
 import 'package:sistema_triage/features/paramedico/presentation/navigation/paramedico_navbar_widget.dart';
+import 'package:sistema_triage/shared/widgets/app_module_bottom_nav.dart';
 import 'package:sistema_triage/shared/widgets/triage_ui.dart';
 
 const _paramedicoTabs = ['Mapa', 'Incidentes', 'Guía START', 'Perfil'];
+
+/// Pestañas con pantalla; Guía START aún no la tiene
+const _paramedicoEnabledTabs = ['Mapa', 'Incidentes', 'Perfil'];
 
 Widget _wrap(Widget nav) =>
     MaterialApp(home: Scaffold(bottomNavigationBar: nav));
@@ -17,10 +21,11 @@ Widget _paramedico({
   int currentIndex = ParamedicoNavbar.mapTab,
   ValueChanged<int>? onTap,
   VoidCallback? onCreateIncident,
+  bool withCreate = true,
 }) => ParamedicoNavbar(
   currentIndex: currentIndex,
   onTap: onTap ?? (_) {},
-  onCreateIncident: onCreateIncident ?? () {},
+  onCreateIncident: withCreate ? onCreateIncident ?? () {} : null,
 );
 
 double _contrast(Color a, Color b) {
@@ -53,12 +58,27 @@ void main() {
     for (final label in _paramedicoTabs) {
       await tester.tap(find.text(label));
     }
+    // Guía START está desactivada: no avisa
     expect(tapped, [
       ParamedicoNavbar.mapTab,
       ParamedicoNavbar.incidentsTab,
-      ParamedicoNavbar.guideTab,
       ParamedicoNavbar.profileTab,
     ]);
+  });
+
+  testWidgets('hospital: Entrantes, Sala, Registrar y Perfil', (tester) async {
+    final tapped = <int>[];
+    await tester.pumpWidget(
+      _wrap(
+        MedicoNavbar(currentIndex: MedicoNavbar.incomingTab, onTap: tapped.add),
+      ),
+    );
+    for (final label in ['Entrantes', 'Sala', 'Registrar', 'Perfil']) {
+      await tester.tap(find.text(label));
+    }
+    // Sala y Perfil aún no tienen pantalla
+    expect(tapped, [MedicoNavbar.incomingTab, MedicoNavbar.registerTab]);
+    expect(find.bySemanticsLabel('Crear incidente'), findsNothing);
   });
 
   testWidgets('colores por rol con contraste ≥ 4.5 sobre la superficie', (
@@ -69,10 +89,12 @@ void main() {
     expect(_textColor(tester, 'Incidentes'), TriageColors.textSecondary);
 
     await tester.pumpWidget(
-      _wrap(MedicoNavbar(currentIndex: 0, onTap: (_) {})),
+      _wrap(
+        MedicoNavbar(currentIndex: MedicoNavbar.incomingTab, onTap: (_) {}),
+      ),
     );
-    expect(_textColor(tester, 'Home'), TriageColors.hospitalAccent);
-    expect(_textColor(tester, 'Registro'), TriageColors.textSecondary);
+    expect(_textColor(tester, 'Entrantes'), TriageColors.hospitalAccent);
+    expect(_textColor(tester, 'Registrar'), TriageColors.textSecondary);
 
     for (final color in [
       TriageColors.paramedicAccent,
@@ -87,14 +109,16 @@ void main() {
     tester,
   ) async {
     await tester.pumpWidget(
-      _wrap(_paramedico(currentIndex: ParamedicoNavbar.guideTab)),
+      _wrap(_paramedico(currentIndex: ParamedicoNavbar.incidentsTab)),
     );
     expect(
-      tester.getSemantics(find.text('Guía START')),
+      tester.getSemantics(find.text('Incidentes')),
       isSemantics(
-        label: 'Guía START',
+        label: 'Incidentes',
         isButton: true,
         isSelected: true,
+        hasEnabledState: true,
+        isEnabled: true,
         hasTapAction: true,
       ),
     );
@@ -104,11 +128,42 @@ void main() {
     );
   });
 
+  testWidgets('una pestaña sin pantalla se anuncia desactivada y atenuada', (
+    tester,
+  ) async {
+    await tester.pumpWidget(_wrap(_paramedico()));
+    expect(
+      tester.getSemantics(find.text('Guía START')),
+      isSemantics(
+        label: 'Guía START',
+        isButton: true,
+        hasEnabledState: true,
+        isEnabled: false,
+        hasTapAction: false,
+      ),
+    );
+    expect(
+      _textColor(tester, 'Guía START'),
+      TriageColors.textSecondary.withValues(alpha: TriageOpacity.disabled),
+    );
+  });
+
+  testWidgets('sin acción no hay "+" y las pestañas ocupan su hueco', (
+    tester,
+  ) async {
+    await tester.pumpWidget(_wrap(_paramedico()));
+    final withSlot = _tabSize(tester, 'Mapa').width;
+
+    await tester.pumpWidget(_wrap(_paramedico(withCreate: false)));
+    expect(_createIncident, findsNothing);
+    expect(_tabSize(tester, 'Mapa').width, greaterThan(withSlot));
+  });
+
   testWidgets('con un índice fuera de rango ninguna pestaña queda activa', (
     tester,
   ) async {
     await tester.pumpWidget(_wrap(_paramedico(currentIndex: -1)));
-    for (final label in _paramedicoTabs) {
+    for (final label in _paramedicoEnabledTabs) {
       expect(_textColor(tester, label), TriageColors.textSecondary);
       expect(
         tester.getSemantics(find.text(label)),
@@ -225,7 +280,7 @@ void main() {
       setWidth(tester, 280);
       await tester.pumpWidget(_wrap(_paramedico()));
       final size = tester.getSize(_createIncident);
-      expect(size.width, lessThan(64));
+      expect(size.width, lessThan(AppModuleBottomNav.centerActionSize));
       expect(size.width, greaterThanOrEqualTo(TriageSizes.touchTarget));
     });
 
@@ -235,7 +290,10 @@ void main() {
       await _loadInter(tester);
       setWidth(tester, 393);
       await tester.pumpWidget(_wrap(_paramedico()));
-      expect(tester.getSize(_createIncident).width, 64);
+      expect(
+        tester.getSize(_createIncident).width,
+        AppModuleBottomNav.centerActionSize,
+      );
       expect(
         tester.getSize(find.text('Guía START')).height,
         tester.getSize(find.text('Mapa')).height,

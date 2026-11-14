@@ -5,6 +5,7 @@ import 'package:sistema_triage/core/constants/triage_icons.dart';
 import 'package:sistema_triage/core/router/paramedico_stack_nav.dart';
 import 'package:sistema_triage/core/theme/triage_role_theme.dart';
 import 'package:sistema_triage/core/theme/triage_tokens.dart';
+import 'package:sistema_triage/core/util/time_ago.dart';
 import 'package:sistema_triage/features/paramedico/data/repositories/paramedico_incidents_repository.dart';
 import 'package:sistema_triage/features/paramedico/domain/constants/incident_sorting_options.dart';
 import 'package:sistema_triage/features/paramedico/domain/entities/home/incident_for_cards.dart';
@@ -18,10 +19,16 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 /// Abre la hoja de "Incidentes activos" (B02) sobre la pantalla actual
 ///
 /// Altura fija (proporción de la pantalla): el encabezado y el buscador quedan
-/// fijos y solo la lista se desplaza.
-Future<void> showParamedicoIncidentsSheet(BuildContext context) async {
+/// fijos y solo la lista se desplaza. La hoja se abre en el navegador de
+/// [host] (por defecto [context]): el shell pasa el de la rama del mapa para
+/// que la barra de navegación quede por delante, como en Figma. Lo que se abre
+/// al elegir algo usa [context].
+Future<void> showParamedicoIncidentsSheet(
+  BuildContext context, {
+  BuildContext? host,
+}) async {
   final path = await showTriageSheet<String>(
-    context,
+    host ?? context,
     showClose: false,
     builder: (_) => const _IncidentsSheetBody(),
   );
@@ -54,9 +61,9 @@ class _IncidentsSheetBodyState extends State<_IncidentsSheetBody> {
   @override
   void initState() {
     super.initState();
+    // Los datos ya los tiene el mapa y se mantienen al día: no se recargan
     _controller = ParamedicoIncidentsController();
     _controller.addListener(_onController);
-    unawaited(_controller.load());
   }
 
   @override
@@ -226,7 +233,8 @@ class _IncidentsSheetBodyState extends State<_IncidentsSheetBody> {
     }
 
     final error = _controller.error;
-    final message = error ??
+    final message =
+        error ??
         (visible.isEmpty
             ? (_controller.items.isEmpty
                   ? 'No hay incidentes activos.'
@@ -266,7 +274,7 @@ class _IncidentsSheetBodyState extends State<_IncidentsSheetBody> {
                 final card = _controller.toCard(incident, _uid);
                 return TriageIncidentCard(
                   folio: card.id,
-                  timeAgo: _timeAgo(card.dateTime),
+                  timeAgo: timeAgo(card.dateTime),
                   title: card.name_card,
                   location: _coordinates(card),
                   counts: {
@@ -282,14 +290,6 @@ class _IncidentsSheetBodyState extends State<_IncidentsSheetBody> {
               },
             ),
     );
-  }
-
-  static String _timeAgo(DateTime dt) {
-    final diff = DateTime.now().difference(dt);
-    if (diff.inMinutes < 1) return 'ahora';
-    if (diff.inMinutes < 60) return 'hace ${diff.inMinutes} min';
-    if (diff.inHours < 24) return 'hace ${diff.inHours} h';
-    return 'hace ${diff.inDays} d';
   }
 
   // Aún no hay dirección en los datos: se muestran las coordenadas

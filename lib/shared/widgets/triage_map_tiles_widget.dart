@@ -32,17 +32,23 @@ class TriageMapTiles extends StatelessWidget {
             userAgentPackageName: 'sistema_triage',
           ),
         ),
-        // SimpleAttributionWidget se desborda con texto grande en pantallas estrechas
+        // SimpleAttributionWidget se desborda con texto grande en pantallas
+        // estrechas. Sobre el padding inferior: no la tapa una barra flotante.
         Align(
           alignment: Alignment.bottomRight,
-          child: ColoredBox(
-            color: TriageColors.surface,
-            child: Padding(
-              padding: const EdgeInsets.all(TriageSpacing.xxs),
-              child: Text(
-                '© OpenStreetMap contributors',
-                style: TriageTextStyles.labelSmall.copyWith(
-                  color: TriageColors.textSecondary,
+          child: Padding(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.paddingOf(context).bottom,
+            ),
+            child: ColoredBox(
+              color: TriageColors.surface,
+              child: Padding(
+                padding: const EdgeInsets.all(TriageSpacing.xxs),
+                child: Text(
+                  '© OpenStreetMap contributors',
+                  style: TriageTextStyles.labelSmall.copyWith(
+                    color: TriageColors.textSecondary,
+                  ),
                 ),
               ),
             ),

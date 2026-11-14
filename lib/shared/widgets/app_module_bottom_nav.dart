@@ -6,22 +6,31 @@ import 'package:sistema_triage/core/theme/triage_tokens.dart';
 import 'package:sistema_triage/shared/widgets/triage_icon_widget.dart';
 
 class AppModuleBottomNavTab {
-  const AppModuleBottomNavTab({required this.iconPath, required this.label});
+  const AppModuleBottomNavTab({
+    required this.iconPath,
+    required this.label,
+    this.enabled = true,
+  });
 
   final String iconPath;
   final String label;
+
+  /// Sin pantalla todavía: se ve atenuada y no responde
+  final bool enabled;
 }
 
 /// Barra de navegación inferior de los módulos (Figma "TRIAGE/Navegación campo"
 /// y "TRIAGE/Navegación hospital")
 ///
-/// Píldora con las pestañas repartidas a partes iguales en el ancho disponible.
-/// En pantallas estrechas cede margen; una etiqueta que no cabe pasa a otra
-/// línea por sus espacios y solo se reduce si una palabra no cabe entera.
+/// Píldora flotante con las pestañas repartidas a partes iguales en el ancho
+/// disponible; para que el contenido pase por detrás, el `Scaffold` que la usa
+/// lleva `extendBody: true`. En pantallas estrechas cede margen; una etiqueta
+/// que no cabe pasa a otra línea por sus espacios y solo se reduce si una
+/// palabra no cabe entera.
 ///
 /// Con [centerAction] se reserva un hueco en medio de las pestañas y el widget
-/// se dibuja sobresaliendo por arriba de la píldora (botón "+" del módulo campo).
-/// Sin [centerAction] la barra es igual que antes.
+/// se dibuja sobresaliendo por arriba de la píldora (botón "+" del módulo campo,
+/// de [centerActionSize]).
 class AppModuleBottomNav extends StatelessWidget {
   const AppModuleBottomNav({
     super.key,
@@ -42,15 +51,20 @@ class AppModuleBottomNav extends StatelessWidget {
   final Color inactiveColor;
   final Widget? centerAction;
 
-  // Medidas de Figma; rDim las reduce en pantallas estrechas
-  static const double _centerSlotWidth = 72;
-  static const double _centerLift = 14;
+  /// Diámetro del "+" con su aro (Figma: botón de 54 y aro de 4); el hueco
+  /// entre las pestañas mide lo mismo
+  static const double centerActionSize =
+      TriageSizes.controlLarge + 4 * TriageSpacing.xs;
+
+  /// Cuánto sobresale el "+" por encima de la píldora (Figma: un tercio)
+  static const double _centerLift = TriageSpacing.xl;
 
   @override
   Widget build(BuildContext context) {
     final action = centerAction;
     final middle = tabs.length ~/ 2;
-    final slotWidth = action == null ? 0.0 : context.rDim(_centerSlotWidth);
+    // rDim lo reduce en pantallas estrechas
+    final slotWidth = action == null ? 0.0 : context.rDim(centerActionSize);
     final screenWidth = MediaQuery.sizeOf(context).width;
 
     double labelWidthWith(double margin, double padding) =>
@@ -98,7 +112,13 @@ class AppModuleBottomNav extends StatelessWidget {
                   Expanded(
                     child: _NavTab(
                       tab: tabs[i],
-                      color: i == currentIndex ? activeColor : inactiveColor,
+                      color: !tabs[i].enabled
+                          ? inactiveColor.withValues(
+                              alpha: TriageOpacity.disabled,
+                            )
+                          : i == currentIndex
+                          ? activeColor
+                          : inactiveColor,
                       isActive: i == currentIndex,
                       horizontalPadding: tabPadding,
                       labelWidth: labelWidth,
@@ -116,10 +136,10 @@ class AppModuleBottomNav extends StatelessWidget {
     return SafeArea(
       top: false,
       minimum: EdgeInsets.fromLTRB(
-        margin,
+        TriageSpacing.xxl,
         TriageSpacing.sm,
-        margin,
-        TriageSpacing.sm,
+        TriageSpacing.xxl,
+        TriageSpacing.lg,
       ),
       child: action == null
           ? bar
@@ -166,9 +186,10 @@ class _NavTab extends StatelessWidget {
     return MergeSemantics(
       child: Semantics(
         button: true,
+        enabled: tab.enabled,
         selected: isActive,
         child: InkWell(
-          onTap: onTap,
+          onTap: tab.enabled ? onTap : null,
           borderRadius: BorderRadius.circular(TriageRadii.full),
           splashColor: color.withValues(alpha: TriageOpacity.pressed),
           highlightColor: color.withValues(alpha: TriageOpacity.hover),

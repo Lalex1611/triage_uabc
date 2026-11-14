@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:sistema_triage/core/config/supabase_env.dart';
-import 'package:sistema_triage/core/router/paramedico_stack_nav.dart';
 import 'package:sistema_triage/core/ui/app_snackbar.dart';
 import 'package:sistema_triage/features/paramedico/data/repositories/paramedico_incidents_repository.dart';
 import 'package:sistema_triage/features/paramedico/domain/constants/patient_blood_type.dart';
@@ -417,11 +416,8 @@ class PatientDetailsController extends ChangeNotifier {
       );
       return;
     }
-    final returnTo = Uri.encodeComponent('/paramedico/patient/$patientId');
-    pushParamedicoFullScreen(
-      context,
-      '/paramedico/mapa-interactivo?focus=${inc.id}&focusPatient=$patientId&returnTo=$returnTo',
-    );
+    // El mismo mapa de la pestaña (ya cargado y al día), con el paciente resaltado
+    context.go('/paramedico/mapa?focus=${inc.id}&focusPatient=$patientId');
   }
 
   Future<void> openAppMapPicker(BuildContext context) async {

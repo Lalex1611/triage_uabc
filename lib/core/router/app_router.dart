@@ -12,7 +12,6 @@ import 'package:sistema_triage/features/medico/presentation/routing/medico_patie
 import 'package:sistema_triage/features/paramedico/presentation/routing/incident_details_flow_page.dart';
 import 'package:sistema_triage/features/paramedico/presentation/routing/paramedico_home_tab_page.dart';
 import 'package:sistema_triage/features/paramedico/presentation/routing/paramedico_incidents_tab_page.dart';
-import 'package:sistema_triage/features/paramedico/presentation/routing/paramedico_interactive_map_flow_page.dart';
 import 'package:sistema_triage/features/paramedico/presentation/routing/paramedico_map_tab_page.dart';
 import 'package:sistema_triage/features/paramedico/presentation/routing/paramedico_patients_tab_page.dart';
 import 'package:sistema_triage/features/paramedico/presentation/routing/paramedico_shell_page.dart';
@@ -90,21 +89,6 @@ final GoRouter appRouter = GoRouter(
               ],
             ),
           ],
-        ),
-        GoRoute(
-          parentNavigatorKey: rootNavigatorKey,
-          path: 'mapa-interactivo',
-          builder: (context, state) {
-            final focus = state.uri.queryParameters['focus'];
-            final focusPatient = state.uri.queryParameters['focusPatient'];
-            final returnTo = state.uri.queryParameters['returnTo'];
-            return ParamedicoInteractiveMapFlowPage(
-              initialFocusIncidentId: focus?.isNotEmpty == true ? focus : null,
-              initialFocusPatientId:
-                  focusPatient?.isNotEmpty == true ? focusPatient : null,
-              returnTo: returnTo?.isNotEmpty == true ? returnTo : null,
-            );
-          },
         ),
         GoRoute(
           parentNavigatorKey: rootNavigatorKey,

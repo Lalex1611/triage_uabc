@@ -173,6 +173,33 @@ void main() {
       );
     });
 
+    testWidgets('sin onChanged queda desactivada y atenuada', (tester) async {
+      await tester.pumpWidget(
+        _wrap(
+          TriageOptionRow.toggle(
+            icon: TriageIcons.map,
+            title: _title,
+            detail: _detail,
+            value: false,
+            onChanged: null,
+          ),
+        ),
+      );
+      expect(
+        tester.getSemantics(find.byType(TriageOptionRow)),
+        isSemantics(
+          hasToggledState: true,
+          hasEnabledState: true,
+          isEnabled: false,
+          hasTapAction: false,
+        ),
+      );
+      expect(
+        tester.widget<Opacity>(find.byType(Opacity)).opacity,
+        TriageOpacity.disabled,
+      );
+    });
+
     testWidgets('se reduce en pantallas estrechas', (tester) async {
       await tester.pumpWidget(_wrap(_toggle(), width: 320));
       expect(tester.getSize(_track).width, closeTo(46 * 0.82, 0.1));

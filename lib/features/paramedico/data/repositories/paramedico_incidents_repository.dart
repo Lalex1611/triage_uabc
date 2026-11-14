@@ -457,6 +457,58 @@ class ParamedicoIncidentsRepository {
         .toList();
   }
 
+  /// Avisa con [onChange] de cualquier cambio en `incidents` o `patients`, y
+  /// con [onSubscribed] cada vez que la suscripción queda activa (también al
+  /// reconectar, cuando pudieron perderse cambios). Devuelve la función que
+  /// corta la suscripción
+  Future<void> Function() watchIncidentsAndPatients({
+    required void Function() onChange,
+    required void Function() onSubscribed,
+  }) {
+    final client = _c;
+    final channel = client.channel('paramedico_incidents_patients');
+    for (final table in const ['incidents', 'patients']) {
+      channel.onPostgresChanges(
+        event: PostgresChangeEvent.all,
+        schema: 'public',
+        table: table,
+        callback: (_) => onChange(),
+      );
+    }
+    channel.subscribe((status, _) {
+      if (status == RealtimeSubscribeStatus.subscribed) onSubscribed();
+    });
+    return () => client.removeChannel(channel);
+  }
+
+  /// Una sola consulta a `patients` para los conteos por color y los pines del
+  /// mapa de los incidentes dados
+  Future<
+    ({Map<String, IncidentPatientTriageCounts> counts, List<MapPatientPin> pins})
+  >
+  patientsOverviewForIncidents(
+    Iterable<String> incidentIds, {
+    Map<String, LatLng> incidentCentersById = const {},
+  }) async {
+    final ids = incidentIds.toList();
+    if (ids.isEmpty) {
+      return (
+        counts: <String, IncidentPatientTriageCounts>{},
+        pins: <MapPatientPin>[],
+      );
+    }
+    final rows = await _c
+        .from('patients')
+        .select('id, incident_id, triage_color, location, demographics')
+        .inFilter('incident_id', ids)
+        .eq('is_deleted', false);
+    final list = rows as List<dynamic>;
+    return (
+      counts: _triageCounts(ids, list),
+      pins: _mapPins(list, incidentCentersById),
+    );
+  }
+
   /// Una sola consulta: triage_color de pacientes para los incidentes dados
   Future<Map<String, IncidentPatientTriageCounts>>
   patientTriageCountsByIncident(Iterable<String> incidentIds) async {
@@ -467,12 +519,18 @@ class ParamedicoIncidentsRepository {
         .select('incident_id, triage_color')
         .inFilter('incident_id', ids)
         .eq('is_deleted', false);
+    return _triageCounts(ids, rows as List<dynamic>);
+  }
 
+  Map<String, IncidentPatientTriageCounts> _triageCounts(
+    List<String> ids,
+    List<dynamic> rows,
+  ) {
     final agg = <String, _TriageAgg>{};
     for (final id in ids) {
       agg[id] = _TriageAgg();
     }
-    for (final raw in rows as List<dynamic>) {
+    for (final raw in rows) {
       final j = raw as Map<String, dynamic>;
       final iid = j['incident_id'] as String?;
       final color = j['triage_color'] as String? ?? 'amarillo';
@@ -526,9 +584,15 @@ class ParamedicoIncidentsRepository {
         .select('id, incident_id, triage_color, location, demographics')
         .inFilter('incident_id', ids)
         .eq('is_deleted', false);
+    return _mapPins(rows as List<dynamic>, incidentCentersById);
+  }
 
+  List<MapPatientPin> _mapPins(
+    List<dynamic> rows,
+    Map<String, LatLng> incidentCentersById,
+  ) {
     final pinsByIncident = <String, List<MapPatientPin>>{};
-    for (final raw in rows as List<dynamic>) {
+    for (final raw in rows) {
       final j = raw as Map<String, dynamic>;
       final incidentId = j['incident_id'] as String? ?? '';
       final incidentCenter = incidentCentersById[incidentId];
