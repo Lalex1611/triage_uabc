@@ -100,6 +100,8 @@ class ParamedicoMapController extends ChangeNotifier {
   bool _mapReady = false;
   VoidCallback? _pendingWhenMapReady;
   int _focusGeneration = 0;
+  // Solo la última petición de ruta se pinta; soltar la selección las anula
+  int _routeGeneration = 0;
   // Solo cuenta la última elección de filtro o búsqueda: una respuesta lenta
   // (GPS, geocodificador) no pisa lo que el usuario eligió después
   int _filterGeneration = 0;
@@ -665,6 +667,8 @@ class ParamedicoMapController extends ChangeNotifier {
   void clearSelection() {
     if (selectedIncidentId == null) return;
     _focusGeneration++;
+    _routeGeneration++;
+    routing = false;
     _stopPositionStream();
     selectedIncidentId = null;
     forceShowPatientsIncidentId = null;
@@ -751,6 +755,11 @@ class ParamedicoMapController extends ChangeNotifier {
     BuildContext? context,
   }) async {
     if (inc.latitude == null || inc.longitude == null) return;
+    final generation = ++_routeGeneration;
+    // Una respuesta tardía no pinta la ruta ni mueve la cámara si ya se pidió
+    // otra o se soltó este incidente
+    bool superseded() =>
+        generation != _routeGeneration || selectedIncidentId != inc.id;
     var from = userPosition;
     if (from == null) {
       final pos = await IncidentLocationService.getCurrentPosition();
@@ -760,6 +769,7 @@ class ParamedicoMapController extends ChangeNotifier {
         notifyListeners();
       }
     }
+    if (superseded()) return;
     if (from == null) {
       if (context != null && context.mounted) {
         showAppSnackBar(
@@ -781,6 +791,7 @@ class ParamedicoMapController extends ChangeNotifier {
       toLat: inc.latitude!,
       toLng: inc.longitude!,
     );
+    if (superseded()) return;
 
     routing = false;
     fullRoutePoints = points;
