@@ -18,4 +18,8 @@ class IncidentForCards {
     required this.totalVictims,
     required this.isMine,
   });
+
+  /// Aún no hay dirección en los datos: se muestran las coordenadas
+  String get coordinatesLabel =>
+      '${latitude.toStringAsFixed(4)}, ${longitude.toStringAsFixed(4)}';
 }

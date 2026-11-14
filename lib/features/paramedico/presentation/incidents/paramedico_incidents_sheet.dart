@@ -8,7 +8,6 @@ import 'package:sistema_triage/core/theme/triage_tokens.dart';
 import 'package:sistema_triage/core/util/time_ago.dart';
 import 'package:sistema_triage/features/paramedico/data/repositories/paramedico_incidents_repository.dart';
 import 'package:sistema_triage/features/paramedico/domain/constants/incident_sorting_options.dart';
-import 'package:sistema_triage/features/paramedico/domain/entities/home/incident_for_cards.dart';
 import 'package:sistema_triage/features/paramedico/domain/services/incident_list_query.dart';
 import 'package:sistema_triage/features/paramedico/presentation/create_incident/create_incident_sheet.dart';
 import 'package:sistema_triage/features/paramedico/presentation/incidents/paramedico_incidents_controller.dart';
@@ -276,7 +275,7 @@ class _IncidentsSheetBodyState extends State<_IncidentsSheetBody> {
                   folio: card.id,
                   timeAgo: timeAgo(card.dateTime),
                   title: card.name_card,
-                  location: _coordinates(card),
+                  location: card.coordinatesLabel,
                   counts: {
                     TriageLevel.red: card.red,
                     TriageLevel.yellow: card.yellow,
@@ -291,10 +290,6 @@ class _IncidentsSheetBodyState extends State<_IncidentsSheetBody> {
             ),
     );
   }
-
-  // Aún no hay dirección en los datos: se muestran las coordenadas
-  static String _coordinates(IncidentForCards card) =>
-      '${card.latitude.toStringAsFixed(4)}, ${card.longitude.toStringAsFixed(4)}';
 }
 
 /// Fila de opción de las hojas de ordenar y filtrar
