@@ -18,7 +18,9 @@ class ParamedicoIncidentsStore extends ChangeNotifier {
 
   static final instance = ParamedicoIncidentsStore();
 
-  /// Agrupa ráfagas de cambios (p. ej. un triage de varios pacientes) en una carga
+  /// Agrupa ráfagas de cambios (p. ej. un triage de varios pacientes) en una
+  /// carga. Cuenta desde el primer cambio, no desde el último: con cambios
+  /// continuos la recarga no se aplaza sin fin
   static const changeDebounce = Duration(milliseconds: 500);
 
   final ParamedicoIncidentsRepository _repo;
@@ -36,6 +38,8 @@ class ParamedicoIncidentsStore extends ChangeNotifier {
 
   Future<void> Function()? _unwatch;
   bool _listening = false;
+  // Cambia en cada desuscripción: lo que pidió una sesión anterior no se publica
+  int _generation = 0;
   Timer? _debounce;
   Future<void>? _running;
   Future<void>? _queued;
@@ -69,15 +73,12 @@ class ParamedicoIncidentsStore extends ChangeNotifier {
   }
 
   void _watch() {
-    var subscribedBefore = false;
     try {
       _unwatch = _repo.watchIncidentsAndPatients(
         onChange: _scheduleRefresh,
-        // La primera vez ya se está cargando; al reconectar sí hace falta
-        onSubscribed: () {
-          if (subscribedBefore) _scheduleRefresh();
-          subscribedBefore = true;
-        },
+        // También la primera vez: lo que cambió entre la carga inicial y la
+        // suscripción no llegó como aviso. Al reconectar, igual
+        onSubscribed: _scheduleRefresh,
       );
     } catch (e) {
       // Sin Supabase o sin conexión: los datos llegan igual con cada recarga
@@ -86,13 +87,17 @@ class ParamedicoIncidentsStore extends ChangeNotifier {
   }
 
   void _scheduleRefresh() {
-    _debounce?.cancel();
-    _debounce = Timer(changeDebounce, () => unawaited(refresh()));
+    _debounce ??= Timer(changeDebounce, () {
+      _debounce = null;
+      unawaited(refresh());
+    });
   }
 
   void _stop() {
     _listening = false;
+    _generation++;
     _debounce?.cancel();
+    _debounce = null;
     final unwatch = _unwatch;
     _unwatch = null;
     if (unwatch != null) unawaited(unwatch());
@@ -105,6 +110,10 @@ class ParamedicoIncidentsStore extends ChangeNotifier {
   }
 
   Future<void> _load() async {
+    final generation = _generation;
+    // Si se desuscribió mientras cargaba (p. ej. cerró sesión y volvió a
+    // entrar), el resultado ya no corresponde: no se guarda
+    bool stale() => generation != _generation;
     try {
       final list = await _repo.listOpenIncidents();
       final centers = <String, LatLng>{
@@ -116,8 +125,7 @@ class ParamedicoIncidentsStore extends ChangeNotifier {
         list.map((e) => e.id),
         incidentCentersById: centers,
       );
-      // Si nadie escucha ya, no se guarda nada (se olvidó al desuscribirse)
-      if (!_listening) return;
+      if (stale()) return;
       final grouped = <String, List<MapPatientPin>>{};
       for (final pin in patients.pins) {
         grouped.putIfAbsent(pin.incidentId, () => []).add(pin);
@@ -135,7 +143,7 @@ class ParamedicoIncidentsStore extends ChangeNotifier {
       loaded = true;
       error = null;
     } catch (e) {
-      if (!_listening) return;
+      if (stale()) return;
       if (!loaded) error = e.toString();
     }
     notifyListeners();

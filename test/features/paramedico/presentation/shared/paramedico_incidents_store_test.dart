@@ -97,17 +97,53 @@ void main() {
     expect(_ids(store), ['a']);
   });
 
-  testWidgets('al reconectar recarga; la primera suscripción no', (
+  testWidgets('recarga al activarse la suscripción y al reconectar', (
     tester,
   ) async {
     store.addListener(() {});
     await tester.pump();
-    repo.onSubscribed!();
-    await tester.pump(ParamedicoIncidentsStore.changeDebounce * 2);
-    expect(repo.loads, 1);
+    // Lo que cambió entre la carga inicial y la suscripción no avisó
     repo.onSubscribed!();
     await tester.pump(ParamedicoIncidentsStore.changeDebounce * 2);
     expect(repo.loads, 2);
+    repo.onSubscribed!();
+    await tester.pump(ParamedicoIncidentsStore.changeDebounce * 2);
+    expect(repo.loads, 3);
+  });
+
+  testWidgets('con cambios continuos la recarga no se aplaza sin fin', (
+    tester,
+  ) async {
+    store.addListener(() {});
+    await tester.pump();
+    // Un cambio cada tercio de la espera, durante el doble de la espera
+    for (var i = 0; i < 6; i++) {
+      repo.onChange!();
+      await tester.pump(ParamedicoIncidentsStore.changeDebounce ~/ 3);
+    }
+    expect(repo.loads, greaterThanOrEqualTo(2));
+    await tester.pump(ParamedicoIncidentsStore.changeDebounce);
+  });
+
+  testWidgets('lo que cargaba una sesión anterior no se publica en la nueva', (
+    tester,
+  ) async {
+    final gate = Completer<void>();
+    repo.gate = gate;
+    void previous() {}
+    store.addListener(previous); // Lee a y b y se queda esperando
+    store.removeListener(previous); // Cierra sesión
+    repo.gate = null;
+    repo.incidents = [_incident('c')];
+
+    final seen = <List<String>>[];
+    store.addListener(() => seen.add(_ids(store))); // Nueva sesión
+    gate.complete();
+    await tester.pump();
+    await tester.pump();
+
+    expect(seen, isNot(contains(['a', 'b'])));
+    expect(_ids(store), ['c']);
   });
 
   testWidgets('pedir recarga durante otra espera a una carga nueva', (
