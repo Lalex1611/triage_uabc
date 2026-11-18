@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:sistema_triage/features/medico/domain/constants/medico_triage_level.dart';
 import 'package:sistema_triage/features/medico/domain/entities/patient_review/medico_incoming_review.dart';
 import 'package:sistema_triage/features/medico/domain/entities/room_patient/medico_attention_note.dart';
+import 'package:sistema_triage/features/medico/domain/entities/room_patient/medico_discharge_info.dart';
 import 'package:sistema_triage/features/medico/presentation/patient_review/medico_incoming_review_format.dart';
 import 'package:sistema_triage/features/medico/presentation/patient_review/widgets/medico_review_card_widget.dart';
 import 'package:sistema_triage/features/medico/presentation/patient_review/widgets/medico_review_header_widget.dart';
@@ -27,6 +28,7 @@ class MedicoRoomPatientPage extends StatelessWidget {
     required this.photos,
     required this.history,
     this.notes = const [],
+    this.discharge,
     required this.onBackTap,
     required this.onEditPatientTap,
     required this.onShowQrTap,
@@ -48,6 +50,9 @@ class MedicoRoomPatientPage extends StatelessWidget {
   final List<String> photos;
   final List<MedicoRoomHistoryItem> history;
   final List<MedicoAttentionNote> notes;
+
+  /// Alta registrada (solo pacientes dados de alta)
+  final MedicoDischargeInfo? discharge;
 
   final VoidCallback onBackTap;
   final VoidCallback onEditPatientTap;
@@ -93,6 +98,47 @@ class MedicoRoomPatientPage extends StatelessWidget {
                 : const Color(0xFF1A1A1A),
           ),
         ),
+      ),
+    );
+  }
+
+  /// Tarjeta "Alta médica" del paciente dado de alta: destino, nota y quién
+  Widget _dischargeCard(MedicoDischargeInfo info, DateTime now) {
+    final rows = <(String, String)>[
+      ('Destino', info.destination?.title ?? '—'),
+      if (info.dischargedByName != null)
+        ('Dio el alta', info.dischargedByName!),
+      if (info.createdAt != null)
+        ('Fecha', MedicoRoomFormat.historyTime(info.createdAt!, now)),
+    ];
+    return MedicoReviewCard(
+      title: 'Alta médica',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          MedicoReviewRows(rows: rows),
+          if (info.note != null) ...[
+            const Divider(height: 1, color: Color(0xFFEDF1F4)),
+            const SizedBox(height: 12),
+            const Text(
+              'Nota de alta',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF5C6670),
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              info.note!,
+              style: const TextStyle(
+                fontSize: 14,
+                height: 1.4,
+                color: Color(0xFF1A1A1A),
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }
@@ -185,6 +231,10 @@ class MedicoRoomPatientPage extends StatelessWidget {
                     now: now ?? DateTime.now(),
                   ),
                 ),
+                if (discharged && discharge != null) ...[
+                  const SizedBox(height: 16),
+                  _dischargeCard(discharge!, now ?? DateTime.now()),
+                ],
                 const SizedBox(height: 16),
                 MedicoReviewCard(
                   title: 'Origen y datos',
