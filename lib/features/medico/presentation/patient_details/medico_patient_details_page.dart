@@ -31,11 +31,10 @@ class MedicoPatientDetailsPage extends StatelessWidget {
         ),
       ),
       floatingActionButton: floatingActionButton,
-      floatingActionButtonLocation:
-          floatingActionButton != null
-              ? (floatingActionButtonLocation ??
-                  FloatingActionButtonLocation.endFloat)
-              : null,
+      floatingActionButtonLocation: floatingActionButton != null
+          ? (floatingActionButtonLocation ??
+                FloatingActionButtonLocation.endFloat)
+          : null,
       bottomNavigationBar: bottomActions,
     );
   }
