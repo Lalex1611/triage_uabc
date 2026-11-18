@@ -8,10 +8,7 @@ import 'package:sistema_triage/features/medico/domain/entities/patient_details/m
 import 'package:sistema_triage/features/medico/presentation/patient_details/widgets/medico_details_app_bar_widget.dart';
 
 void main() {
-  runApp(const MaterialApp(
-    debugShowCheckedModeBanner: false,
-    home: _Demo(),
-  ));
+  runApp(const MaterialApp(debugShowCheckedModeBanner: false, home: _Demo()));
 }
 
 class _Demo extends StatelessWidget {

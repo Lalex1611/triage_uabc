@@ -70,9 +70,7 @@ class _Sandbox extends StatelessWidget {
     ];
 
     return MedicoTriageHistoryWidget(
-      data: MedicoTriageHistoryData(
-        entries: sampleEntries,
-      ),
+      data: MedicoTriageHistoryData(entries: sampleEntries),
     );
   }
 }

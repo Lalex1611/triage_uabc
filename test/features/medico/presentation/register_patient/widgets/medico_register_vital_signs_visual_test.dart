@@ -8,10 +8,7 @@ import 'package:sistema_triage/features/medico/domain/entities/register_patient/
 import 'package:sistema_triage/features/medico/presentation/register_patient/widgets/medico_register_vital_signs_widget.dart';
 
 void main() {
-  runApp(const MaterialApp(
-    debugShowCheckedModeBanner: false,
-    home: _Demo(),
-  ));
+  runApp(const MaterialApp(debugShowCheckedModeBanner: false, home: _Demo()));
 }
 
 class _Demo extends StatelessWidget {
