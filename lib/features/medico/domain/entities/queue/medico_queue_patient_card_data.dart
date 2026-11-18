@@ -1,25 +1,26 @@
 import 'package:flutter/foundation.dart';
-import 'package:sistema_triage/features/medico/domain/constants/medico_triage_category.dart';
+import 'package:flutter/painting.dart';
+import 'package:sistema_triage/features/medico/domain/constants/medico_queue_patient_status.dart';
 
+/// Datos de una tarjeta de paciente en la Sala (mockup 05)
 @immutable
 class MedicoQueuePatientCardData {
-  final String patientId;
-  final int level;
-  final MedicoTriageCategory category;
-  final String patientLine;
-  final String ingressLabel;
-  final String registrationDateTime;
-  final VoidCallback onCardTap;
-  final VoidCallback onCallTap;
+  /// Nivel de triage hospitalario (1 = rojo … 5 = azul); null si no aplica
+  final int? level;
+  final Color levelColor;
+  final String name;
+  final MedicoQueuePatientStatus status;
+
+  /// p. ej. «Hace 4 min · del incidente INC-729»
+  final String subtitle;
+  final VoidCallback? onTap;
 
   const MedicoQueuePatientCardData({
-    required this.patientId,
     required this.level,
-    required this.category,
-    required this.patientLine,
-    required this.ingressLabel,
-    required this.registrationDateTime,
-    required this.onCardTap,
-    required this.onCallTap,
+    required this.levelColor,
+    required this.name,
+    required this.status,
+    required this.subtitle,
+    this.onTap,
   });
 }
