@@ -75,14 +75,21 @@ class MedicoProfileSummary {
     required this.shift,
   });
 
+  /// "Urgencias" / "Consulta regular" según `hospitals.center_kind`
+  static String? areaLabelOf(String? centerKind) => switch (centerKind) {
+    'urgencias' => 'Urgencias',
+    'consulta_regular' => 'Consulta regular',
+    _ => null,
+  };
+
+  /// "Hospital General de Tijuana · Urgencias" (encabezados del médico)
+  static String hospitalLabel(String name, String? areaLabel) =>
+      [name, ?areaLabel].join(' · ');
+
   factory MedicoProfileSummary.fromJson(Map<String, dynamic> j) {
     final h = Map<String, dynamic>.from(j['hospital'] as Map? ?? const {});
     final s = Map<String, dynamic>.from(j['shift'] as Map? ?? const {});
-    final area = switch (h['center_kind'] as String?) {
-      'urgencias' => 'Urgencias',
-      'consulta_regular' => 'Consulta regular',
-      _ => null,
-    };
+    final area = areaLabelOf(h['center_kind'] as String?);
     return MedicoProfileSummary(
       hospitalName: (h['name'] as String?)?.trim().isNotEmpty == true
           ? h['name'] as String
