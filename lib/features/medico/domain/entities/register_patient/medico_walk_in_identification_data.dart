@@ -22,6 +22,12 @@ class MedicoWalkInIdentificationData {
   final MedicoWalkInInsurance? insurance;
   final ValueChanged<MedicoWalkInInsurance> onInsuranceChanged;
 
+  /// Institución del seguro (solo se muestra con "Sí"); "Otra" usa
+  /// [otherInstitutionController] para escribir el nombre
+  final String? institution;
+  final ValueChanged<String?> onInstitutionChanged;
+  final TextEditingController otherInstitutionController;
+
   const MedicoWalkInIdentificationData({
     required this.photoPath,
     required this.onAddPhotoTap,
@@ -37,5 +43,8 @@ class MedicoWalkInIdentificationData {
     required this.onBloodTypeChanged,
     required this.insurance,
     required this.onInsuranceChanged,
+    required this.institution,
+    required this.onInstitutionChanged,
+    required this.otherInstitutionController,
   });
 }
