@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:sistema_triage/core/constants/app_colors.dart';
 import 'package:sistema_triage/core/theme/app_theme.dart';
 import 'package:sistema_triage/features/medico/domain/constants/medico_queue_filter.dart';
 import 'package:sistema_triage/features/medico/domain/entities/queue/medico_queue_filter_chips_data.dart';
+import 'package:sistema_triage/shared/widgets/triage_pressable_widget.dart';
 
+/// Chips de la Sala (mockup 05): Todos / En espera / Recibidos / Dados de alta
 class MedicoQueueFilterChipsWidget extends StatelessWidget {
   final MedicoQueueFilterChipsData data;
 
@@ -13,40 +14,43 @@ class MedicoQueueFilterChipsWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Row(children: MedicoQueueFilter.values.map(_buildChip).toList()),
+      physics: const BouncingScrollPhysics(),
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Row(
+        children: [
+          for (final filter in MedicoQueueFilter.values)
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: _buildChip(filter),
+            ),
+        ],
+      ),
     );
   }
 
   Widget _buildChip(MedicoQueueFilter filter) {
-    final bool isSelected = data.selectedFilter == filter;
+    final isSelected = data.selectedFilter == filter;
 
-    Color background = Colors.white;
-    Color textColor = AppColors.primaryMedico;
-    Color borderColor = AppColors.primaryMedico;
-    if (isSelected) {
-      background = AppColors.primaryMedico;
-      textColor = Colors.white;
-    }
-
-    return Padding(
-      padding: const EdgeInsets.only(right: 8),
-      child: GestureDetector(
-        onTap: () => data.onFilterSelected(filter),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 180),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-          decoration: BoxDecoration(
-            color: background,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: borderColor, width: 1),
+    return TriagePressable(
+      onTap: () => data.onFilterSelected(filter),
+      builder: (context, pressed) => Container(
+        height: 32,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+        decoration: BoxDecoration(
+          color: isSelected ? Colors.black : Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isSelected ? Colors.black : const Color(0xFFE5E5EA),
           ),
-          child: Text(
-            filter.label,
-            style: AppTextStyles.ESC_Regular_bodyMedium.copyWith(
-              color: textColor,
-              fontSize: 12,
-            ),
+          boxShadow: triagePressedShadow(pressed: pressed),
+        ),
+        alignment: Alignment.center,
+        child: Text(
+          filter.label,
+          style: AppTextStyles.ESC_Regular_bodyMedium.copyWith(
+            color: isSelected ? Colors.white : Colors.black87,
+            fontSize: 13,
+            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
           ),
         ),
       ),

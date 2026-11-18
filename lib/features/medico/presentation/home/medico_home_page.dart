@@ -14,6 +14,9 @@ import 'package:sistema_triage/features/medico/presentation/home/widgets/medico_
 class MedicoHomePage extends StatelessWidget {
   final Widget walkInRegisterTab;
 
+  /// Contenido de la pestaña Sala (navIndex 1, mockup 05) con encabezado propio
+  final Widget? salaTab;
+
   const MedicoHomePage({
     super.key,
     required this.navIndex,
@@ -31,6 +34,7 @@ class MedicoHomePage extends StatelessWidget {
     required this.contentSlivers,
     this.onProfileTap,
     required this.walkInRegisterTab,
+    this.salaTab,
     this.hasUnreadNotifications = false,
     this.onNotificationTap,
   });
@@ -63,6 +67,18 @@ class MedicoHomePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (navIndex == 1 && salaTab != null) {
+      return Scaffold(
+        backgroundColor: const Color(0xFFF5F5F7),
+        resizeToAvoidBottomInset: false,
+        body: salaTab,
+        bottomNavigationBar: MedicoNavbar(
+          currentIndex: navIndex,
+          onTap: onNavTap,
+        ),
+      );
+    }
+
     if (navIndex == 2) {
       return Scaffold(
         backgroundColor: Colors.white,

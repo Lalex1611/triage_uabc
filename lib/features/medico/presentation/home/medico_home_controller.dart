@@ -5,6 +5,8 @@ import 'package:sistema_triage/core/config/supabase_env.dart';
 import 'package:sistema_triage/core/session/auth_gate.dart';
 import 'package:sistema_triage/features/medico/data/repositories/patients_repository.dart';
 import 'package:sistema_triage/features/medico/domain/constants/medico_patient_filter.dart';
+import 'package:sistema_triage/features/medico/domain/constants/medico_queue_filter.dart';
+import 'package:sistema_triage/features/medico/domain/constants/medico_queue_patient_status.dart';
 import 'package:sistema_triage/features/medico/domain/entities/home/medico_notification_item.dart';
 import 'package:sistema_triage/features/medico/domain/entities/home/medico_patient_card_data.dart';
 import 'package:sistema_triage/features/medico/domain/entities/home/medico_user_stats.dart';
@@ -17,11 +19,22 @@ class MedicoHomeController extends ChangeNotifier {
   MedicoHomeController({
     PatientsRepository? repository,
     TextEditingController? searchController,
+    TextEditingController? salaSearchController,
   }) : _repo = repository ?? PatientsRepository(),
-       searchController = searchController ?? TextEditingController();
+       searchController = searchController ?? TextEditingController(),
+       salaSearchController = salaSearchController ?? TextEditingController();
 
   final PatientsRepository _repo;
   final TextEditingController searchController;
+
+  /// Búsqueda propia de la pestaña Sala (independiente de Entrantes)
+  final TextEditingController salaSearchController;
+  MedicoQueueFilter salaFilter = MedicoQueueFilter.todos;
+  String salaSearchQuery = '';
+
+  /// Hora en que cada paciente pasó a `recibido` / `alta_medica`
+  Map<String, DateTime> receivedAt = {};
+  Map<String, DateTime> dischargedAt = {};
 
   List<MedicoPatientCardData> patients = [];
   List<MedicoPatientCardData> rejectedPatients = [];
@@ -95,7 +108,7 @@ class MedicoHomeController extends ChangeNotifier {
         .where(
           (p) =>
               p.status == PatientStatus.trasladando ||
-              p.status == PatientStatus.enEspera
+              p.status == PatientStatus.enEspera,
         )
         .length;
     final rojo = list
@@ -231,6 +244,128 @@ class MedicoHomeController extends ChangeNotifier {
     } catch (_) {}
   }
 
+  // ---------------------------------------------------------------------------
+  // Sala (mockup 05)
+  // ---------------------------------------------------------------------------
+
+  /// Estado visible en Sala; null si el paciente no está en sala
+  MedicoQueuePatientStatus? salaStatusOf(MedicoPatientCardData p) {
+    switch (p.status) {
+      case PatientStatus.alta:
+        return MedicoQueuePatientStatus.alta;
+      case PatientStatus.recibido:
+        return p.incidentId == null
+            ? MedicoQueuePatientStatus.enEspera
+            : MedicoQueuePatientStatus.recibido;
+      case PatientStatus.enEspera:
+      case PatientStatus.trasladando:
+        return null;
+    }
+  }
+
+  /// Pacientes en atención (recibidos, sin alta)
+  List<MedicoPatientCardData> salaInCare() =>
+      patients.where((p) => p.status == PatientStatus.recibido).toList();
+
+  /// Conteo de pacientes en atención por color de triage
+  int salaCountFor(TriageCategory category) =>
+      salaInCare().where((p) => p.triageCategory == category).length;
+
+  /// Lista de la Sala según chip + búsqueda.
+  /// En atención: por nivel (más grave primero) y luego por llegada más antigua.
+  /// Dados de alta: alta más reciente primero.
+  List<MedicoPatientCardData> salaPatientsFiltered() {
+    final q = salaSearchQuery.trim().toLowerCase();
+    final list = patients.where((p) {
+      final st = salaStatusOf(p);
+      if (st == null) return false;
+      final matchesChip = switch (salaFilter) {
+        MedicoQueueFilter.todos => st != MedicoQueuePatientStatus.alta,
+        MedicoQueueFilter.enEspera => st == MedicoQueuePatientStatus.enEspera,
+        MedicoQueueFilter.recibidos => st == MedicoQueuePatientStatus.recibido,
+        MedicoQueueFilter.dadosDeAlta => st == MedicoQueuePatientStatus.alta,
+      };
+      if (!matchesChip) return false;
+      if (q.isEmpty) return true;
+      return p.name.toLowerCase().contains(q) || p.id.toLowerCase().contains(q);
+    }).toList();
+
+    if (salaFilter == MedicoQueueFilter.dadosDeAlta) {
+      list.sort((a, b) {
+        final ta = salaDischargedAt(a) ?? DateTime(0);
+        final tb = salaDischargedAt(b) ?? DateTime(0);
+        return tb.compareTo(ta);
+      });
+    } else {
+      list.sort((a, b) {
+        final byLevel = _severityRank(
+          a.triageCategory,
+        ).compareTo(_severityRank(b.triageCategory));
+        if (byLevel != 0) return byLevel;
+        final ta = salaArrivedAt(a) ?? DateTime.now();
+        final tb = salaArrivedAt(b) ?? DateTime.now();
+        return ta.compareTo(tb);
+      });
+    }
+    return list;
+  }
+
+  /// Momento de llegada a sala: recepción del traslado o registro en ventanilla
+  DateTime? salaArrivedAt(MedicoPatientCardData p) =>
+      receivedAt[p.patientRecordId] ?? p.createdAt;
+
+  DateTime? salaDischargedAt(MedicoPatientCardData p) =>
+      dischargedAt[p.patientRecordId];
+
+  static int _severityRank(TriageCategory c) {
+    switch (c) {
+      case TriageCategory.negro:
+        return 0;
+      case TriageCategory.rojo:
+        return 1;
+      case TriageCategory.naranja:
+        return 2;
+      case TriageCategory.amarillo:
+        return 3;
+      case TriageCategory.verde:
+        return 4;
+      case TriageCategory.azul:
+        return 5;
+      case TriageCategory.todos:
+        return 6;
+    }
+  }
+
+  void setSalaFilter(MedicoQueueFilter filter) {
+    salaFilter = filter;
+    notifyListeners();
+  }
+
+  void onSalaSearchChanged(String value) {
+    salaSearchQuery = value;
+    notifyListeners();
+  }
+
+  Future<void> _loadSalaTimestamps() async {
+    final ids = patients
+        .where(
+          (p) =>
+              p.status == PatientStatus.recibido ||
+              p.status == PatientStatus.alta,
+        )
+        .map((p) => p.patientRecordId)
+        .toList();
+    try {
+      final r = await _repo.fetchStatusTimestamps(ids);
+      receivedAt = r.receivedAt;
+      dischargedAt = r.dischargedAt;
+    } catch (_) {
+      // Sin historial: la Sala usa created_at como respaldo
+      receivedAt = {};
+      dischargedAt = {};
+    }
+  }
+
   void setNavIndex(int index) {
     navIndex = index.clamp(0, 3);
     notifyListeners();
@@ -281,6 +416,7 @@ class MedicoHomeController extends ChangeNotifier {
           : list
                 .where((p) => !rejectedIds.contains(p.patientRecordId))
                 .toList();
+      await _loadSalaTimestamps();
       try {
         medicoNotifications = await _repo.fetchMedicoNotifications();
       } catch (_) {
@@ -299,6 +435,7 @@ class MedicoHomeController extends ChangeNotifier {
   void dispose() {
     stopNotificationSubscription();
     searchController.dispose();
+    salaSearchController.dispose();
     super.dispose();
   }
 }
