@@ -36,6 +36,9 @@ class MedicoIncomingReview {
 
   // Datos administrativos (null = no se registró)
   final bool? hasInsurance;
+
+  /// Institución del seguro (IMSS, ISSSTE, ...), si se capturó
+  final String? insuranceInstitution;
   final String? bloodTypeLabel;
   final String? contactPhone;
 
@@ -58,6 +61,7 @@ class MedicoIncomingReview {
     this.injuryLabels = const [],
     this.startTriageModeLabel,
     this.hasInsurance,
+    this.insuranceInstitution,
     this.bloodTypeLabel,
     this.contactPhone,
   });
@@ -66,6 +70,13 @@ class MedicoIncomingReview {
       reportedDescription != null ||
       injuryLabels.isNotEmpty ||
       startTriageModeLabel != null;
+
+  /// "IMSS", "Sí", "No" o null si no se sabe
+  String? get insuranceLabel {
+    if (hasInsurance == null) return null;
+    if (!hasInsurance!) return 'No';
+    return insuranceInstitution ?? 'Sí';
+  }
 
   bool get hasAdministrativeData =>
       hasInsurance != null || bloodTypeLabel != null || contactPhone != null;
@@ -132,6 +143,7 @@ class MedicoIncomingReview {
           ? _startMode(demo['start_triage_mode'])
           : null,
       hasInsurance: insuranceFrom(demo),
+      insuranceInstitution: _text(demo['insurance_institution']),
       bloodTypeLabel: _bloodType(demo['blood_type']),
       contactPhone: _text(demo['emergency_contact']),
     );
