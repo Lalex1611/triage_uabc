@@ -7,7 +7,6 @@ import 'package:sistema_triage/features/medico/domain/entities/patient_details/p
 import 'package:sistema_triage/features/paramedico/domain/constants/patient_status.dart';
 import 'package:sistema_triage/features/paramedico/domain/constants/triage_catalog.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:uuid/uuid.dart';
 
 class PatientsRepository {
   static const _patientCardSelect =
@@ -196,47 +195,38 @@ class PatientsRepository {
   }
 
   /// Registra un ingreso al hospital sin traslado quedando en estado recibido
+  /// Registra a un paciente que llegó por su cuenta (sin traslado) como
+  /// `recibido` en el hospital del médico y genera su código de consulta.
+  /// Todo ocurre en una sola transacción (RPC `medico_register_walk_in_patient`).
   Future<({String patientId, String consultationCode})> registerWalkInPatient({
-    required String hospitalId,
     required String triageColor,
     required String displayName,
     required Map<String, dynamic> demographics,
     Map<String, dynamic>? vitalSigns,
+    String? reasonForVisit,
   }) async {
-    final uidAuth = _c.auth.currentUser?.id;
-    if (uidAuth == null)
+    if (_c.auth.currentUser == null) {
       throw Exception('La sesión no es válida o ha expirado');
-
-    final insertRow = <String, dynamic>{
-      'sync_client_id': const Uuid().v4(),
-      'hospital_id': hospitalId,
-      'triage_color': triageColor,
-      'status': 'recibido',
-      'created_by': uidAuth,
-      'demographics': demographics,
-    };
-    final dn = displayName.trim();
-    if (dn.isNotEmpty) insertRow['display_name'] = dn;
-    if (vitalSigns != null && vitalSigns.isNotEmpty) {
-      insertRow['vital_signs'] = vitalSigns;
     }
 
-    final inserted = await _c
-        .from('patients')
-        .insert(insertRow)
-        .select('id')
-        .single();
+    final result = await _c.rpc(
+      'medico_register_walk_in_patient',
+      params: {
+        'p_display_name': displayName.trim(),
+        'p_triage_color': triageColor,
+        'p_demographics': demographics,
+        'p_vital_signs': (vitalSigns == null || vitalSigns.isEmpty)
+            ? null
+            : vitalSigns,
+        'p_descriptive_notes': reasonForVisit?.trim(),
+      },
+    );
 
-    final patientId = inserted['id'] as String;
-
-    final code =
-        await _c.rpc(
-              'create_consultation_code',
-              params: {'p_patient_id': patientId},
-            )
-            as String;
-
-    return (patientId: patientId, consultationCode: code);
+    final m = Map<String, dynamic>.from(result as Map);
+    return (
+      patientId: m['patient_id'] as String,
+      consultationCode: m['consultation_code'] as String,
+    );
   }
 
   Future<List<MedicoPatientCardData>> fetchRejectedTransfers({
