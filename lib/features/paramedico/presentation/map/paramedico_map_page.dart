@@ -45,6 +45,7 @@ class ParamedicoMapPage extends StatelessWidget {
     this.onPatientPinTap,
     this.onMapReady,
     this.onReturnToPatient,
+    this.panelKey,
   });
 
   /// Buscador de direcciones: [onSearchSubmitted] mueve el mapa al resultado
@@ -93,6 +94,9 @@ class ParamedicoMapPage extends StatelessWidget {
 
   /// Se llegó desde la ficha de un paciente: botón para volver a ella
   final VoidCallback? onReturnToPatient;
+
+  /// Para medir cuánto mapa tapa el panel al encuadrar
+  final GlobalKey? panelKey;
 
   // Marcador de incidente: ancho para "88" con aire; alto = zona táctil
   static const double _incidentMarkerWidth = 88;
@@ -228,7 +232,10 @@ class ParamedicoMapPage extends StatelessWidget {
                 child: _DragToDismiss(
                   key: ValueKey(selectedIncidentId),
                   onDismissed: onClearSelection,
-                  child: _buildIncidentPanel(selected),
+                  child: KeyedSubtree(
+                    key: panelKey,
+                    child: _buildIncidentPanel(selected),
+                  ),
                 ),
               ),
             ),

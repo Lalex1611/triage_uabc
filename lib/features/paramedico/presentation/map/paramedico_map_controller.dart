@@ -477,8 +477,16 @@ class ParamedicoMapController extends ChangeNotifier {
     highlightedPatientId = highlightPatientId;
     returnToPatientId = highlightPatientId;
     notifyListeners();
-    _fitIncidentAndPatients(inc);
+    // Tras dibujarse el panel, para saber cuánto mapa tapa
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_disposed && selectedIncidentId == inc.id) {
+        _fitIncidentAndPatients(inc);
+      }
+    });
   }
+
+  /// Alto del panel del incidente sobre el mapa; lo da la pantalla
+  double Function() panelHeight = () => 0;
 
   void _fitIncidentAndPatients(ParamedicoIncidentSummary inc) {
     if (inc.latitude == null || inc.longitude == null) return;
@@ -497,10 +505,12 @@ class ParamedicoMapController extends ChangeNotifier {
         mapController.move(center, 16);
         return;
       }
+      // Abajo, además, lo que tapa el panel: el paciente resaltado queda a la vista
       mapController.fitCamera(
         CameraFit.bounds(
           bounds: LatLngBounds.fromPoints(points),
-          padding: const EdgeInsets.all(72),
+          padding:
+              const EdgeInsets.all(72) + EdgeInsets.only(bottom: panelHeight()),
           maxZoom: 17,
         ),
       );
@@ -580,6 +590,8 @@ class ParamedicoMapController extends ChangeNotifier {
 
   /// Tocar un incidente lo elige y muestra su panel (B03), sin mover el mapa
   void onPinTap(ParamedicoIncidentSummary inc) {
+    // Un enfoque pedido por la ruta que aún esperaba datos ya no lo pisa
+    _focusGeneration++;
     if (selectedIncidentId != inc.id) {
       highlightedPatientId = null;
       returnToPatientId = null;

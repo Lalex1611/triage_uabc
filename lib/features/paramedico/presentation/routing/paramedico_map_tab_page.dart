@@ -21,13 +21,14 @@ class _ParamedicoMapTabPageState extends State<ParamedicoMapTabPage> {
   late final ParamedicoMapController _controller;
   bool _loadHandled = false;
   ValueNotifier<bool>? _navbarHidden;
+  final _panelKey = GlobalKey();
 
   @override
   void initState() {
     super.initState();
     _controller = ParamedicoMapController(
       initialFocusIncidentId: widget.initialFocusIncidentId,
-    );
+    )..panelHeight = () => _panelKey.currentContext?.size?.height ?? 0;
     _controller.addListener(_onController);
     _controller.init();
   }
@@ -111,6 +112,7 @@ class _ParamedicoMapTabPageState extends State<ParamedicoMapTabPage> {
         highlightedPatientId: c.highlightedPatientId,
         onPatientPinTap: (pin) => c.openPatientDetail(context, pin.id),
         onMapReady: c.markMapReady,
+        panelKey: _panelKey,
       ),
     );
   }
