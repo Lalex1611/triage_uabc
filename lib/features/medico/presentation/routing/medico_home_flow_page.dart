@@ -100,9 +100,14 @@ class _MedicoHomeFlowPageState extends State<MedicoHomeFlowPage>
       onProfileTap: () => ParamedicoSessionActions.confirmSignOut(context),
       salaTab: _buildSalaTab(context),
       walkInRegisterTab: MedicoWalkInRegisterTab(
+        onClose: ({required bool registered}) {
+          c.setNavIndex(0);
+          if (registered) unawaited(c.load());
+        },
         onSuccessfullyRegistered: (_) async {
-          await _controller.load();
-          _controller.setNavIndex(0);
+          // "Ver en la sala" (mockup 09): el paciente quedó «recibido»
+          await c.load();
+          c.setNavIndex(1);
         },
       ),
     );

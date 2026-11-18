@@ -70,41 +70,12 @@ class MedicoHomePage extends StatelessWidget {
       );
     }
 
+    // Registrar (mockups 07-08): flujo a pantalla completa con su propio
+    // encabezado y botonera; se sale con X / Cancelar.
     if (navIndex == 2) {
       return Scaffold(
-        backgroundColor: Colors.white,
-        resizeToAvoidBottomInset: false,
-        body: SafeArea(
-          bottom: false,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _header(),
-              Padding(
-                padding: EdgeInsets.fromLTRB(
-                  context.horizontalPadding,
-                  10,
-                  context.horizontalPadding,
-                  4,
-                ),
-                child: Text(
-                  'Registro cuando el paciente llega por su cuenta al hospital '
-                  '(no viene en ambulancia ni en traslado). Quedará como '
-                  '«Recibido» en su hospital.',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Colors.black87,
-                    height: 1.4,
-                  ),
-                ),
-              ),
-              Expanded(child: walkInRegisterTab),
-            ],
-          ),
-        ),
-        bottomNavigationBar: MedicoNavbar(
-          currentIndex: navIndex,
-          onTap: onNavTap,
-        ),
+        backgroundColor: const Color(0xFFEEF2F6),
+        body: walkInRegisterTab,
       );
     }
 
