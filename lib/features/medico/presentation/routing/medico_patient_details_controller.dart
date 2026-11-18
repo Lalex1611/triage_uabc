@@ -560,13 +560,14 @@ class MedicoPatientDetailsController extends ChangeNotifier {
   }
 
   Future<void> onAccept(BuildContext context) async {
-    if (detail == null || actionBusy) return;
+    final review = incomingReview;
+    if (detail == null || review == null || actionBusy) return;
     actionBusy = true;
     notifyListeners();
     try {
       final ok = await MedicoIncomingTransferInteractions.acceptIncoming(
         context: context,
-        patientId: detail!.id,
+        review: review,
         repository: _patientsRepo,
       );
       if (ok && context.mounted) context.pop(true);
@@ -586,6 +587,7 @@ class MedicoPatientDetailsController extends ChangeNotifier {
           await MedicoIncomingTransferInteractions.rejectIncomingTransfer(
             context: context,
             patientId: detail!.id,
+            patientName: incomingReview?.displayName ?? detail!.displayName,
             repository: _patientsRepo,
           );
       if (ok && context.mounted) context.pop(true);
