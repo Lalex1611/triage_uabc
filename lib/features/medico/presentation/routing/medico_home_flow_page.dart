@@ -11,11 +11,11 @@ import 'package:sistema_triage/features/medico/domain/entities/queue/medico_queu
 import 'package:sistema_triage/features/medico/domain/entities/queue/medico_queue_patient_card_data.dart';
 import 'package:sistema_triage/features/medico/presentation/queue/medico_queue_page.dart';
 import 'package:sistema_triage/features/medico/domain/entities/home/medico_patient_card_data.dart';
-import 'package:sistema_triage/features/medico/domain/entities/home/medico_user_stats.dart';
 import 'package:sistema_triage/features/medico/presentation/home/medico_home_controller.dart';
 import 'package:sistema_triage/features/medico/presentation/home/medico_incoming_transfer_interactions.dart';
 import 'package:sistema_triage/features/medico/presentation/home/medico_home_page.dart';
 import 'package:sistema_triage/features/medico/presentation/register_patient/medico_walk_in_register_tab.dart';
+import 'package:sistema_triage/features/medico/presentation/profile/medico_profile_tab.dart';
 import 'package:sistema_triage/features/medico/presentation/home/widgets/medico_patient_card_widget.dart';
 import 'package:sistema_triage/features/medico/presentation/home/widgets/medico_notifications_panel.dart';
 import 'package:sistema_triage/features/medico/presentation/home/widgets/medico_patient_incoming_transfer_shell.dart';
@@ -97,8 +97,15 @@ class _MedicoHomeFlowPageState extends State<MedicoHomeFlowPage>
       contentSlivers: _buildContentSlivers(context),
       hasUnreadNotifications: c.hasUnreadMedicoNotifications,
       onNotificationTap: () => unawaited(_openNotifications(context)),
-      onProfileTap: () => ParamedicoSessionActions.confirmSignOut(context),
+      onProfileTap: () => c.setNavIndex(3),
       salaTab: _buildSalaTab(context),
+      profileTab: MedicoProfileTab(
+        userName: c.statsFor(c.patients).userName,
+        onBack: () => c.setNavIndex(0),
+        onNotificationsTap: () => unawaited(_openNotifications(context)),
+        onSignOut: () =>
+            unawaited(ParamedicoSessionActions.confirmSignOut(context)),
+      ),
       walkInRegisterTab: MedicoWalkInRegisterTab(
         onClose: ({required bool registered}) {
           c.setNavIndex(0);
@@ -116,20 +123,6 @@ class _MedicoHomeFlowPageState extends State<MedicoHomeFlowPage>
   List<Widget> _buildContentSlivers(BuildContext context) {
     final c = _controller;
     if (c.loading) return const [];
-
-    if (c.navIndex == 3) {
-      return [
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: _MedicoProfileCard(
-              name: c.statsFor(c.patients).userName,
-              stats: c.statsFor(c.patients),
-            ),
-          ),
-        ),
-      ];
-    }
 
     if (c.navIndex == 0) {
       final incoming = c.incomingPatientsFiltered();
@@ -380,89 +373,6 @@ class _MedicoHomeFlowPageState extends State<MedicoHomeFlowPage>
       onAccept: () => unawaited(accept()),
       onReject: () => unawaited(reject()),
       onTap: open,
-    );
-  }
-}
-
-class _MedicoProfileCard extends StatelessWidget {
-  const _MedicoProfileCard({required this.name, required this.stats});
-
-  final String name;
-  final MedicoUserStats stats;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1C69AA),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const CircleAvatar(
-                backgroundColor: Colors.white24,
-                child: Icon(Icons.person, color: Colors.white),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'MÉDICO RECEPTOR',
-                      style: const TextStyle(
-                        color: Colors.white70,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    Text(
-                      name,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const Text(
-                      'Hospital General de Tijuana · Urgencias',
-                      style: TextStyle(color: Colors.white70, fontSize: 12),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          _row('Pacientes recibidos', '${stats.totalActive}'),
-          _row('En camino', '${stats.enCaminoCount}'),
-          _row('Críticos (rojo)', '${stats.rojoCriticoCount}'),
-          _row('En sala', '${stats.enColaCount}'),
-        ],
-      ),
-    );
-  }
-
-  Widget _row(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(label, style: const TextStyle(color: Colors.white)),
-          Text(
-            value,
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ],
-      ),
     );
   }
 }
