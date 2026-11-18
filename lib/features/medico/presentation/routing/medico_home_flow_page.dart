@@ -17,7 +17,7 @@ import 'package:sistema_triage/features/medico/presentation/home/medico_home_pag
 import 'package:sistema_triage/features/medico/presentation/register_patient/medico_walk_in_register_tab.dart';
 import 'package:sistema_triage/features/medico/presentation/profile/medico_profile_tab.dart';
 import 'package:sistema_triage/features/medico/presentation/home/widgets/medico_patient_card_widget.dart';
-import 'package:sistema_triage/features/medico/presentation/home/widgets/medico_notifications_panel.dart';
+import 'package:sistema_triage/features/medico/presentation/notifications/medico_notifications_page.dart';
 import 'package:sistema_triage/features/medico/presentation/home/widgets/medico_patient_incoming_transfer_shell.dart';
 import 'package:sistema_triage/features/paramedico/domain/constants/patient_status.dart';
 import 'package:sistema_triage/features/paramedico/domain/constants/triage_catalog.dart';
@@ -277,36 +277,31 @@ class _MedicoHomeFlowPageState extends State<MedicoHomeFlowPage>
     return days == 1 ? 'Hace 1 día' : 'Hace $days días';
   }
 
+  /// Notificaciones del médico (mockup 12), a pantalla completa. Se
+  /// actualizan solas mientras están abiertas (el controlador las recarga).
   Future<void> _openNotifications(BuildContext context) async {
     final c = _controller;
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (sheetCtx) {
-        return ListenableBuilder(
+    unawaited(c.reloadNotificationsOnly());
+    await Navigator.of(context, rootNavigator: true).push<void>(
+      MaterialPageRoute(
+        builder: (pageCtx) => ListenableBuilder(
           listenable: c,
-          builder: (context, _) {
-            return Padding(
-              padding: EdgeInsets.only(top: MediaQuery.paddingOf(context).top),
-              child: MedicoNotificationsPanel(
-                items: List<MedicoNotificationItem>.of(c.medicoNotifications),
-                onItemTap: (item) async {
-                  if (item.isUnread) {
-                    await c.markMedicoNotificationRead(item.id);
-                  }
-                  final pid = item.patientId;
-                  if (pid != null && pid.isNotEmpty && context.mounted) {
-                    Navigator.of(sheetCtx).pop();
-                    final r = await context.push<bool>('/medico/paciente/$pid');
-                    if (context.mounted && r == true) await c.load();
-                  }
-                },
-              ),
-            );
-          },
-        );
-      },
+          builder: (pageCtx, _) => MedicoNotificationsPage(
+            items: List<MedicoNotificationItem>.of(c.medicoNotifications),
+            onBackTap: () => Navigator.of(pageCtx).pop(),
+            onRefresh: c.reloadNotificationsOnly,
+            onItemTap: (item) async {
+              if (item.isUnread) {
+                await c.markMedicoNotificationRead(item.id);
+              }
+              final pid = item.patientId;
+              if (pid == null || pid.isEmpty || !pageCtx.mounted) return;
+              final r = await pageCtx.push<bool>('/medico/paciente/$pid');
+              if (r == true && mounted) await c.load();
+            },
+          ),
+        ),
+      ),
     );
     if (mounted) await c.reloadNotificationsOnly();
   }
