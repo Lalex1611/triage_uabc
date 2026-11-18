@@ -1,5 +1,6 @@
 // Sandbox de las pantallas de traslado del médico: confirmar recepción
-// (mockup 03) y rechazar traslado (mockup 04). Sin backend.
+// (mockup 03), paciente aceptado (mockup 11) y rechazar traslado (mockup 04).
+// Sin backend.
 //
 // Run:
 // flutter run -t test/features/medico/presentation/transfer/medico_transfer_visual_test.dart
@@ -8,6 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:sistema_triage/features/medico/domain/entities/patient_review/medico_incoming_review.dart';
 import 'package:sistema_triage/features/medico/presentation/transfer/medico_accept_transfer_page.dart';
 import 'package:sistema_triage/features/medico/presentation/transfer/medico_reject_transfer_page.dart';
+import 'package:sistema_triage/features/medico/presentation/transfer/medico_transfer_accepted_page.dart';
 import 'package:sistema_triage/features/paramedico/domain/constants/triage_catalog.dart';
 
 void main() {
@@ -54,6 +56,17 @@ class _Sandbox extends StatelessWidget {
                 ),
               ),
               child: const Text('03 · Confirmar recepción'),
+            ),
+            const SizedBox(height: 12),
+            FilledButton(
+              onPressed: () => _open(
+                context,
+                MedicoTransferAcceptedPage(
+                  review: _review,
+                  consultationCode: 'ABK37X',
+                ),
+              ),
+              child: const Text('11 · Paciente aceptado'),
             ),
             const SizedBox(height: 12),
             FilledButton(

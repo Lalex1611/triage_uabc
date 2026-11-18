@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 
 /// Botonera fija inferior de las confirmaciones de traslado (mockups 03 y 04):
-/// botón principal (azul para recibir, rojo para rechazar) y "Cancelar"
+/// botón principal (azul para recibir, rojo para rechazar) y uno de texto
+/// abajo ("Cancelar" por defecto)
 class MedicoTransferBottomBar extends StatelessWidget {
   const MedicoTransferBottomBar({
     super.key,
@@ -10,6 +11,7 @@ class MedicoTransferBottomBar extends StatelessWidget {
     required this.onPrimaryTap,
     required this.onCancelTap,
     this.busy = false,
+    this.cancelLabel = 'Cancelar',
   });
 
   final String primaryLabel;
@@ -17,6 +19,9 @@ class MedicoTransferBottomBar extends StatelessWidget {
   final VoidCallback onPrimaryTap;
   final VoidCallback onCancelTap;
   final bool busy;
+
+  /// Texto del botón de abajo ("Cancelar", "Volver a entrantes", ...)
+  final String cancelLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -72,7 +77,7 @@ class MedicoTransferBottomBar extends StatelessWidget {
               foregroundColor: const Color(0xFF1A1A1A),
               textStyle: const TextStyle(fontSize: 14),
             ),
-            child: const Text('Cancelar'),
+            child: Text(cancelLabel),
           ),
         ],
       ),
