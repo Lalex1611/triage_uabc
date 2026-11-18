@@ -8,6 +8,7 @@ import 'package:sistema_triage/core/ui/app_snackbar.dart';
 import 'package:sistema_triage/features/medico/data/repositories/patients_repository.dart';
 import 'package:sistema_triage/features/medico/domain/constants/medico_insurance_option.dart';
 import 'package:sistema_triage/features/medico/domain/constants/medico_patient_gender.dart';
+import 'package:sistema_triage/features/medico/domain/constants/medico_patient_details_result.dart';
 import 'package:sistema_triage/features/medico/domain/constants/medico_patient_status.dart';
 import 'package:sistema_triage/features/medico/domain/constants/medico_triage_category.dart';
 import 'package:sistema_triage/features/medico/domain/entities/patient_details/patient_triage_history_entry.dart';
@@ -754,12 +755,21 @@ class MedicoPatientDetailsController extends ChangeNotifier {
     actionBusy = true;
     notifyListeners();
     try {
-      final ok = await MedicoIncomingTransferInteractions.acceptIncoming(
+      final outcome = await MedicoIncomingTransferInteractions.acceptIncoming(
         context: context,
         review: review,
+        consultationCode: consultationCode,
         repository: _patientsRepo,
       );
-      if (ok && context.mounted) context.pop(true);
+      if (!context.mounted) return;
+      switch (outcome) {
+        case MedicoAcceptOutcome.notAccepted:
+          break;
+        case MedicoAcceptOutcome.accepted:
+          context.pop(true);
+        case MedicoAcceptOutcome.acceptedOpenRoom:
+          context.pop(MedicoPatientDetailsResult.openRoom);
+      }
     } finally {
       actionBusy = false;
       notifyListeners();

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:sistema_triage/features/medico/domain/constants/medico_patient_details_result.dart';
 import 'package:sistema_triage/features/medico/domain/constants/medico_queue_filter.dart';
 import 'package:sistema_triage/features/medico/domain/constants/medico_queue_patient_status.dart';
 import 'package:sistema_triage/features/medico/domain/constants/medico_triage_level.dart';
@@ -296,8 +297,14 @@ class _MedicoHomeFlowPageState extends State<MedicoHomeFlowPage>
               }
               final pid = item.patientId;
               if (pid == null || pid.isEmpty || !pageCtx.mounted) return;
-              final r = await pageCtx.push<bool>('/medico/paciente/$pid');
-              if (r == true && mounted) await c.load();
+              final r = await pageCtx.push<Object?>('/medico/paciente/$pid');
+              if (!mounted) return;
+              if (r == MedicoPatientDetailsResult.openRoom) {
+                // "Ver en la sala": se cierran las notificaciones
+                if (pageCtx.mounted) Navigator.of(pageCtx).pop();
+                c.setNavIndex(1);
+              }
+              if (r != null) await c.load();
             },
           ),
         ),
@@ -329,8 +336,9 @@ class _MedicoHomeFlowPageState extends State<MedicoHomeFlowPage>
   ) async {
     final id = raw.patientRecordId;
     if (id.isEmpty) return;
-    final r = await context.push<bool>('/medico/paciente/$id');
-    if (r == true && context.mounted) await c.load();
+    final r = await context.push<Object?>('/medico/paciente/$id');
+    if (r == MedicoPatientDetailsResult.openRoom) c.setNavIndex(1);
+    if (r != null && context.mounted) await c.load();
   }
 
   MedicoPatientCardData _patientCardPayload(
