@@ -11,6 +11,7 @@ import 'package:sistema_triage/features/medico/domain/constants/medico_patient_g
 import 'package:sistema_triage/features/medico/domain/constants/medico_patient_status.dart';
 import 'package:sistema_triage/features/medico/domain/constants/medico_triage_category.dart';
 import 'package:sistema_triage/features/medico/domain/entities/patient_details/patient_triage_history_entry.dart';
+import 'package:sistema_triage/features/medico/domain/entities/patient_review/medico_incoming_review.dart';
 import 'package:sistema_triage/features/medico/presentation/home/medico_incoming_transfer_interactions.dart';
 import 'package:sistema_triage/features/medico/presentation/home/widgets/medico_patient_alta_medica_confirm_dialog.dart';
 import 'package:sistema_triage/features/paramedico/data/repositories/paramedico_incidents_repository.dart';
@@ -38,6 +39,9 @@ class MedicoPatientDetailsController extends ChangeNotifier {
   ParamedicoPatientDetail? detail;
   String? consultationCode;
   HospitalRow? assignedHospital;
+
+  /// Revisión del paciente en camino (mockup 02); solo si está `trasladando`
+  MedicoIncomingReview? incomingReview;
 
   Map<String, dynamic> vitalSigns = {};
   List<PatientTriageHistoryEntry> triageHistory = [];
@@ -108,6 +112,9 @@ class MedicoPatientDetailsController extends ChangeNotifier {
       final vitals = await _patientsRepo.fetchVitalSigns(patientId);
       final history = await _patientsRepo.fetchTriageHistory(patientId);
       final code = await _detailRepo.getActiveConsultationCode(patientId);
+      incomingReview = d.status == 'trasladando'
+          ? await _patientsRepo.fetchIncomingReview(patientId)
+          : null;
       detail = d;
       consultationCode = code;
       assignedHospital = hosp;

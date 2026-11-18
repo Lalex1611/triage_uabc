@@ -14,6 +14,7 @@ import 'package:sistema_triage/features/medico/domain/entities/register_patient/
 import 'package:sistema_triage/features/medico/domain/entities/register_patient/medico_register_triage_data.dart';
 import 'package:sistema_triage/features/medico/domain/entities/register_patient/medico_register_vital_signs_data.dart';
 import 'package:sistema_triage/features/medico/presentation/patient_details/medico_patient_details_page.dart';
+import 'package:sistema_triage/features/medico/presentation/patient_review/medico_incoming_review_page.dart';
 import 'package:sistema_triage/features/medico/presentation/patient_details/widgets/medico_details_app_bar_widget.dart';
 import 'package:sistema_triage/features/medico/presentation/patient_details/widgets/medico_triage_history_widget.dart';
 import 'package:sistema_triage/features/medico/presentation/register_patient/widgets/medico_register_actions_widget.dart';
@@ -88,6 +89,18 @@ class _MedicoPatientDetailsFlowPageState
             ),
           },
         ),
+      );
+    }
+
+    // Paciente en camino: revisión para aceptar o rechazar (mockup 02)
+    final review = c.incomingReview;
+    if (c.showAcceptReject && review != null) {
+      return MedicoIncomingReviewPage(
+        review: review,
+        busy: c.actionBusy,
+        onBackTap: () => c.onBack(context),
+        onAcceptTap: () => unawaited(c.onAccept(context)),
+        onRejectTap: () => unawaited(c.onRejectFlow(context)),
       );
     }
 
