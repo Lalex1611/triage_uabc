@@ -3,6 +3,7 @@ import 'package:sistema_triage/core/geo/geo_location_parser.dart';
 import 'package:sistema_triage/features/medico/domain/constants/medico_triage_category.dart';
 import 'package:sistema_triage/features/medico/domain/entities/home/medico_notification_item.dart';
 import 'package:sistema_triage/features/medico/domain/entities/home/medico_patient_card_data.dart';
+import 'package:sistema_triage/features/medico/domain/entities/patient_review/medico_incoming_review.dart';
 import 'package:sistema_triage/features/medico/domain/entities/patient_details/patient_triage_history_entry.dart';
 import 'package:sistema_triage/features/paramedico/domain/constants/patient_status.dart';
 import 'package:sistema_triage/features/paramedico/domain/constants/triage_catalog.dart';
@@ -79,6 +80,68 @@ class PatientsRepository {
       target.putIfAbsent(pid, () => at.toLocal());
     }
     return (receivedAt: received, dischargedAt: discharged);
+  }
+
+  static const _incidentPhotosBucket = 'incident_photos';
+
+  /// Datos para revisar a un paciente que viene en camino (mockup 02):
+  /// paciente + incidente + unidad + paramédico, hora de clasificación y
+  /// enlaces temporales de las fotos del incidente.
+  Future<MedicoIncomingReview?> fetchIncomingReview(String patientId) async {
+    final row = await _c
+        .from('patients')
+        .select(
+          'id, display_name, triage_color, status, created_at, incident_id, '
+          'regulation_folio, descriptive_notes, demographics, estimated_arrival_at, '
+          'incidents ( generated_title, emergency_type, photo_local_paths ), '
+          'ambulancias_unidades ( numero_economico ), '
+          'creator:profiles!created_by ( full_name )',
+        )
+        .eq('id', patientId)
+        .eq('is_deleted', false)
+        .maybeSingle();
+    if (row == null) return null;
+
+    // Última vez que se asignó o cambió el color de triage
+    DateTime? classifiedAt;
+    try {
+      final hist = await _c
+          .from('patient_state_history')
+          .select('created_at')
+          .eq('patient_id', patientId)
+          .contains('changed_fields', ['triage_color'])
+          .order('created_at', ascending: false)
+          .limit(1)
+          .maybeSingle();
+      classifiedAt = DateTime.tryParse(
+        hist?['created_at'] as String? ?? '',
+      )?.toLocal();
+    } catch (_) {}
+
+    // Fotos del incidente en Storage (las que empiezan con / son rutas
+    // locales antiguas del teléfono del paramédico y no se pueden mostrar)
+    final photoUrls = <String>[];
+    final incident = row['incidents'];
+    if (incident is Map && incident['photo_local_paths'] is List) {
+      final stored = [
+        for (final p in incident['photo_local_paths'] as List)
+          if (p is String && p.isNotEmpty && !p.startsWith('/')) p,
+      ];
+      if (stored.isNotEmpty) {
+        try {
+          final signed = await _c.storage
+              .from(_incidentPhotosBucket)
+              .createSignedUrls(stored, const Duration(hours: 1).inSeconds);
+          photoUrls.addAll(signed.map((s) => s.signedUrl));
+        } catch (_) {}
+      }
+    }
+
+    return MedicoIncomingReview.fromRow(
+      Map<String, dynamic>.from(row),
+      photoUrls: photoUrls,
+      classifiedAt: classifiedAt,
+    );
   }
 
   Future<void> updateLifecycleStatus({
