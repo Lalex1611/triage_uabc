@@ -39,6 +39,8 @@ class _SandboxState extends State<_Sandbox> {
   MedicoPatientGender? _gender;
   PatientBloodType? _blood;
   MedicoWalkInInsurance? _insurance = MedicoWalkInInsurance.si;
+  String? _institution = 'IMSS';
+  final _otherInstitution = TextEditingController();
   MedicoTriageCategory? _triage = MedicoTriageCategory.naranja;
   final _c = List.generate(14, (_) => TextEditingController());
 
@@ -49,6 +51,7 @@ class _SandboxState extends State<_Sandbox> {
     for (final c in _c) {
       c.dispose();
     }
+    _otherInstitution.dispose();
     super.dispose();
   }
 
@@ -97,6 +100,10 @@ class _SandboxState extends State<_Sandbox> {
                         insurance: _insurance,
                         onInsuranceChanged: (i) =>
                             setState(() => _insurance = i),
+                        institution: _institution,
+                        onInstitutionChanged: (v) =>
+                            setState(() => _institution = v),
+                        otherInstitutionController: _otherInstitution,
                       ),
                     )
                   : MedicoWalkInAssessmentStep(

@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:sistema_triage/features/medico/domain/constants/medico_insurance_institution.dart';
 import 'package:sistema_triage/features/medico/domain/constants/medico_patient_gender.dart';
 import 'package:sistema_triage/features/medico/domain/constants/medico_walk_in_insurance.dart';
 import 'package:sistema_triage/features/medico/domain/entities/register_patient/medico_walk_in_identification_data.dart';
@@ -155,6 +156,26 @@ class MedicoWalkInIdentificationStep extends StatelessWidget {
                   ],
                 ],
               ),
+              if (data.insurance == MedicoWalkInInsurance.si) ...[
+                const SizedBox(height: 16),
+                const MedicoWalkInLabel('Institución'),
+                MedicoWalkInDropdown<String>(
+                  value: data.institution,
+                  items: MedicoInsuranceInstitution.options,
+                  labelOf: (s) => s,
+                  hint: 'Selecciona la institución',
+                  onChanged: data.onInstitutionChanged,
+                ),
+                if (data.institution == MedicoInsuranceInstitution.other) ...[
+                  const SizedBox(height: 10),
+                  MedicoWalkInTextField(
+                    controller: data.otherInstitutionController,
+                    hint: 'Nombre de la institución',
+                    maxLength: 60,
+                    textCapitalization: TextCapitalization.words,
+                  ),
+                ],
+              ],
             ],
           ),
         ),

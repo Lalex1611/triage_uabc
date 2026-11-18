@@ -6,6 +6,7 @@ import 'package:sistema_triage/core/config/supabase_env.dart';
 import 'package:sistema_triage/core/session/auth_gate.dart';
 import 'package:sistema_triage/core/ui/app_snackbar.dart';
 import 'package:sistema_triage/features/medico/data/repositories/patients_repository.dart';
+import 'package:sistema_triage/features/medico/domain/constants/medico_insurance_institution.dart';
 import 'package:sistema_triage/features/medico/domain/constants/medico_patient_gender.dart';
 import 'package:sistema_triage/features/medico/domain/constants/medico_triage_category.dart';
 import 'package:sistema_triage/features/medico/domain/constants/medico_walk_in_insurance.dart';
@@ -14,6 +15,7 @@ import 'package:sistema_triage/features/medico/domain/entities/register_patient/
 import 'package:sistema_triage/features/medico/domain/entities/register_patient/medico_walk_in_header_data.dart';
 import 'package:sistema_triage/features/medico/domain/entities/register_patient/medico_walk_in_identification_data.dart';
 import 'package:sistema_triage/features/medico/domain/entities/register_patient/medico_walk_in_success_data.dart';
+import 'package:sistema_triage/features/medico/domain/services/medico_patient_form_validators.dart';
 import 'package:sistema_triage/features/medico/domain/constants/medico_triage_level.dart';
 import 'package:sistema_triage/features/medico/presentation/register_patient/widgets/medico_walk_in_assessment_step_widget.dart';
 import 'package:sistema_triage/features/medico/presentation/register_patient/widgets/medico_walk_in_bottom_bar_widget.dart';
@@ -71,6 +73,8 @@ class _MedicoWalkInRegisterTabState extends State<MedicoWalkInRegisterTab> {
   MedicoPatientGender? _gender;
   PatientBloodType? _bloodType;
   MedicoWalkInInsurance? _insurance;
+  String? _institution;
+  final _otherInstitution = TextEditingController();
 
   // Paso 2
   MedicoTriageCategory? _triage;
@@ -90,6 +94,7 @@ class _MedicoWalkInRegisterTabState extends State<MedicoWalkInRegisterTab> {
     _birthMonth,
     _birthYear,
     _phone,
+    _otherInstitution,
     _reason,
     _allergies,
     _systolic,
@@ -120,71 +125,18 @@ class _MedicoWalkInRegisterTabState extends State<MedicoWalkInRegisterTab> {
   // Validación y armado del payload
   // ---------------------------------------------------------------------------
 
-  /// Devuelve un mensaje de error o null si la fecha es válida / está vacía.
-  /// La fecha es opcional y puede ir incompleta (p. ej. solo el año), pero lo
-  /// que se escriba debe estar en rango y no puede quedar en el futuro.
-  String? _birthDateError() {
-    final d = _birthDay.text.trim();
-    final m = _birthMonth.text.trim();
-    final y = _birthYear.text.trim();
-    if (d.isEmpty && m.isEmpty && y.isEmpty) return null;
+  String? _birthDateError() => MedicoPatientFormValidators.birthDateError(
+    _birthDay.text,
+    _birthMonth.text,
+    _birthYear.text,
+  );
 
-    final day = int.tryParse(d);
-    final month = int.tryParse(m);
-    final year = int.tryParse(y);
-    final now = DateTime.now();
+  String? _phoneError() => MedicoPatientFormValidators.phoneError(_phone.text);
 
-    if (d.isNotEmpty && (day == null || day < 1 || day > 31)) {
-      return 'El día debe estar entre 1 y 31.';
-    }
-    if (m.isNotEmpty && (month == null || month < 1 || month > 12)) {
-      return 'El mes debe estar entre 1 y 12.';
-    }
-    if (y.isNotEmpty) {
-      if (y.length != 4 || year == null) {
-        return 'Escribe el año con 4 dígitos.';
-      }
-      if (year < 1900 || year > now.year) {
-        return 'El año debe estar entre 1900 y ${now.year}.';
-      }
-    }
-
-    // El día debe existir en ese mes (29 de febrero solo en año bisiesto;
-    // sin año se acepta)
-    if (day != null && month != null) {
-      final refYear = year ?? 2000;
-      final daysInMonth = DateTime(refYear, month + 1, 0).day;
-      if (day > daysInMonth) {
-        return year == null
-            ? 'Ese mes no tiene $day días.'
-            : 'La fecha de nacimiento no existe.';
-      }
-    }
-
-    // No puede ser posterior a hoy
-    if (year != null && year == now.year) {
-      if (month != null && month > now.month) {
-        return 'La fecha de nacimiento no puede ser posterior a hoy.';
-      }
-      if (month != null &&
-          day != null &&
-          DateTime(year, month, day).isAfter(now)) {
-        return 'La fecha de nacimiento no puede ser posterior a hoy.';
-      }
-    }
-    return null;
-  }
-
-  /// Teléfono opcional: 10 dígitos (México / EE. UU.), u 11–12 con la lada
-  /// del país (+1 / +52)
-  String? _phoneError() {
-    final digits = _phone.text.replaceAll(RegExp(r'[^0-9]'), '');
-    if (digits.isEmpty) return null;
-    if (digits.length < 10 || digits.length > 12) {
-      return 'El teléfono debe tener 10 dígitos (o 11–12 con la lada del país).';
-    }
-    return null;
-  }
+  /// Nombre de la institución elegida ("Otra" toma lo escrito)
+  String _institutionText() => _institution == MedicoInsuranceInstitution.other
+      ? _otherInstitution.text.trim()
+      : (_institution ?? '');
 
   Map<String, dynamic> _buildDemographics() {
     final demo = <String, dynamic>{
@@ -206,6 +158,10 @@ class _MedicoWalkInRegisterTabState extends State<MedicoWalkInRegisterTab> {
 
     final insurance = _insurance?.storedValue;
     if (insurance != null) demo['seguro_medico'] = insurance;
+    final institution = _institutionText();
+    if (_insurance == MedicoWalkInInsurance.si && institution.isNotEmpty) {
+      demo['insurance_institution'] = institution;
+    }
 
     final allergies = _allergies.text.trim();
     if (allergies.isNotEmpty) demo['allergies'] = allergies;
@@ -259,6 +215,16 @@ class _MedicoWalkInRegisterTabState extends State<MedicoWalkInRegisterTab> {
     final phoneError = _phoneError();
     if (phoneError != null) {
       showAppSnackBar(context, phoneError, isError: true);
+      return;
+    }
+    if (_insurance == MedicoWalkInInsurance.si &&
+        _institution == MedicoInsuranceInstitution.other &&
+        _otherInstitution.text.trim().isEmpty) {
+      showAppSnackBar(
+        context,
+        'Escribe el nombre de la institución del seguro.',
+        isError: true,
+      );
       return;
     }
     _goToStep(2);
@@ -331,6 +297,7 @@ class _MedicoWalkInRegisterTabState extends State<MedicoWalkInRegisterTab> {
       _gender = null;
       _bloodType = null;
       _insurance = null;
+      _institution = null;
       _triage = null;
     });
     if (_scrollController.hasClients) _scrollController.jumpTo(0);
@@ -542,6 +509,9 @@ class _MedicoWalkInRegisterTabState extends State<MedicoWalkInRegisterTab> {
         onBloodTypeChanged: (b) => setState(() => _bloodType = b),
         insurance: _insurance,
         onInsuranceChanged: (i) => setState(() => _insurance = i),
+        institution: _institution,
+        onInstitutionChanged: (v) => setState(() => _institution = v),
+        otherInstitutionController: _otherInstitution,
       ),
     );
   }
