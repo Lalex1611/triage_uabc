@@ -29,10 +29,9 @@ class MedicoNotificationItem {
       body: row['body'] as String? ?? '',
       kind: row['kind'] as String? ?? 'generic',
       patientId: row['patient_id'] as String?,
-      createdAt:
-          createdRaw != null
-              ? DateTime.tryParse(createdRaw) ?? DateTime.now()
-              : DateTime.now(),
+      createdAt: createdRaw != null
+          ? DateTime.tryParse(createdRaw) ?? DateTime.now()
+          : DateTime.now(),
       readAt: readRaw != null ? DateTime.tryParse(readRaw) : null,
     );
   }
