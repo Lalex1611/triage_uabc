@@ -350,15 +350,6 @@ class _MedicoHomeFlowPageState extends State<MedicoHomeFlowPage>
 
     final id = raw.patientRecordId;
 
-    Future<void> accept() async {
-      if (!mounted || id.isEmpty) return;
-      final ok = await MedicoIncomingTransferInteractions.acceptIncoming(
-        context: ctx,
-        patientId: id,
-      );
-      if (ok && mounted) await c.load();
-    }
-
     Future<void> reject() async {
       if (!mounted || id.isEmpty) return;
       final ok =
@@ -369,8 +360,10 @@ class _MedicoHomeFlowPageState extends State<MedicoHomeFlowPage>
       if (ok && mounted) await c.load();
     }
 
+    // "Revisar y aceptar" abre la revisión del paciente (mockup 02); ahí el
+    // médico confirma la recepción o rechaza el traslado
     return raw.withIncomingTransferActions(
-      onAccept: () => unawaited(accept()),
+      onAccept: open,
       onReject: () => unawaited(reject()),
       onTap: open,
     );
