@@ -17,6 +17,9 @@ class MedicoHomePage extends StatelessWidget {
   /// Contenido de la pestaña Sala (navIndex 1, mockup 05) con encabezado propio
   final Widget? salaTab;
 
+  /// Contenido de la pestaña Perfil (navIndex 3, mockup 13) con encabezado propio
+  final Widget? profileTab;
+
   const MedicoHomePage({
     super.key,
     required this.navIndex,
@@ -35,6 +38,7 @@ class MedicoHomePage extends StatelessWidget {
     this.onProfileTap,
     required this.walkInRegisterTab,
     this.salaTab,
+    this.profileTab,
     this.hasUnreadNotifications = false,
     this.onNotificationTap,
   });
@@ -63,6 +67,18 @@ class MedicoHomePage extends StatelessWidget {
         backgroundColor: const Color(0xFFF5F5F7),
         resizeToAvoidBottomInset: false,
         body: salaTab,
+        bottomNavigationBar: MedicoNavbar(
+          currentIndex: navIndex,
+          onTap: onNavTap,
+        ),
+      );
+    }
+
+    if (navIndex == 3 && profileTab != null) {
+      return Scaffold(
+        backgroundColor: const Color(0xFFEEF2F6),
+        resizeToAvoidBottomInset: false,
+        body: profileTab,
         bottomNavigationBar: MedicoNavbar(
           currentIndex: navIndex,
           onTap: onNavTap,
