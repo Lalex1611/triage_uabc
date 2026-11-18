@@ -83,9 +83,12 @@ class MedicoTransferAcceptedPage extends StatelessWidget {
                   const SizedBox(height: 10),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 8),
+                    // El aviso al paramédico lo genera el backend al pasar a
+                    // "recibido" (migración 20261117170000)
                     child: Text(
-                      '${r.displayName} quedó como recibido y aparece en la '
-                      'sala en cuanto llegue a urgencias.',
+                      '${r.paramedicName ?? 'El paramédico'} ya recibió el '
+                      'aviso. ${r.displayName} aparece en la sala en cuanto '
+                      'llegue a urgencias.',
                       textAlign: TextAlign.center,
                       style: const TextStyle(
                         fontSize: 14,
