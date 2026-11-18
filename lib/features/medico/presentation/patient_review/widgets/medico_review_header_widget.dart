@@ -9,12 +9,16 @@ class MedicoReviewHeader extends StatelessWidget {
     required this.subtitle,
     required this.onBackTap,
     this.leadingIcon = Icons.arrow_back,
+    this.trailing,
   });
 
   final String title;
   final String subtitle;
   final VoidCallback onBackTap;
   final IconData leadingIcon;
+
+  /// Acción a la derecha (p. ej. menú "⋯" de la vista en sala)
+  final Widget? trailing;
 
   @override
   Widget build(BuildContext context) {
@@ -57,6 +61,7 @@ class MedicoReviewHeader extends StatelessWidget {
               ],
             ),
           ),
+          ?trailing,
         ],
       ),
     );
