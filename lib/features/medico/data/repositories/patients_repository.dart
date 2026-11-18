@@ -4,6 +4,7 @@ import 'package:sistema_triage/features/medico/domain/constants/medico_triage_ca
 import 'package:sistema_triage/features/medico/domain/entities/home/medico_notification_item.dart';
 import 'package:sistema_triage/features/medico/domain/entities/home/medico_patient_card_data.dart';
 import 'package:sistema_triage/features/medico/domain/entities/patient_review/medico_incoming_review.dart';
+import 'package:sistema_triage/features/medico/domain/entities/room_patient/medico_attention_note.dart';
 import 'package:sistema_triage/features/medico/domain/entities/patient_details/patient_triage_history_entry.dart';
 import 'package:sistema_triage/features/paramedico/domain/constants/patient_status.dart';
 import 'package:sistema_triage/features/paramedico/domain/constants/triage_catalog.dart';
@@ -142,6 +143,50 @@ class PatientsRepository {
       photoUrls: photoUrls,
       classifiedAt: classifiedAt,
     );
+  }
+
+  /// Guarda los datos editables de un paciente en sala (nombre, datos
+  /// demográficos y signos vitales) en una sola actualización
+  Future<void> updatePatientInfo({
+    required String patientId,
+    required String displayName,
+    required Map<String, dynamic> demographics,
+    required Map<String, dynamic> vitalSigns,
+  }) async {
+    await _c
+        .from('patients')
+        .update({
+          'display_name': displayName.trim(),
+          'demographics': demographics,
+          'vital_signs': vitalSigns.isEmpty ? null : vitalSigns,
+        })
+        .eq('id', patientId);
+  }
+
+  /// Notas de atención del paciente, de la más reciente a la más antigua
+  Future<List<MedicoAttentionNote>> fetchAttentionNotes(
+    String patientId,
+  ) async {
+    final rows = await _c
+        .from('patient_attention_notes')
+        .select('id, body, created_at, author:profiles!author_id ( full_name )')
+        .eq('patient_id', patientId)
+        .order('created_at', ascending: false);
+    return [
+      for (final r in rows as List<dynamic>)
+        MedicoAttentionNote.fromRow(Map<String, dynamic>.from(r as Map)),
+    ];
+  }
+
+  /// Agrega una nota de atención a nombre del médico en sesión
+  Future<void> addAttentionNote({
+    required String patientId,
+    required String body,
+  }) async {
+    await _c.from('patient_attention_notes').insert({
+      'patient_id': patientId,
+      'body': body.trim(),
+    });
   }
 
   Future<void> updateLifecycleStatus({

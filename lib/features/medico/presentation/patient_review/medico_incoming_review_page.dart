@@ -55,8 +55,7 @@ class MedicoIncomingReviewPage extends StatelessWidget {
   List<(String, String)> _administrativeRows() {
     final r = review;
     return [
-      if (r.hasInsurance != null)
-        ('Seguro médico', r.hasInsurance! ? 'Sí' : 'No'),
+      if (r.insuranceLabel != null) ('Seguro médico', r.insuranceLabel!),
       if (r.bloodTypeLabel != null) ('Tipo de sangre', r.bloodTypeLabel!),
       if (r.contactPhone != null) ('Teléfono de contacto', r.contactPhone!),
     ];
