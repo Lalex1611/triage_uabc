@@ -44,7 +44,7 @@ class _MedicoHomeFlowPageState extends State<MedicoHomeFlowPage>
     _controller.addListener(_onController);
     _controller.searchController.addListener(_onSearch);
     _controller.salaSearchController.addListener(_onSalaSearch);
-    _controller.startNotificationSubscription();
+    _controller.startLiveUpdates();
     unawaited(_controller.load());
   }
 
@@ -74,6 +74,7 @@ class _MedicoHomeFlowPageState extends State<MedicoHomeFlowPage>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       unawaited(_controller.reloadNotificationsOnly());
+      _controller.requestSilentRefresh();
     }
   }
 

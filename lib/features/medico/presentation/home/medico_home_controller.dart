@@ -47,8 +47,129 @@ class MedicoHomeController extends ChangeNotifier {
 
   static const Duration _notificationPollInterval = Duration(seconds: 8);
 
+  /// Red de seguridad por si Realtime se cae (o un cambio no llega por el
+  /// filtro, p. ej. otro médico rechaza y el paciente queda sin hospital)
+  static const Duration _patientsPollInterval = Duration(seconds: 30);
+
+  /// Agrupa varios cambios seguidos en una sola recarga
+  static const Duration _refreshDebounce = Duration(milliseconds: 600);
+
+  Timer? _patientsPollTimer;
+  Timer? _refreshDebounceTimer;
+  RealtimeChannel? _patientsRealtimeChannel;
+  bool _refreshing = false;
+  bool _refreshPending = false;
+  bool _disposed = false;
+
+  /// Ids de notificaciones ya vistas; una nueva dispara recarga de pacientes
+  final Set<String> _seenNotificationIds = {};
+  bool _notificationsPrimed = false;
+
   Timer? _notificationPollTimer;
   RealtimeChannel? _notificationRealtimeChannel;
+
+  /// Mantiene al día la campana y la lista de pacientes ("Llegando ahora",
+  /// Sala) sin que el médico tenga que recargar
+  void startLiveUpdates() {
+    startNotificationSubscription();
+    _startPatientsSubscription();
+  }
+
+  void stopLiveUpdates() {
+    stopNotificationSubscription();
+    _stopPatientsSubscription();
+  }
+
+  /// Realtime sobre `patients` del hospital del médico + polling de respaldo
+  void _startPatientsSubscription() {
+    _stopPatientsSubscription();
+    if (!SupabaseEnv.isConfigured) return;
+
+    _patientsPollTimer = Timer.periodic(
+      _patientsPollInterval,
+      (_) => requestSilentRefresh(),
+    );
+
+    final hid = AuthGate.instance.hospitalId;
+    if (hid == null || hid.isEmpty) return;
+
+    try {
+      final channel = Supabase.instance.client.channel('medico_patients_$hid');
+      channel.onPostgresChanges(
+        event: PostgresChangeEvent.all,
+        schema: 'public',
+        table: 'patients',
+        filter: PostgresChangeFilter(
+          type: PostgresChangeFilterType.eq,
+          column: 'hospital_id',
+          value: hid,
+        ),
+        callback: (_) => requestSilentRefresh(),
+      );
+      _patientsRealtimeChannel = channel;
+      channel.subscribe();
+    } catch (_) {
+      // Sin Realtime quedan el polling y las notificaciones como respaldo
+    }
+  }
+
+  void _stopPatientsSubscription() {
+    _patientsPollTimer?.cancel();
+    _patientsPollTimer = null;
+    _refreshDebounceTimer?.cancel();
+    _refreshDebounceTimer = null;
+    final ch = _patientsRealtimeChannel;
+    _patientsRealtimeChannel = null;
+    if (ch != null && SupabaseEnv.isConfigured) {
+      try {
+        unawaited(Supabase.instance.client.removeChannel(ch));
+      } catch (_) {}
+    }
+  }
+
+  /// Pide una recarga de pacientes sin indicador de carga (agrupada)
+  void requestSilentRefresh() {
+    if (_disposed) return;
+    _refreshDebounceTimer?.cancel();
+    _refreshDebounceTimer = Timer(_refreshDebounce, () {
+      unawaited(_silentRefresh());
+    });
+  }
+
+  Future<void> _silentRefresh() async {
+    if (_disposed || !SupabaseEnv.isConfigured) return;
+    if (loading || _refreshing) {
+      _refreshPending = true;
+      return;
+    }
+    _refreshing = true;
+    try {
+      await _fetchPatients();
+      if (_disposed) return;
+      error = null;
+      notifyListeners();
+    } catch (_) {
+      // Se conservan los datos anteriores; el siguiente cambio reintenta
+    } finally {
+      _refreshing = false;
+      if (_refreshPending) {
+        _refreshPending = false;
+        requestSilentRefresh();
+      }
+    }
+  }
+
+  /// Si llegó una notificación que no habíamos visto, la lista de pacientes
+  /// probablemente cambió (traslado nuevo, registro de otro médico, etc.)
+  void _onNotificationsFetched(List<MedicoNotificationItem> items) {
+    final ids = items.map((n) => n.id).toSet();
+    final hasNew = ids.difference(_seenNotificationIds).isNotEmpty;
+    _seenNotificationIds
+      ..clear()
+      ..addAll(ids);
+    if (_notificationsPrimed && hasNew) requestSilentRefresh();
+    _notificationsPrimed = true;
+  }
 
   /// Polling + Realtime (si la tabla está en `supabase_realtime`) para que la campana
   /// y el panel vean notificaciones nuevas sin salir del home
@@ -233,6 +354,7 @@ class MedicoHomeController extends ChangeNotifier {
     }
     try {
       medicoNotifications = await _repo.fetchMedicoNotifications();
+      _onNotificationsFetched(medicoNotifications);
       notifyListeners();
     } catch (_) {}
   }
@@ -398,27 +520,10 @@ class MedicoHomeController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final hid = AuthGate.instance.hospitalId;
-      final list = await _repo.fetchForMedico(hospitalIdFromProfile: hid);
-      rejectedPatients = [];
-      if (hid != null && hid.isNotEmpty) {
-        try {
-          rejectedPatients = await _repo.fetchRejectedTransfers(
-            hospitalId: hid,
-          );
-        } catch (_) {
-          rejectedPatients = [];
-        }
-      }
-      final rejectedIds = _rejectedPatientIds();
-      patients = rejectedIds.isEmpty
-          ? list
-          : list
-                .where((p) => !rejectedIds.contains(p.patientRecordId))
-                .toList();
-      await _loadSalaTimestamps();
+      await _fetchPatients();
       try {
         medicoNotifications = await _repo.fetchMedicoNotifications();
+        _onNotificationsFetched(medicoNotifications);
       } catch (_) {
         medicoNotifications = [];
       }
@@ -428,12 +533,47 @@ class MedicoHomeController extends ChangeNotifier {
       error = e.toString();
       loading = false;
       notifyListeners();
+    } finally {
+      // Un cambio que llegó durante la carga completa se aplica al terminar
+      if (_refreshPending) {
+        _refreshPending = false;
+        requestSilentRefresh();
+      }
     }
+  }
+
+  /// Pacientes del hospital, traslados rechazados y tiempos de la Sala.
+  /// Los datos se reemplazan solo si todo se obtuvo bien.
+  Future<void> _fetchPatients() async {
+    final hid = AuthGate.instance.hospitalId;
+    final list = await _repo.fetchForMedico(hospitalIdFromProfile: hid);
+    var rejected = <MedicoPatientCardData>[];
+    if (hid != null && hid.isNotEmpty) {
+      try {
+        rejected = await _repo.fetchRejectedTransfers(hospitalId: hid);
+      } catch (_) {
+        rejected = [];
+      }
+    }
+    rejectedPatients = rejected;
+    final rejectedIds = _rejectedPatientIds();
+    patients = rejectedIds.isEmpty
+        ? list
+        : list.where((p) => !rejectedIds.contains(p.patientRecordId)).toList();
+    await _loadSalaTimestamps();
+  }
+
+  /// Una carga puede terminar después de salir del inicio; en ese caso ya no
+  /// hay a quién avisar
+  @override
+  void notifyListeners() {
+    if (!_disposed) super.notifyListeners();
   }
 
   @override
   void dispose() {
-    stopNotificationSubscription();
+    _disposed = true;
+    stopLiveUpdates();
     searchController.dispose();
     salaSearchController.dispose();
     super.dispose();
