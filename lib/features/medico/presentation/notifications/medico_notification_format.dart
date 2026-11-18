@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:sistema_triage/features/medico/domain/constants/medico_discharge_destination.dart';
 import 'package:sistema_triage/features/medico/domain/constants/medico_triage_level.dart';
 import 'package:sistema_triage/features/medico/domain/entities/home/medico_notification_item.dart';
 import 'package:sistema_triage/features/paramedico/domain/constants/triage_catalog.dart';
@@ -85,7 +86,25 @@ abstract final class MedicoNotificationFormat {
         );
 
       case 'patient_discharged':
-        final body = who == null ? n.body : '$who salió con alta médica.';
+        final destination = MedicoDischargeDestination.fromDb(
+          m['destination'] as String?,
+        );
+        final String body;
+        if (who == null) {
+          body = n.body;
+        } else {
+          body = switch (destination) {
+            MedicoDischargeDestination.domicilio =>
+              '$who salió con alta a domicilio.',
+            MedicoDischargeDestination.hospitalizacion =>
+              '$who pasó a hospitalización.',
+            MedicoDischargeDestination.traslado =>
+              '$who fue trasladado a otra unidad.',
+            MedicoDischargeDestination.defuncion =>
+              'Se registró la defunción de $who.',
+            null => '$who salió con alta médica.',
+          };
+        }
         return MedicoNotificationView(
           title: 'Alta registrada',
           body: body,

@@ -14,6 +14,8 @@ import 'package:sistema_triage/features/medico/domain/entities/patient_details/p
 import 'package:sistema_triage/features/medico/domain/entities/patient_edit/medico_patient_edit_data.dart';
 import 'package:sistema_triage/features/medico/domain/entities/patient_review/medico_incoming_review.dart';
 import 'package:sistema_triage/features/medico/domain/entities/room_patient/medico_attention_note.dart';
+import 'package:sistema_triage/features/medico/domain/entities/room_patient/medico_discharge_info.dart';
+import 'package:sistema_triage/features/medico/presentation/discharge/medico_discharge_page.dart';
 import 'package:sistema_triage/features/medico/presentation/room_patient/widgets/medico_attention_note_dialog.dart';
 import 'package:sistema_triage/features/medico/presentation/patient_edit/medico_patient_edit_page.dart';
 import 'package:sistema_triage/features/medico/presentation/home/medico_incoming_transfer_interactions.dart';
@@ -51,6 +53,9 @@ class MedicoPatientDetailsController extends ChangeNotifier {
 
   /// Notas de atención (vista en sala), de la más reciente a la más antigua
   List<MedicoAttentionNote> attentionNotes = [];
+
+  /// Alta registrada (destino y nota); solo si el paciente ya tiene alta
+  MedicoDischargeInfo? discharge;
 
   /// Momento en que entró a `recibido` / `alta_medica` (vista en sala)
   DateTime? receivedAt;
@@ -144,7 +149,9 @@ class MedicoPatientDetailsController extends ChangeNotifier {
         receivedAt = t.receivedAt[patientId];
         dischargedAt = t.dischargedAt[patientId];
         attentionNotes = await _loadAttentionNotes();
+        discharge = d.status == 'alta_medica' ? await _loadDischarge() : null;
       } else {
+        discharge = null;
         receivedAt = null;
         dischargedAt = null;
         attentionNotes = [];
@@ -177,6 +184,38 @@ class MedicoPatientDetailsController extends ChangeNotifier {
     } catch (_) {
       return [];
     }
+  }
+
+  Future<MedicoDischargeInfo?> _loadDischarge() async {
+    try {
+      return await _patientsRepo.fetchDischarge(patientId);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// "Dar alta médica" (mockup 10): destino y nota de alta
+  Future<void> dischargeFromRoom(BuildContext context) async {
+    final d = detail;
+    if (d == null || d.status != 'recibido' || roomBusy) return;
+    final done = await Navigator.of(context, rootNavigator: true).push<bool>(
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (_) => MedicoDischargePage(
+          folio: IncidentPresentationFormatters.shortPatientId(d.id),
+          patientName: summary?.displayName ?? d.displayName,
+          onConfirm: (destination, note) => _patientsRepo.dischargePatient(
+            patientId: d.id,
+            destination: destination.dbValue,
+            note: note,
+          ),
+        ),
+      ),
+    );
+    if (done != true || !context.mounted) return;
+    didChange = true;
+    showAppSnackBar(context, 'Alta médica registrada.');
+    await load();
   }
 
   /// "Agregar nota de atención": pop-up para escribirla y guardarla

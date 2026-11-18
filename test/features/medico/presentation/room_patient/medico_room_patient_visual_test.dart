@@ -6,7 +6,9 @@
 
 import 'package:flutter/material.dart';
 import 'package:sistema_triage/features/medico/domain/entities/patient_review/medico_incoming_review.dart';
+import 'package:sistema_triage/features/medico/domain/constants/medico_discharge_destination.dart';
 import 'package:sistema_triage/features/medico/domain/entities/room_patient/medico_attention_note.dart';
+import 'package:sistema_triage/features/medico/domain/entities/room_patient/medico_discharge_info.dart';
 import 'package:sistema_triage/features/medico/presentation/room_patient/medico_room_patient_page.dart';
 import 'package:sistema_triage/features/medico/presentation/room_patient/widgets/medico_attention_note_dialog.dart';
 import 'package:sistema_triage/features/medico/presentation/room_patient/widgets/medico_room_photos_history_widget.dart';
@@ -65,6 +67,14 @@ class _SandboxState extends State<_Sandbox> {
           consultationCode: 'ABK37X',
           photos: const [],
           notes: _notes,
+          discharge: _discharged
+              ? MedicoDischargeInfo(
+                  destination: MedicoDischargeDestination.domicilio,
+                  note: 'Reposo 3 días. Paracetamol 500 mg cada 8 h.',
+                  dischargedByName: 'Dra. Sofía Ramírez',
+                  createdAt: now,
+                )
+              : null,
           history: const [
             MedicoRoomHistoryItem(
               time: '14:52',

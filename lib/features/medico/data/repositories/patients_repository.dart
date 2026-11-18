@@ -5,6 +5,7 @@ import 'package:sistema_triage/features/medico/domain/entities/home/medico_notif
 import 'package:sistema_triage/features/medico/domain/entities/home/medico_patient_card_data.dart';
 import 'package:sistema_triage/features/medico/domain/entities/patient_review/medico_incoming_review.dart';
 import 'package:sistema_triage/features/medico/domain/entities/room_patient/medico_attention_note.dart';
+import 'package:sistema_triage/features/medico/domain/entities/room_patient/medico_discharge_info.dart';
 import 'package:sistema_triage/features/medico/domain/entities/patient_details/patient_triage_history_entry.dart';
 import 'package:sistema_triage/features/paramedico/domain/constants/patient_status.dart';
 import 'package:sistema_triage/features/paramedico/domain/constants/triage_catalog.dart';
@@ -187,6 +188,36 @@ class PatientsRepository {
       'patient_id': patientId,
       'body': body.trim(),
     });
+  }
+
+  /// Da de alta al paciente: guarda destino y nota y lo pasa a `alta_medica`
+  /// en una sola transacción (RPC `medico_discharge_patient`)
+  Future<void> dischargePatient({
+    required String patientId,
+    required String destination,
+    String? note,
+  }) async {
+    await _c.rpc(
+      'medico_discharge_patient',
+      params: {
+        'p_patient_id': patientId,
+        'p_destination': destination,
+        'p_note': note?.trim(),
+      },
+    );
+  }
+
+  /// Alta registrada del paciente, o null si no tiene
+  Future<MedicoDischargeInfo?> fetchDischarge(String patientId) async {
+    final row = await _c
+        .from('patient_discharges')
+        .select(
+          'destination, note, created_at, by:profiles!discharged_by ( full_name )',
+        )
+        .eq('patient_id', patientId)
+        .maybeSingle();
+    if (row == null) return null;
+    return MedicoDischargeInfo.fromRow(Map<String, dynamic>.from(row));
   }
 
   Future<void> updateLifecycleStatus({

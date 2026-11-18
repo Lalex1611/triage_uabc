@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:sistema_triage/core/ui/app_snackbar.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:sistema_triage/features/medico/domain/entities/patient_details/medico_details_app_bar_data.dart';
 import 'package:sistema_triage/features/medico/domain/entities/patient_details/medico_triage_history_data.dart';
@@ -160,6 +159,7 @@ class _MedicoPatientDetailsFlowPageState
       photos: photos,
       history: history,
       notes: c.attentionNotes,
+      discharge: c.discharge,
       busy: c.roomBusy,
       now: now,
       onBackTap: () => c.onBack(context),
@@ -169,13 +169,9 @@ class _MedicoPatientDetailsFlowPageState
       onAddNoteTap: discharged
           ? null
           : () => unawaited(c.addAttentionNote(context)),
-      // La pantalla de alta médica es el mockup 10 (se agrega después)
       onDischargeTap: discharged
           ? null
-          : () => showAppSnackBar(
-              context,
-              'La pantalla de alta médica se agregará pronto.',
-            ),
+          : () => unawaited(c.dischargeFromRoom(context)),
     );
   }
 
