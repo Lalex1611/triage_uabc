@@ -232,8 +232,14 @@ class MedicoHomeController extends ChangeNotifier {
               p.status == PatientStatus.enEspera,
         )
         .length;
+    // Críticos: rojos que el hospital tiene a su cargo ahora (en camino o en
+    // sala); los dados de alta ya no cuentan
     final rojo = list
-        .where((p) => p.triageCategory == TriageCategory.rojo)
+        .where(
+          (p) =>
+              p.triageCategory == TriageCategory.rojo &&
+              p.status != PatientStatus.alta,
+        )
         .length;
     final cola = list.where((p) => p.status == PatientStatus.recibido).length;
 
