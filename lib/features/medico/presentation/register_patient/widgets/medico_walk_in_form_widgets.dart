@@ -227,23 +227,34 @@ class MedicoWalkInMaxValueFormatter extends TextInputFormatter {
 }
 
 /// Teléfono de México o EE. UU.: 10 dígitos, o hasta [maxDigits] con la lada
-/// del país (+52 / +1). Acepta espacios, guiones, paréntesis y un "+" inicial.
+/// del país (+52 / +1). Acepta espacios, guiones, paréntesis y "+".
+///
+/// Solo revisa lo que se agrega: borrar siempre se permite, y un valor ya
+/// guardado con otros caracteres (p. ej. "664 123 4567 (esposa)") se puede
+/// seguir editando.
 class MedicoWalkInPhoneFormatter extends TextInputFormatter {
   MedicoWalkInPhoneFormatter({this.maxDigits = 12});
 
   final int maxDigits;
 
-  static final _allowed = RegExp(r'^\+?[0-9 ()\-]*$');
+  static final _notAllowed = RegExp(r'[^0-9 ()+\-]');
+  static final _nonDigit = RegExp(r'[^0-9]');
+
+  static int _digits(String s) => s.replaceAll(_nonDigit, '').length;
+  static int _invalid(String s) => _notAllowed.allMatches(s).length;
 
   @override
   TextEditingValue formatEditUpdate(
     TextEditingValue oldValue,
     TextEditingValue newValue,
   ) {
+    final oldText = oldValue.text;
     final text = newValue.text;
-    if (!_allowed.hasMatch(text)) return oldValue;
-    final digits = text.replaceAll(RegExp(r'[^0-9]'), '').length;
-    if (digits > maxDigits) return oldValue;
+    if (text.length <= oldText.length) return newValue;
+    if (_invalid(text) > _invalid(oldText)) return oldValue;
+    if (_digits(text) > maxDigits && _digits(text) > _digits(oldText)) {
+      return oldValue;
+    }
     return newValue;
   }
 }
