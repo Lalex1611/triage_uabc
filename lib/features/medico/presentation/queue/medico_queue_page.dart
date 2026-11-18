@@ -43,12 +43,12 @@ class MedicoQueuePage extends StatelessWidget {
       child: HomeScreenBody(
         header: [
           MedicoQueueHeaderWidget(data: header),
-          const SizedBox(height: 16),
+          const SizedBox(height: 18),
           MedicoSearchBar(
             controller: searchController,
             onChanged: onSearchChanged,
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 18),
           MedicoQueueFilterChipsWidget(data: filters),
           const SizedBox(height: 14),
           if (errorMessage != null)
