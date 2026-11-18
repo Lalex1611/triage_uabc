@@ -4,7 +4,8 @@ enum MedicoPatientFilter {
   rojo('Rojo'),
   naranja('Naranja'),
   amarillo('Amarillo'),
-  verde('Verde');
+  verde('Verde'),
+  azul('Azul');
 
   final String label;
   const MedicoPatientFilter(this.label);

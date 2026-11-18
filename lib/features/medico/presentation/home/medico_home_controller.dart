@@ -258,14 +258,39 @@ class MedicoHomeController extends ChangeNotifier {
         return p.triageCategory == TriageCategory.amarillo;
       case MedicoPatientFilter.verde:
         return p.triageCategory == TriageCategory.verde;
+      case MedicoPatientFilter.azul:
+        return p.triageCategory == TriageCategory.azul;
     }
+  }
+
+  /// Minúsculas y sin acentos, para que "perez" encuentre a "Pérez"
+  static String _normalize(String s) {
+    const from = 'áàäâéèëêíìïîóòöôúùüûñ';
+    const to = 'aaaaeeeeiiiioooouuuun';
+    final lower = s.toLowerCase();
+    final out = StringBuffer();
+    for (final ch in lower.split('')) {
+      final i = from.indexOf(ch);
+      out.write(i >= 0 ? to[i] : ch);
+    }
+    return out.toString();
+  }
+
+  /// Búsqueda de Entradas y Sala: nombre, folio PAC-… o unidad (p. ej. CRT-101)
+  static bool _matchesSearch(MedicoPatientCardData p, String query) {
+    final q = _normalize(query.trim());
+    if (q.isEmpty) return true;
+    return _normalize(p.name).contains(q) ||
+        _normalize(p.id).contains(q) ||
+        _normalize(p.ambulanceUnit).contains(q);
   }
 
   List<MedicoPatientCardData> filteredByChip() {
     return patients.where((p) => _matchesColor(activeFilter, p)).toList();
   }
 
-  /// Pacientes aún no recibidos por el hospital, filtrados por color de triage
+  /// "Llegando ahora": pacientes aún no recibidos por el hospital, filtrados
+  /// por color de triage y por el buscador
   List<MedicoPatientCardData> incomingPatientsFiltered() {
     final rejectedIds = _rejectedPatientIds();
     return patients
@@ -274,7 +299,8 @@ class MedicoHomeController extends ChangeNotifier {
               (p.status == PatientStatus.trasladando ||
                   p.status == PatientStatus.enEspera) &&
               !rejectedIds.contains(p.patientRecordId) &&
-              _matchesColor(activeFilter, p),
+              _matchesColor(activeFilter, p) &&
+              _matchesSearch(p, searchQuery),
         )
         .toList();
   }
@@ -397,7 +423,6 @@ class MedicoHomeController extends ChangeNotifier {
   /// En atención: por nivel (más grave primero) y luego por llegada más antigua.
   /// Dados de alta: alta más reciente primero.
   List<MedicoPatientCardData> salaPatientsFiltered() {
-    final q = salaSearchQuery.trim().toLowerCase();
     final list = patients.where((p) {
       final st = salaStatusOf(p);
       if (st == null) return false;
@@ -407,9 +432,7 @@ class MedicoHomeController extends ChangeNotifier {
         MedicoQueueFilter.recibidos => st == MedicoQueuePatientStatus.recibido,
         MedicoQueueFilter.dadosDeAlta => st == MedicoQueuePatientStatus.alta,
       };
-      if (!matchesChip) return false;
-      if (q.isEmpty) return true;
-      return p.name.toLowerCase().contains(q) || p.id.toLowerCase().contains(q);
+      return matchesChip && _matchesSearch(p, salaSearchQuery);
     }).toList();
 
     if (salaFilter == MedicoQueueFilter.dadosDeAlta) {
