@@ -1,8 +1,9 @@
+// Filtros de la Sala hospitalaria (mockup 05)
 enum MedicoQueueFilter {
-  enCamino('En camino'),
+  todos('Todos'),
+  enEspera('En espera'),
   recibidos('Recibidos'),
-  independientes('Independientes'),
-  triageHospitalario('TRIAGE - HOSPITALARIO');
+  dadosDeAlta('Dados de alta');
 
   final String label;
 

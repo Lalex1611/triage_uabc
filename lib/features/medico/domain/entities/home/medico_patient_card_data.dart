@@ -16,6 +16,12 @@ class MedicoPatientCardData {
   final String ambulanceUnit;
   final PatientStatus status;
 
+  /// `patients.incident_id`; null cuando el paciente llegó por su cuenta
+  final String? incidentId;
+
+  /// `patients.created_at` (hora de registro)
+  final DateTime? createdAt;
+
   /// Texto opcional bajo el panel (p. ej. motivo de rechazo de traslado)
   final String? footerNote;
   final bool isRejectedTransfer;
@@ -37,6 +43,8 @@ class MedicoPatientCardData {
     required this.eta,
     required this.ambulanceUnit,
     required this.status,
+    this.incidentId,
+    this.createdAt,
     this.footerNote,
     this.isRejectedTransfer = false,
     this.onMapTap,
@@ -61,6 +69,8 @@ class MedicoPatientCardData {
       eta: eta,
       ambulanceUnit: ambulanceUnit,
       status: status,
+      incidentId: incidentId,
+      createdAt: createdAt,
       footerNote: footerNote ?? this.footerNote,
       isRejectedTransfer: isRejectedTransfer ?? this.isRejectedTransfer,
       onMapTap: onMapTap,
@@ -82,6 +92,8 @@ class MedicoPatientCardData {
       eta: eta,
       ambulanceUnit: ambulanceUnit,
       status: status,
+      incidentId: incidentId,
+      createdAt: createdAt,
       footerNote: footerNote,
       isRejectedTransfer: isRejectedTransfer,
       onMapTap: onMapTap,
@@ -105,6 +117,8 @@ class MedicoPatientCardData {
       eta: eta,
       ambulanceUnit: ambulanceUnit,
       status: status,
+      incidentId: incidentId,
+      createdAt: createdAt,
       footerNote: footerNote,
       isRejectedTransfer: isRejectedTransfer,
       onMapTap: onMapTap,
