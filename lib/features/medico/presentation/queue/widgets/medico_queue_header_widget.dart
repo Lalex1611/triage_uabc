@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
-import 'package:sistema_triage/core/constants/triage_icons.dart';
 import 'package:sistema_triage/core/theme/app_theme.dart';
 import 'package:sistema_triage/features/medico/domain/entities/queue/medico_queue_header_data.dart';
-import 'package:sistema_triage/shared/widgets/triage_pressable_widget.dart';
+import 'package:sistema_triage/features/medico/presentation/home/widgets/medico_bell_button_widget.dart';
 
 /// Encabezado azul de la Sala (mockup 05): título, campana y conteo por nivel
 class MedicoQueueHeaderWidget extends StatelessWidget {
@@ -92,48 +90,10 @@ class MedicoQueueHeaderWidget extends StatelessWidget {
     );
   }
 
-  Widget _bell() {
-    return TriagePressable(
-      onTap: data.onNotificationTap,
-      builder: (context, pressed) => Container(
-        width: 40,
-        height: 40,
-        decoration: BoxDecoration(
-          color: _tile,
-          shape: BoxShape.circle,
-          boxShadow: triagePressedShadow(pressed: pressed),
-        ),
-        child: Stack(
-          clipBehavior: Clip.none,
-          alignment: Alignment.center,
-          children: [
-            SvgPicture.asset(
-              TriageIcons.bell,
-              width: 22,
-              height: 22,
-              colorFilter: const ColorFilter.mode(
-                Colors.white,
-                BlendMode.srcIn,
-              ),
-            ),
-            if (data.hasUnreadNotifications)
-              Positioned(
-                right: 9,
-                top: 9,
-                child: Container(
-                  width: 10,
-                  height: 10,
-                  decoration: const BoxDecoration(
-                    color: Color(0xFFB6070C),
-                    shape: BoxShape.circle,
-                  ),
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
+  Widget _bell() => MedicoBellButton(
+    hasUnread: data.hasUnreadNotifications,
+    onTap: data.onNotificationTap,
+  );
 
   Widget _levelTile(MedicoQueueLevelCount level) {
     return Container(
