@@ -50,10 +50,7 @@ class MedicoIncomingPatientActionsDialog extends StatelessWidget {
               onTap: data.onReceivePatientTap,
             ),
             const SizedBox(height: 8),
-            TextButton(
-              onPressed: data.onCloseTap,
-              child: const Text('Cerrar'),
-            ),
+            TextButton(onPressed: data.onCloseTap, child: const Text('Cerrar')),
           ],
         ),
       ),

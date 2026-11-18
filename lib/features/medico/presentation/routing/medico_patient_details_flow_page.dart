@@ -251,9 +251,7 @@ class _MedicoPatientDetailsFlowPageState
         ),
         const SizedBox(height: 26),
         MedicoTriageHistoryWidget(
-          data: MedicoTriageHistoryData(
-            entries: c.triageHistory,
-          ),
+          data: MedicoTriageHistoryData(entries: c.triageHistory),
         ),
         if (c.assignedHospital != null &&
             (c.assignedHospital!.name).isNotEmpty) ...[

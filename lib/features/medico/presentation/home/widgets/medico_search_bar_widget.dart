@@ -51,10 +51,7 @@ class MedicoSearchBar extends StatelessWidget {
                 ),
                 decoration: const InputDecoration(
                   hintText: 'Buscar paciente',
-                  hintStyle: TextStyle(
-                    color: Color(0xFFB3B3B3),
-                    fontSize: 15,
-                  ),
+                  hintStyle: TextStyle(color: Color(0xFFB3B3B3), fontSize: 15),
                   border: InputBorder.none,
                   isDense: true,
                   contentPadding: EdgeInsets.zero,

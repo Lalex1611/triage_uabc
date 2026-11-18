@@ -3,7 +3,6 @@ import 'package:sistema_triage/core/constants/triage_icons.dart';
 import 'package:sistema_triage/core/theme/triage_tokens.dart';
 import 'package:sistema_triage/shared/widgets/app_module_bottom_nav.dart';
 
-
 // Barra de navegación inferior del módulo médico (mockup 01, sin botón central)
 class MedicoNavbar extends StatelessWidget {
   final int currentIndex;
