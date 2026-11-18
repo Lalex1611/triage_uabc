@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:sistema_triage/core/config/supabase_env.dart';
 import 'package:sistema_triage/core/session/auth_gate.dart';
+import 'package:sistema_triage/features/medico/data/repositories/medico_profile_repository.dart';
 import 'package:sistema_triage/features/medico/data/repositories/patients_repository.dart';
 import 'package:sistema_triage/features/medico/domain/constants/medico_patient_filter.dart';
 import 'package:sistema_triage/features/medico/domain/constants/medico_queue_filter.dart';
@@ -18,13 +19,19 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 class MedicoHomeController extends ChangeNotifier {
   MedicoHomeController({
     PatientsRepository? repository,
+    MedicoProfileRepository? profileRepository,
     TextEditingController? searchController,
     TextEditingController? salaSearchController,
   }) : _repo = repository ?? PatientsRepository(),
+       _profileRepo = profileRepository ?? MedicoProfileRepository(),
        searchController = searchController ?? TextEditingController(),
        salaSearchController = salaSearchController ?? TextEditingController();
 
   final PatientsRepository _repo;
+  final MedicoProfileRepository _profileRepo;
+
+  /// "Hospital · Área" del médico para el encabezado (null mientras carga)
+  String? hospitalLabel;
   final TextEditingController searchController;
 
   /// Búsqueda propia de la pestaña Sala (independiente de Entrantes)
@@ -143,6 +150,8 @@ class MedicoHomeController extends ChangeNotifier {
       return;
     }
     _refreshing = true;
+    unawaited(_loadHospitalLabel());
+
     try {
       await _fetchPatients();
       if (_disposed) return;
@@ -568,6 +577,23 @@ class MedicoHomeController extends ChangeNotifier {
         _refreshPending = false;
         requestSilentRefresh();
       }
+    }
+  }
+
+  /// Nombre del hospital del médico; se lee una vez (cambia muy poco)
+  Future<void> _loadHospitalLabel() async {
+    if (hospitalLabel != null) return;
+    final hid = AuthGate.instance.hospitalId;
+    if (hid == null || hid.isEmpty) {
+      hospitalLabel = 'Sin hospital asignado';
+      notifyListeners();
+      return;
+    }
+    try {
+      hospitalLabel = await _profileRepo.fetchHospitalLabel(hid);
+      notifyListeners();
+    } catch (_) {
+      // Se reintenta en la siguiente carga
     }
   }
 

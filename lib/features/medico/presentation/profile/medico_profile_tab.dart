@@ -191,7 +191,10 @@ class _MedicoProfileTabState extends State<MedicoProfileTab> {
     final s = _summary;
     final hospitalLabel = s == null
         ? (_loading ? 'Cargando hospital…' : 'Hospital no disponible')
-        : [s.hospitalName, ?s.hospitalAreaLabel].join(' · ');
+        : MedicoProfileSummary.hospitalLabel(
+            s.hospitalName,
+            s.hospitalAreaLabel,
+          );
 
     return MedicoProfilePage(
       userName: widget.userName,
