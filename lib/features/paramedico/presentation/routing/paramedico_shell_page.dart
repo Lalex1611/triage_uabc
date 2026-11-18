@@ -1,12 +1,33 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:go_router/go_router.dart';
 import 'package:sistema_triage/core/theme/triage_tokens.dart';
 import 'package:sistema_triage/features/paramedico/presentation/navigation/paramedico_navbar_widget.dart';
 import 'package:sistema_triage/features/paramedico/presentation/shared/paramedico_session_actions.dart';
 import 'package:sistema_triage/features/paramedico/presentation/incidents/paramedico_incidents_sheet.dart';
 import 'package:sistema_triage/features/paramedico/presentation/create_incident/create_incident_sheet.dart';
+
+/// Deja que el mapa oculte la barra de navegación mientras hay un incidente
+/// elegido (B03), como en Figma
+class ParamedicoNavbarVisibility extends InheritedWidget {
+  const ParamedicoNavbarVisibility({
+    super.key,
+    required this.hidden,
+    required super.child,
+  });
+
+  final ValueNotifier<bool> hidden;
+
+  static ValueNotifier<bool>? maybeOf(BuildContext context) => context
+      .getInheritedWidgetOfExactType<ParamedicoNavbarVisibility>()
+      ?.hidden;
+
+  @override
+  bool updateShouldNotify(ParamedicoNavbarVisibility oldWidget) =>
+      hidden != oldWidget.hidden;
+}
 
 class ParamedicoShellPage extends StatefulWidget {
   const ParamedicoShellPage({super.key, required this.navigationShell});
@@ -26,6 +47,33 @@ class _ParamedicoShellPageState extends State<ParamedicoShellPage> {
   /// La hoja de Incidentes activos está abierta: su pestaña se marca y el "+"
   /// se oculta, como en Figma (B02)
   bool _incidentsOpen = false;
+
+  final _navbarHidden = ValueNotifier(false);
+
+  @override
+  void initState() {
+    super.initState();
+    _navbarHidden.addListener(_onNavbarHiddenChanged);
+  }
+
+  @override
+  void dispose() {
+    _navbarHidden.dispose();
+    super.dispose();
+  }
+
+  // El mapa puede pedirlo mientras se construye (al enfocar desde la ruta):
+  // el shell, que está por encima, se reconstruye al terminar ese cuadro
+  void _onNavbarHiddenChanged() {
+    final binding = SchedulerBinding.instance;
+    if (binding.schedulerPhase == SchedulerPhase.persistentCallbacks) {
+      binding.addPostFrameCallback((_) {
+        if (mounted) setState(() {});
+      });
+    } else {
+      setState(() {});
+    }
+  }
 
   StatefulNavigationShell get _shell => widget.navigationShell;
 
@@ -71,6 +119,7 @@ class _ParamedicoShellPageState extends State<ParamedicoShellPage> {
   @override
   Widget build(BuildContext context) {
     final onMapBranch = _branchIndex == ParamedicoNavbar.mapTab;
+    final hideNavbar = onMapBranch && _navbarHidden.value;
 
     return Scaffold(
       backgroundColor: TriageColors.surface,
@@ -80,15 +129,17 @@ class _ParamedicoShellPageState extends State<ParamedicoShellPage> {
       // (incidentes, home, paciente) tienen listas con padding fijo que
       // quedarían tapadas; flotar también ahí cuando se migren.
       extendBody: onMapBranch,
-      body: _shell,
-      bottomNavigationBar: ParamedicoNavbar(
-        currentIndex: _navIndex,
-        onTap: _onNavTap,
-        // En Figma el "+" solo está en el mapa
-        onCreateIncident: _navIndex == ParamedicoNavbar.mapTab
-            ? () => unawaited(showCreateIncidentSheet(context))
-            : null,
-      ),
+      body: ParamedicoNavbarVisibility(hidden: _navbarHidden, child: _shell),
+      bottomNavigationBar: hideNavbar
+          ? null
+          : ParamedicoNavbar(
+              currentIndex: _navIndex,
+              onTap: _onNavTap,
+              // En Figma el "+" solo está en el mapa
+              onCreateIncident: _navIndex == ParamedicoNavbar.mapTab
+                  ? () => unawaited(showCreateIncidentSheet(context))
+                  : null,
+            ),
     );
   }
 }
