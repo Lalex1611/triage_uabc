@@ -14,6 +14,13 @@ class MedicoQueueHeaderWidget extends StatelessWidget {
   static const Color _background = Color(0xFF1C69AA);
   static const Color _tile = Color(0xFF3D7EB4);
 
+  // Mismas medidas que el encabezado de Entrantes (MedicoHomeHeader +
+  // MedicoMinidash) para que el bloque azul no cambie de tamaño al cambiar
+  // de pestaña: 10 + 42 + 20 + 64 + 14 = 150 px.
+  static const double _topRowHeight = 42;
+  static const double _rowGap = 20;
+  static const double _tileHeight = 64;
+
   @override
   Widget build(BuildContext context) {
     final count = data.patientsInCare;
@@ -30,43 +37,48 @@ class MedicoQueueHeaderWidget extends StatelessWidget {
           bottomRight: Radius.circular(20),
         ),
       ),
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      'SALA HOSPITALARIA',
-                      style: AppTextStyles.ESC_SemiBold_bodyMedium.copyWith(
-                        color: Colors.white70,
-                        fontSize: 11,
-                        letterSpacing: 0.6,
+          SizedBox(
+            height: _topRowHeight,
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        'SALA HOSPITALARIA',
+                        style: AppTextStyles.ESC_SemiBold_bodyMedium.copyWith(
+                          color: Colors.white70,
+                          fontSize: 11,
+                          height: 1.2,
+                          letterSpacing: 0.6,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: AppTextStyles.ESC_Bold_titleLarge.copyWith(
-                        color: Colors.white,
-                        fontSize: 18,
+                      const SizedBox(height: 1),
+                      Text(
+                        title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTextStyles.ESC_Bold_titleLarge.copyWith(
+                          color: Colors.white,
+                          fontSize: 18,
+                          height: 1.2,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(width: 8),
-              _bell(),
-            ],
+                const SizedBox(width: 8),
+                _bell(),
+              ],
+            ),
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: _rowGap),
           Row(
             children: [
               for (var i = 0; i < data.levelCounts.length; i++) ...[
@@ -125,30 +137,30 @@ class MedicoQueueHeaderWidget extends StatelessWidget {
 
   Widget _levelTile(MedicoQueueLevelCount level) {
     return Container(
-      height: 50,
+      height: _tileHeight,
       decoration: BoxDecoration(
         color: _tile,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Container(
-            width: 10,
-            height: 10,
+            width: 12,
+            height: 12,
             decoration: BoxDecoration(
               color: level.color,
               shape: BoxShape.circle,
               border: Border.all(color: Colors.white, width: 1),
             ),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 6),
           Text(
             '${level.count}',
             style: AppTextStyles.ESC_Bold_titleLarge.copyWith(
               color: Colors.white,
-              fontSize: 16,
+              fontSize: 20,
               height: 1,
             ),
           ),
