@@ -220,13 +220,6 @@ class PatientsRepository {
     return MedicoDischargeInfo.fromRow(Map<String, dynamic>.from(row));
   }
 
-  Future<void> updateLifecycleStatus({
-    required String patientId,
-    required String status,
-  }) async {
-    await _c.from('patients').update({'status': status}).eq('id', patientId);
-  }
-
   Future<void> receivePatient({required String patientId}) async {
     final updated = await _c
         .from('patients')
@@ -248,17 +241,6 @@ class PatientsRepository {
       'medico_cancel_patient_transfer',
       params: {'p_patient_id': patientId, 'p_reason': reason.trim()},
     );
-  }
-
-  /// Se guardan los signos vitales del paciente
-  Future<void> updateVitalSigns({
-    required String patientId,
-    required Map<String, dynamic> vitals,
-  }) async {
-    await _c
-        .from('patients')
-        .update({'vital_signs': vitals})
-        .eq('id', patientId);
   }
 
   Future<Map<String, dynamic>> fetchVitalSigns(String patientId) async {
