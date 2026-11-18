@@ -356,6 +356,7 @@ class _MedicoHomeFlowPageState extends State<MedicoHomeFlowPage>
           await MedicoIncomingTransferInteractions.rejectIncomingTransfer(
             context: ctx,
             patientId: id,
+            patientName: raw.name,
           );
       if (ok && mounted) await c.load();
     }
