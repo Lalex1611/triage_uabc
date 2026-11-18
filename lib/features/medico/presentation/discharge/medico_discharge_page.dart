@@ -225,8 +225,8 @@ class _InfoBanner extends StatelessWidget {
                 ),
                 SizedBox(height: 3),
                 Text(
-                  'El paciente sale de la sala y la consulta externa pasa a '
-                  'mostrar "Alta médica".',
+                  'El paciente sale de la sala y la consulta externa le '
+                  'muestra a la familia que la atención concluyó.',
                   style: TextStyle(
                     fontSize: 12.5,
                     height: 1.35,
