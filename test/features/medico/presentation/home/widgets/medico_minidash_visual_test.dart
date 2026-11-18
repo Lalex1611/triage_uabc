@@ -24,7 +24,6 @@ class MedicoMinidashVisualTest extends StatelessWidget {
   Widget build(BuildContext context) {
     const mockStats = MedicoUserStats(
       userName: 'Juan Ozuna',
-      totalActive: 11,
       enCaminoCount: 2,
       rojoCriticoCount: 2,
       enColaCount: 7,

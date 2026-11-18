@@ -42,7 +42,6 @@ class _MedicoHomeVisualTestState extends State<MedicoHomeVisualTest> {
     // MOCK DE ESTADÍSTICAS DEL MÉDICO
     const mockStats = MedicoUserStats(
       userName: 'Juan Ozuna',
-      totalActive: 11,
       enCaminoCount: 2,
       rojoCriticoCount: 2,
       enColaCount: 7,
