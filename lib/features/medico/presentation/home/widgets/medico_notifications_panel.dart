@@ -55,77 +55,73 @@ class MedicoNotificationsPanel extends StatelessWidget {
           ),
           const Divider(height: 1),
           Expanded(
-            child:
-                items.isEmpty
-                    ? Center(
-                      child: Text(
-                        'Sin notificaciones',
-                        style: AppTextStyles.ESC_Regular_bodyMedium.copyWith(
-                          color: Colors.black54,
-                        ),
+            child: items.isEmpty
+                ? Center(
+                    child: Text(
+                      'Sin notificaciones',
+                      style: AppTextStyles.ESC_Regular_bodyMedium.copyWith(
+                        color: Colors.black54,
                       ),
-                    )
-                    : ListView.separated(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      itemCount: items.length,
-                      separatorBuilder: (_, _) => const Divider(height: 1),
-                      itemBuilder: (ctx, i) {
-                        final n = items[i];
-                        return ListTile(
-                          leading:
-                              n.isUnread
-                                  ? Container(
-                                    width: 10,
-                                    height: 10,
-                                    alignment: Alignment.center,
-                                    child: Container(
-                                      width: 8,
-                                      height: 8,
-                                      decoration: const BoxDecoration(
-                                        color: Color(0xFFFFB020),
-                                        shape: BoxShape.circle,
-                                      ),
-                                    ),
-                                  )
-                                  : const SizedBox(width: 10),
-                          title: Text(
-                            n.title.trim().isEmpty
-                                ? 'Notificación'
-                                : n.title,
-                            style: AppTextStyles.ESC_SemiBold_bodyMedium,
-                          ),
-                          subtitle: Padding(
-                            padding: const EdgeInsets.only(top: 4),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  n.body.trim().isEmpty
-                                      ? 'Sin detalle'
-                                      : n.body,
-                                  style: AppTextStyles.ESC_Regular_bodyMedium
-                                      .copyWith(
-                                        fontSize: 13,
-                                        color: Colors.black87,
-                                      ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  _fmtTime(n.createdAt),
-                                  style: AppTextStyles.ESC_Regular_bodyMedium
-                                      .copyWith(
-                                        fontSize: 11,
-                                        color: Colors.black45,
-                                      ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          isThreeLine: true,
-                          onTap: () => onItemTap(n),
-                        );
-                      },
                     ),
+                  )
+                : ListView.separated(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    itemCount: items.length,
+                    separatorBuilder: (_, _) => const Divider(height: 1),
+                    itemBuilder: (ctx, i) {
+                      final n = items[i];
+                      return ListTile(
+                        leading: n.isUnread
+                            ? Container(
+                                width: 10,
+                                height: 10,
+                                alignment: Alignment.center,
+                                child: Container(
+                                  width: 8,
+                                  height: 8,
+                                  decoration: const BoxDecoration(
+                                    color: Color(0xFFFFB020),
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                              )
+                            : const SizedBox(width: 10),
+                        title: Text(
+                          n.title.trim().isEmpty ? 'Notificación' : n.title,
+                          style: AppTextStyles.ESC_SemiBold_bodyMedium,
+                        ),
+                        subtitle: Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                n.body.trim().isEmpty ? 'Sin detalle' : n.body,
+                                style:
+                                    AppTextStyles
+                                        .ESC_Regular_bodyMedium.copyWith(
+                                      fontSize: 13,
+                                      color: Colors.black87,
+                                    ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                _fmtTime(n.createdAt),
+                                style:
+                                    AppTextStyles
+                                        .ESC_Regular_bodyMedium.copyWith(
+                                      fontSize: 11,
+                                      color: Colors.black45,
+                                    ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        isThreeLine: true,
+                        onTap: () => onItemTap(n),
+                      );
+                    },
+                  ),
           ),
         ],
       ),

@@ -18,7 +18,8 @@ class MedicoTransferCancelReasonDialog extends StatefulWidget {
       _MedicoTransferCancelReasonDialogState();
 }
 
-class _MedicoTransferCancelReasonDialogState extends State<MedicoTransferCancelReasonDialog> {
+class _MedicoTransferCancelReasonDialogState
+    extends State<MedicoTransferCancelReasonDialog> {
   final _controller = TextEditingController();
 
   @override
@@ -86,12 +87,16 @@ class _MedicoTransferCancelReasonDialogState extends State<MedicoTransferCancelR
             ),
             const SizedBox(height: 16),
             GestureDetector(
-              onTap: canSubmit ? () => widget.onSubmit(_controller.text.trim()) : null,
+              onTap: canSubmit
+                  ? () => widget.onSubmit(_controller.text.trim())
+                  : null,
               child: Container(
                 height: 40,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  color: canSubmit ? Colors.white : Colors.white.withValues(alpha: 0.45),
+                  color: canSubmit
+                      ? Colors.white
+                      : Colors.white.withValues(alpha: 0.45),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(

@@ -8,10 +8,7 @@ import 'package:sistema_triage/shared/widgets/triage_pressable_widget.dart';
 /// Caja única: tarjeta del incidente arriba y **debajo** (fuera de la tarjeta)
 /// los controles de ingreso en traslado (ACEPTAR / RECHAZAR)
 class MedicoPatientIncomingTransferShell extends StatelessWidget {
-  const MedicoPatientIncomingTransferShell({
-    super.key,
-    required this.data,
-  });
+  const MedicoPatientIncomingTransferShell({super.key, required this.data});
 
   final MedicoPatientCardData data;
 
@@ -51,18 +48,28 @@ class MedicoPatientIncomingTransferShell extends StatelessWidget {
             decoration: BoxDecoration(
               color: AppColors.primaryMedico.withValues(alpha: 0.06),
               border: Border(
-                top: BorderSide(
-                  color: Colors.black.withValues(alpha: 0.08),
-                ),
+                top: BorderSide(color: Colors.black.withValues(alpha: 0.08)),
               ),
             ),
             child: Padding(
               padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
               child: Row(
                 children: [
-                  Expanded(child: _chip(label: 'Rechazar', outlined: true, onTap: reject)),
+                  Expanded(
+                    child: _chip(
+                      label: 'Rechazar',
+                      outlined: true,
+                      onTap: reject,
+                    ),
+                  ),
                   const SizedBox(width: 10),
-                  Expanded(child: _chip(label: 'Revisar y aceptar', outlined: false, onTap: accept)),
+                  Expanded(
+                    child: _chip(
+                      label: 'Revisar y aceptar',
+                      outlined: false,
+                      onTap: accept,
+                    ),
+                  ),
                 ],
               ),
             ),
