@@ -199,3 +199,11 @@ insert into public.consultation_codes (patient_id, code, expires_at, created_by)
   ('e0000000-0000-0000-0000-000000000001', 'TRG234', now() + interval '30 days', 'a0000000-0000-0000-0000-000000000002'),
   ('e0000000-0000-0000-0000-000000000006', 'HSP567', now() + interval '30 days', 'a0000000-0000-0000-0000-000000000002'),
   ('e0000000-0000-0000-0000-000000000011', 'AXT789', now() + interval '30 days', 'a0000000-0000-0000-0000-000000000003');
+
+-- Capacidad de urgencias (perfil del médico, mockup 13)
+update public.hospitals
+set shock_beds_total = 6, shock_beds_free = 2,
+    observation_beds_total = 14, observation_beds_free = 5,
+    accepting_red_patients = true, operating_room_available = false,
+    capacity_updated_at = now()
+where id = 'b0000000-0000-0000-0000-000000000001';
