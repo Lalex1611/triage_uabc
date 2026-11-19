@@ -199,3 +199,95 @@ insert into public.consultation_codes (patient_id, code, expires_at, created_by)
   ('e0000000-0000-0000-0000-000000000001', 'TRG234', now() + interval '30 days', 'a0000000-0000-0000-0000-000000000002'),
   ('e0000000-0000-0000-0000-000000000006', 'HSP567', now() + interval '30 days', 'a0000000-0000-0000-0000-000000000002'),
   ('e0000000-0000-0000-0000-000000000011', 'AXT789', now() + interval '30 days', 'a0000000-0000-0000-0000-000000000003');
+
+-- Capacidad de urgencias (perfil del médico, mockup 13)
+update public.hospitals
+set shock_beds_total = 6, shock_beds_free = 2,
+    observation_beds_total = 14, observation_beds_free = 5,
+    accepting_red_patients = true, operating_room_available = false,
+    capacity_updated_at = now()
+where id = 'b0000000-0000-0000-0000-000000000001';
+
+-- Casos de prueba: revisión de paciente entrante (mockup 02) ----------------
+-- Cuatro pacientes en camino (trasladando) al Hospital General de Tijuana para
+-- probar la pantalla con medico1 / medico2. Cada uno cubre un caso distinto:
+--   e…021 rojo     · datos completos, seguro capturado por el paramédico, llega en ~6 min
+--   e…022 naranja  · sin nombre ni edad, solo descripción, sin datos administrativos, sin hora de llegada
+--   e…023 amarillo · clasificado con START (protocolo guiado), sin descripción, ya debería haber llegado
+--   e…024 verde    · menor de edad, lesiones y teléfono, sin seguro ni tipo de sangre
+insert into public.incidents (id, generated_title, description, emergency_type, location, status, created_by, created_at) values
+  ('d0000000-0000-0000-0000-000000000005', 'Volcadura en Blvd. 2000',
+   'Camioneta volcada con 3 ocupantes, uno prensado.',
+   'accidente_vehicular', 'SRID=4326;POINT(-116.9200 32.4700)', 'activo',
+   'a0000000-0000-0000-0000-000000000002', now() - interval '35 minutes'),
+  ('d0000000-0000-0000-0000-000000000006', 'Caída en obra en construcción',
+   'Trabajadores caen de andamio a 4 metros de altura.',
+   'otro', 'SRID=4326;POINT(-117.0150 32.5100)', 'activo',
+   'a0000000-0000-0000-0000-000000000003', now() - interval '30 minutes');
+
+insert into public.patients (
+  id, sync_client_id, incident_id, display_name, triage_color, status, location, location_captured_at,
+  hospital_id, ambulance_unit_id, regulation_folio, descriptive_notes, vital_signs, is_pediatric,
+  demographics, departed_scene_at, estimated_arrival_at, created_by, created_at
+) values
+  ('e0000000-0000-0000-0000-000000000021', gen_random_uuid(), 'd0000000-0000-0000-0000-000000000005',
+   'Alberto Pérez', 'rojo', 'trasladando', 'SRID=4326;POINT(-116.9201 32.4701)', now() - interval '30 minutes',
+   'b0000000-0000-0000-0000-000000000001', 'c0000000-0000-0000-0000-000000000001', 'REG-2026-0201', null, null, false,
+   '{"gender":"masculino","blood_type":"oPositivo","birth_year":1992,"birth_month":3,"birth_day":8,"injury_types":["hemorragia","fractura","traumatismoCraneal"],"description":"Conductor prensado 20 min. Consciente pero desorientado, sangrado activo en pierna derecha controlado con torniquete a las 14:20. Posible fractura de fémur.","emergency_contact":"664 210 3344","has_medical_insurance":true,"transfer_destination_hospital_name":"Hospital General de Tijuana"}',
+   now() - interval '5 minutes', now() + interval '6 minutes', 'a0000000-0000-0000-0000-000000000002', now() - interval '30 minutes'),
+  ('e0000000-0000-0000-0000-000000000022', gen_random_uuid(), 'd0000000-0000-0000-0000-000000000005',
+   null, 'naranja', 'trasladando', 'SRID=4326;POINT(-116.9199 32.4699)', now() - interval '28 minutes',
+   'b0000000-0000-0000-0000-000000000001', 'c0000000-0000-0000-0000-000000000001', null, null, null, false,
+   '{"gender":"femenino","description":"Copiloto sin identificación. Dolor torácico al respirar, refiere golpe con el cinturón."}',
+   now() - interval '4 minutes', null, 'a0000000-0000-0000-0000-000000000002', now() - interval '28 minutes'),
+  ('e0000000-0000-0000-0000-000000000023', gen_random_uuid(), 'd0000000-0000-0000-0000-000000000006',
+   'Javier Ochoa', 'amarillo', 'trasladando', 'SRID=4326;POINT(-117.0151 32.5101)', now() - interval '25 minutes',
+   'b0000000-0000-0000-0000-000000000001', 'c0000000-0000-0000-0000-000000000002', 'REG-2026-0202', null, null, false,
+   '{"birth_year":1979,"registered_from_start":true,"start_triage_mode":"protocoloGuiado","has_medical_insurance":false}',
+   now() - interval '15 minutes', now() - interval '2 minutes', 'a0000000-0000-0000-0000-000000000003', now() - interval '25 minutes'),
+  ('e0000000-0000-0000-0000-000000000024', gen_random_uuid(), 'd0000000-0000-0000-0000-000000000006',
+   'Mateo Ochoa', 'verde', 'trasladando', 'SRID=4326;POINT(-117.0149 32.5099)', now() - interval '22 minutes',
+   'b0000000-0000-0000-0000-000000000001', 'c0000000-0000-0000-0000-000000000002', 'REG-2026-0203', null, null, true,
+   '{"gender":"masculino","birth_year":2016,"birth_month":7,"birth_day":21,"injury_types":["luxacion","laceracion"],"description":"Hijo del trabajador, cayó de 1.5 m. Luxación de hombro izquierdo y raspones, estable.","emergency_contact":"664 998 1200 (madre)"}',
+   now() - interval '12 minutes', now() + interval '18 minutes', 'a0000000-0000-0000-0000-000000000003', now() - interval '22 minutes');
+
+-- Más casos de prueba: pacientes en camino al Hospital General ---------------
+--   e…025 rojo     · trauma con datos completos, ISSSTECALI, llega en ~4 min
+--   e…026 naranja  · clasificado con START (asignación rápida) + descripción, llega en ~9 min
+--   e…027 azul     · caso leve, solo nombre y teléfono, llega en ~25 min
+--   e…028 rojo     · paciente sin identificar, solo lesiones, sin hora de llegada
+insert into public.incidents (id, generated_title, description, emergency_type, location, status, created_by, created_at) values
+  ('d0000000-0000-0000-0000-000000000007', 'Choque de motocicleta en Blvd. Agua Caliente',
+   'Motociclista impactado por automóvil en cruce semaforizado.',
+   'accidente_vehicular', 'SRID=4326;POINT(-117.0120 32.5180)', 'activo',
+   'a0000000-0000-0000-0000-000000000002', now() - interval '20 minutes'),
+  ('d0000000-0000-0000-0000-000000000008', 'Riña en bar de la Zona Centro',
+   'Dos lesionados, uno con herida por arma blanca.',
+   'violencia', 'SRID=4326;POINT(-117.0360 32.5330)', 'activo',
+   'a0000000-0000-0000-0000-000000000003', now() - interval '15 minutes');
+
+insert into public.patients (
+  id, sync_client_id, incident_id, display_name, triage_color, status, location, location_captured_at,
+  hospital_id, ambulance_unit_id, regulation_folio, descriptive_notes, vital_signs, is_pediatric,
+  demographics, departed_scene_at, estimated_arrival_at, created_by, created_at
+) values
+  ('e0000000-0000-0000-0000-000000000025', gen_random_uuid(), 'd0000000-0000-0000-0000-000000000007',
+   'Ricardo Lozano', 'rojo', 'trasladando', 'SRID=4326;POINT(-117.0121 32.5181)', now() - interval '18 minutes',
+   'b0000000-0000-0000-0000-000000000001', 'c0000000-0000-0000-0000-000000000001', 'REG-2026-0301', null, null, false,
+   '{"gender":"masculino","blood_type":"aNegativo","birth_year":1997,"birth_month":11,"birth_day":2,"injury_types":["fractura","traumatismoCraneal","laceracion"],"description":"Motociclista sin casco, pérdida de conciencia de 2 min. Glasgow 13, fractura expuesta de tibia izquierda inmovilizada. Se canaliza vía periférica.","emergency_contact":"664 450 7788","seguro_medico":"si","insurance_institution":"ISSSTECALI"}',
+   now() - interval '6 minutes', now() + interval '4 minutes', 'a0000000-0000-0000-0000-000000000002', now() - interval '18 minutes'),
+  ('e0000000-0000-0000-0000-000000000026', gen_random_uuid(), 'd0000000-0000-0000-0000-000000000007',
+   'Daniela Ruiz', 'naranja', 'trasladando', 'SRID=4326;POINT(-117.0119 32.5179)', now() - interval '16 minutes',
+   'b0000000-0000-0000-0000-000000000001', 'c0000000-0000-0000-0000-000000000001', 'REG-2026-0302', null, null, false,
+   '{"gender":"femenino","birth_year":2001,"registered_from_start":true,"start_triage_mode":"asignacionRapida","injury_types":["luxacion"],"description":"Conductora del automóvil. Dolor cervical y en hombro derecho, consciente y orientada. Se coloca collarín.","has_medical_insurance":true}',
+   now() - interval '5 minutes', now() + interval '9 minutes', 'a0000000-0000-0000-0000-000000000002', now() - interval '16 minutes'),
+  ('e0000000-0000-0000-0000-000000000027', gen_random_uuid(), 'd0000000-0000-0000-0000-000000000008',
+   'Óscar Meza', 'azul', 'trasladando', 'SRID=4326;POINT(-117.0361 32.5331)', now() - interval '12 minutes',
+   'b0000000-0000-0000-0000-000000000001', 'c0000000-0000-0000-0000-000000000002', 'REG-2026-0303', null, null, false,
+   '{"gender":"masculino","emergency_contact":"664 112 9090"}',
+   now() - interval '3 minutes', now() + interval '25 minutes', 'a0000000-0000-0000-0000-000000000003', now() - interval '12 minutes'),
+  ('e0000000-0000-0000-0000-000000000028', gen_random_uuid(), 'd0000000-0000-0000-0000-000000000008',
+   null, 'rojo', 'trasladando', 'SRID=4326;POINT(-117.0359 32.5329)', now() - interval '11 minutes',
+   'b0000000-0000-0000-0000-000000000001', 'c0000000-0000-0000-0000-000000000002', null, null, null, false,
+   '{"gender":"masculino","injury_types":["hemorragia","laceracion"]}',
+   now() - interval '2 minutes', null, 'a0000000-0000-0000-0000-000000000003', now() - interval '11 minutes');
