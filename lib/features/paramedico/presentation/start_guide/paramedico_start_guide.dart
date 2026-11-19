@@ -51,7 +51,7 @@ class ParamedicoStartGuide extends StatelessWidget {
       case TriageLevel.green:
         return (
           background: TriageColors.triageGreen,
-          foreground: TriageColors.textInverse,
+          foreground: TriageColors.textPrimary,
         );
       case TriageLevel.black:
         return (
