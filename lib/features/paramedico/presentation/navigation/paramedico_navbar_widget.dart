@@ -32,11 +32,7 @@ class ParamedicoNavbar extends StatelessWidget {
     AppModuleBottomNavTab(iconPath: TriageIcons.map, label: 'Mapa'),
     AppModuleBottomNavTab(iconPath: TriageIcons.list, label: 'Incidentes'),
     // Sin pantalla todavía (B19 · Guía rápida START)
-    AppModuleBottomNavTab(
-      iconPath: TriageIcons.clipboard,
-      label: 'Guía START',
-      enabled: false,
-    ),
+    AppModuleBottomNavTab(iconPath: TriageIcons.clipboard, label: 'Guía START'),
     AppModuleBottomNavTab(iconPath: TriageIcons.user, label: 'Perfil'),
   ];
 
