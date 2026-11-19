@@ -5,8 +5,8 @@ import 'package:sistema_triage/core/session/auth_gate.dart';
 import 'package:sistema_triage/core/ui/app_snackbar.dart';
 import 'package:sistema_triage/features/paramedico/data/repositories/paramedic_notifications_repository.dart';
 import 'package:sistema_triage/features/paramedico/data/repositories/paramedico_incidents_repository.dart';
-import 'package:sistema_triage/features/paramedico/presentation/create_incident/services/incident_location_service.dart';
 import 'package:sistema_triage/features/paramedico/domain/entities/notifications/paramedic_notification.dart';
+import 'package:sistema_triage/features/paramedico/presentation/create_incident/services/incident_location_service.dart';
 import 'package:sistema_triage/features/paramedico/presentation/notifications/widgets/paramedic_notifications_modal_widget.dart';
 import 'package:sistema_triage/shared/widgets/triage_ui.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -180,21 +180,31 @@ class _ParamedicoProfileSheet extends StatefulWidget {
 
 class _ParamedicoProfileSheetState extends State<_ParamedicoProfileSheet> {
   bool _loading = true;
+  bool _unitFailed = false;
+  bool _incidentsFailed = false;
+  bool _patientsFailed = false;
+  bool _notificationsLoaded = false;
+  bool _notificationsFailed = false;
+  bool _openingNotifications = false;
+
+  int _unitSaveGeneration = 0;
+  int _notificationsEpoch = 0;
+
   String? _unitCode;
   int _incidentsCount = 0;
   int _patientsCount = 0;
   int _transfersCount = 0;
   List<ParamedicNotification> _notifications = const [];
-  late final String _shiftStartTime;
+  late final String _lastSignInTime;
 
   @override
   void initState() {
     super.initState();
-    _shiftStartTime = _resolveSessionStartTime();
+    _lastSignInTime = _resolveLastSignInTime();
     _loadData();
   }
 
-  String _resolveSessionStartTime() {
+  String _resolveLastSignInTime() {
     if (!SupabaseEnv.isConfigured) return '—';
     final raw = Supabase.instance.client.auth.currentUser?.lastSignInAt;
     if (raw == null || raw.isEmpty) return '—';
@@ -205,27 +215,77 @@ class _ParamedicoProfileSheetState extends State<_ParamedicoProfileSheet> {
     return '$hh:$mm';
   }
 
-  Future<List<ParamedicNotification>> _safeListNotifications() async {
+  Future<bool> _fetchNotifications() async {
+    final epoch = ++_notificationsEpoch;
     try {
-      return await widget.notificationsRepo.listRecent();
+      final items = await widget.notificationsRepo.listRecent();
+      if (!mounted || epoch != _notificationsEpoch) return true;
+      setState(() {
+        _notifications = items;
+        _notificationsLoaded = true;
+        _notificationsFailed = false;
+      });
+      return true;
     } catch (_) {
-      return const [];
+      if (!mounted || epoch != _notificationsEpoch) return false;
+      setState(() {
+        _notificationsLoaded = true;
+        _notificationsFailed = true;
+      });
+      return false;
     }
   }
 
-  Future<void> _openNotificationsModal() async {
-    await showDialog<void>(
-      context: context,
-      builder: (_) => ParamedicNotificationsModal(
-        notifications: _notifications,
-        onNotificationTap: (notification) =>
-            widget.notificationsRepo.markRead(notification.id),
-      ),
-    );
+  /// La bandeja del perfil es de consulta rápida: al tocar una notificación
+  /// únicamente la marca como leída tras confirmar la escritura en backend,
+  /// sin navegar fuera de la hoja de perfil.
+  Future<void> _handleNotificationTap(
+    ParamedicNotification notification,
+  ) async {
+    try {
+      await widget.notificationsRepo.markRead(notification.id);
+    } catch (_) {
+      // Si falla markRead, se conserva el estado previo sin marcar como leída.
+      return;
+    }
     if (!mounted) return;
-    final updated = await _safeListNotifications();
-    if (mounted) {
-      setState(() => _notifications = updated);
+    // Invalida cualquier consulta previa en vuelo para que no sobrescriba la lectura.
+    _notificationsEpoch++;
+    await _fetchNotifications();
+  }
+
+  Future<void> _openNotificationsModal() async {
+    if (_openingNotifications) return;
+    setState(() => _openingNotifications = true);
+
+    try {
+      if (!_notificationsLoaded || _notificationsFailed) {
+        final ok = await _fetchNotifications();
+        if (!mounted) return;
+        if (!ok) {
+          showAppSnackBar(
+            context,
+            'No se pudieron cargar las notificaciones. Intenta de nuevo.',
+            isError: true,
+          );
+          return;
+        }
+      }
+
+      if (!mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (_) => ParamedicNotificationsModal(
+          notifications: _notifications,
+          onNotificationTap: _handleNotificationTap,
+        ),
+      );
+      if (!mounted) return;
+      await _fetchNotifications();
+    } finally {
+      if (mounted) {
+        setState(() => _openingNotifications = false);
+      }
     }
   }
 
@@ -239,48 +299,81 @@ class _ParamedicoProfileSheetState extends State<_ParamedicoProfileSheet> {
   }
 
   Future<void> _loadData() async {
-    try {
-      final results = await Future.wait<dynamic>([
-        widget.repo.currentAmbulanceUnitCode(),
-        widget.repo.listOpenIncidents(),
-        widget.repo.listRecentPatientsForCurrentUser(limit: 100),
-        _safeListNotifications(),
-      ]);
+    setState(() => _loading = true);
+    final initialUnitGen = _unitSaveGeneration;
 
-      final code = results[0] as String?;
-      final incidents = results[1] as List<ParamedicoIncidentSummary>;
-      final recentPatients = results[2] as List<ParamedicoPatientRow>;
-      final notifications = results[3] as List<ParamedicNotification>;
+    String? fetchedCode;
+    var unitOk = false;
+    var incidentsCount = 0;
+    var incidentsOk = false;
+    var patientsCount = 0;
+    var transfersCount = 0;
+    var patientsOk = false;
 
-      final now = DateTime.now();
-      final todayPatients = recentPatients.where((p) {
-        final created = p.createdAt?.toLocal();
-        if (created == null) return false;
-        return created.year == now.year &&
-            created.month == now.month &&
-            created.day == now.day;
-      }).toList();
+    await Future.wait<void>([
+      () async {
+        try {
+          fetchedCode = await widget.repo.currentAmbulanceUnitCode();
+          unitOk = true;
+        } catch (_) {
+          unitOk = false;
+        }
+      }(),
+      () async {
+        try {
+          final incidents = await widget.repo.listOpenIncidents();
+          incidentsCount = incidents.length;
+          incidentsOk = true;
+        } catch (_) {
+          incidentsOk = false;
+        }
+      }(),
+      () async {
+        try {
+          final recentPatients = await widget.repo
+              .listRecentPatientsForCurrentUser(limit: 100);
+          final now = DateTime.now();
+          final dayStart = DateTime(now.year, now.month, now.day);
+          final dayEnd = dayStart.add(const Duration(days: 1));
 
-      final confirmedTransfers = todayPatients.where((p) {
-        return p.status == 'trasladando' ||
-            p.status == 'recibido' ||
-            p.status == 'alta_medica';
-      }).length;
+          final todayPatients = recentPatients.where((p) {
+            final created = p.createdAt?.toLocal();
+            if (created == null) return false;
+            return !created.isBefore(dayStart) && created.isBefore(dayEnd);
+          }).toList();
 
-      if (!mounted) return;
-      setState(() {
-        _unitCode = code;
-        _incidentsCount = incidents.length;
-        _patientsCount = todayPatients.length;
-        _transfersCount = confirmedTransfers;
-        _notifications = notifications;
-        _loading = false;
-      });
-    } catch (_) {
-      if (mounted) {
-        setState(() => _loading = false);
+          patientsCount = todayPatients.length;
+          transfersCount = todayPatients.where((p) {
+            return p.status == 'recibido' || p.status == 'alta_medica';
+          }).length;
+          patientsOk = true;
+        } catch (_) {
+          patientsOk = false;
+        }
+      }(),
+      _fetchNotifications().then((_) {}),
+    ]);
+
+    if (!mounted) return;
+    setState(() {
+      _unitFailed = !unitOk;
+      if (unitOk && _unitSaveGeneration == initialUnitGen) {
+        _unitCode = fetchedCode;
       }
-    }
+
+      _incidentsFailed = !incidentsOk;
+      if (incidentsOk) {
+        _incidentsCount = incidentsCount;
+      }
+
+      _patientsFailed = !patientsOk;
+      if (patientsOk) {
+        _patientsCount = patientsCount;
+        _transfersCount = transfersCount;
+      }
+
+      _loading = false;
+    });
   }
 
   Future<void> _editUnit() async {
@@ -290,7 +383,11 @@ class _ParamedicoProfileSheetState extends State<_ParamedicoProfileSheet> {
       _unitCode,
     );
     if (newCode != null && mounted) {
-      setState(() => _unitCode = newCode);
+      setState(() {
+        _unitSaveGeneration++;
+        _unitFailed = false;
+        _unitCode = newCode;
+      });
     }
   }
 
@@ -300,6 +397,8 @@ class _ParamedicoProfileSheetState extends State<_ParamedicoProfileSheet> {
     final sheetHeight = media.size.height - media.padding.top - 64;
     final fullName = AuthGate.instance.fullName ?? 'Cuenta activa';
     final unreadNotifications = _notifications.where((n) => n.isUnread).length;
+    final hasAnyMetricError =
+        !_loading && (_unitFailed || _incidentsFailed || _patientsFailed);
 
     return Container(
       height: sheetHeight,
@@ -488,7 +587,11 @@ class _ParamedicoProfileSheetState extends State<_ParamedicoProfileSheet> {
                             ),
                             const SizedBox(height: 2),
                             Text(
-                              _loading ? '...' : (_unitCode ?? 'Sin asignar'),
+                              _loading
+                                  ? '...'
+                                  : (_unitFailed
+                                        ? 'No disponible'
+                                        : (_unitCode ?? 'Sin asignar')),
                               style: TriageTextStyles.titleLarge.copyWith(
                                 color: TriageColors.textPrimary,
                                 fontWeight: FontWeight.bold,
@@ -524,32 +627,71 @@ class _ParamedicoProfileSheetState extends State<_ParamedicoProfileSheet> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        'Turno de hoy',
-                        style: TriageTextStyles.titleMedium.copyWith(
-                          color: TriageColors.textPrimary,
-                          fontWeight: FontWeight.bold,
-                        ),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              'Turno de hoy',
+                              style: TriageTextStyles.titleMedium.copyWith(
+                                color: TriageColors.textPrimary,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                          if (hasAnyMetricError)
+                            TextButton.icon(
+                              onPressed: _loadData,
+                              style: TextButton.styleFrom(
+                                foregroundColor: TriageColors.paramedicAccent,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: TriageSpacing.sm,
+                                  vertical: 4,
+                                ),
+                                minimumSize: Size.zero,
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              ),
+                              icon: const Icon(Icons.refresh_rounded, size: 16),
+                              label: Text(
+                                'Reintentar',
+                                style: TriageTextStyles.labelSmall.copyWith(
+                                  color: TriageColors.paramedicAccent,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                        ],
                       ),
                       const SizedBox(height: TriageSpacing.md),
                       _ShiftMetricRow(
                         label: 'Incidentes atendidos',
-                        value: _loading ? '—' : '$_incidentsCount',
+                        value: _loading
+                            ? '—'
+                            : (_incidentsFailed
+                                  ? 'No disponible'
+                                  : '$_incidentsCount'),
                       ),
                       const SizedBox(height: TriageSpacing.md),
                       _ShiftMetricRow(
                         label: 'Pacientes registrados',
-                        value: _loading ? '—' : '$_patientsCount',
+                        value: _loading
+                            ? '—'
+                            : (_patientsFailed
+                                  ? 'No disponible'
+                                  : '$_patientsCount'),
                       ),
                       const SizedBox(height: TriageSpacing.md),
                       _ShiftMetricRow(
                         label: 'Traslados confirmados',
-                        value: _loading ? '—' : '$_transfersCount',
+                        value: _loading
+                            ? '—'
+                            : (_patientsFailed
+                                  ? 'No disponible'
+                                  : '$_transfersCount'),
                       ),
                       const SizedBox(height: TriageSpacing.md),
                       _ShiftMetricRow(
-                        label: 'Entró en turno',
-                        value: _shiftStartTime,
+                        label: 'Inicio de turno',
+                        value: _lastSignInTime,
                       ),
                     ],
                   ),
@@ -870,45 +1012,48 @@ class _UnitCodeDialogState extends State<_UnitCodeDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      backgroundColor: TriageColors.surface,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(TriageRadii.md),
-      ),
-      title: Text(
-        'Código de unidad',
-        style: TriageTextStyles.titleMedium.copyWith(
-          color: TriageColors.textPrimary,
-          fontWeight: FontWeight.bold,
+    return PopScope(
+      canPop: !_saving,
+      child: AlertDialog(
+        backgroundColor: TriageColors.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(TriageRadii.md),
         ),
-      ),
-      content: TextField(
-        controller: _controller,
-        textCapitalization: TextCapitalization.characters,
-        decoration: const InputDecoration(
-          hintText: 'Ej. CRT-101',
-          labelText: 'Número económico',
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: _saving
-              ? null
-              : () {
-                  FocusManager.instance.primaryFocus?.unfocus();
-                  Navigator.of(context).pop();
-                },
-          child: const Text('Cancelar'),
-        ),
-        FilledButton(
-          style: FilledButton.styleFrom(
-            backgroundColor: TriageColors.paramedicAccent,
-            foregroundColor: TriageColors.textInverse,
+        title: Text(
+          'Código de unidad',
+          style: TriageTextStyles.titleMedium.copyWith(
+            color: TriageColors.textPrimary,
+            fontWeight: FontWeight.bold,
           ),
-          onPressed: _saving ? null : _submit,
-          child: Text(_saving ? 'Guardando...' : 'Guardar'),
         ),
-      ],
+        content: TextField(
+          controller: _controller,
+          textCapitalization: TextCapitalization.characters,
+          decoration: const InputDecoration(
+            hintText: 'Ej. CRT-101',
+            labelText: 'Número económico',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: _saving
+                ? null
+                : () {
+                    FocusManager.instance.primaryFocus?.unfocus();
+                    Navigator.of(context).pop();
+                  },
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: TriageColors.paramedicAccent,
+              foregroundColor: TriageColors.textInverse,
+            ),
+            onPressed: _saving ? null : _submit,
+            child: Text(_saving ? 'Guardando...' : 'Guardar'),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -931,7 +1076,10 @@ class _ProfileFloatingSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bottomInset = MediaQuery.of(context).padding.bottom;
+    final media = MediaQuery.of(context);
+    final bottomInset = media.padding.bottom;
+    final maxSheetHeight =
+        media.size.height - media.padding.top - (TriageSpacing.md * 2);
 
     return Padding(
       padding: EdgeInsets.fromLTRB(
@@ -940,32 +1088,35 @@ class _ProfileFloatingSheet extends StatelessWidget {
         TriageSpacing.md,
         bottomInset + TriageSpacing.md,
       ),
-      child: Container(
-        padding: padding,
-        decoration: BoxDecoration(
-          color: TriageColors.surface,
-          borderRadius: BorderRadius.circular(TriageRadii.xxl),
-          boxShadow: TriageShadows.floating,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            if (showDragHandle) ...[
-              Center(
-                child: Container(
-                  width: 38,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: TriageColors.borderMedium,
-                    borderRadius: BorderRadius.circular(999),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxHeight: maxSheetHeight),
+        child: Container(
+          padding: padding,
+          decoration: BoxDecoration(
+            color: TriageColors.surface,
+            borderRadius: BorderRadius.circular(TriageRadii.xxl),
+            boxShadow: TriageShadows.floating,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (showDragHandle) ...[
+                Center(
+                  child: Container(
+                    width: 38,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: TriageColors.borderMedium,
+                      borderRadius: BorderRadius.circular(999),
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(height: TriageSpacing.md),
+                const SizedBox(height: TriageSpacing.md),
+              ],
+              Flexible(child: SingleChildScrollView(child: child)),
             ],
-            child,
-          ],
+          ),
         ),
       ),
     );
@@ -1110,13 +1261,17 @@ class _ShiftMetricRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: TriageTextStyles.bodyMedium.copyWith(
-            color: TriageColors.textSecondary,
+        Expanded(
+          child: Text(
+            label,
+            style: TriageTextStyles.bodyMedium.copyWith(
+              color: TriageColors.textSecondary,
+            ),
           ),
         ),
+        const SizedBox(width: TriageSpacing.md),
         Text(
           value,
           style: TriageTextStyles.labelLarge.copyWith(

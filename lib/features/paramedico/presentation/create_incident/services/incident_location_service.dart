@@ -12,6 +12,8 @@ typedef GpsStatus = ({
 class IncidentLocationService {
   IncidentLocationService._();
 
+  static bool _retainedPermanentlyDenied = false;
+
   /// Abre el panel flotante para revisar, solicitar o probar el permiso de GPS
   static Future<void> showPermissionsSheet(BuildContext context) {
     return showModalBottomSheet<void>(
@@ -38,8 +40,17 @@ class IncidentLocationService {
       final isGranted =
           permission == LocationPermission.whileInUse ||
           permission == LocationPermission.always;
+
+      if (isGranted) {
+        _retainedPermanentlyDenied = false;
+      } else if (permission == LocationPermission.deniedForever) {
+        _retainedPermanentlyDenied = true;
+      }
+
       final isPermanentlyDenied =
-          permission == LocationPermission.deniedForever;
+          permission == LocationPermission.deniedForever ||
+          (_retainedPermanentlyDenied &&
+              permission == LocationPermission.denied);
 
       return (
         serviceEnabled: true,
@@ -56,21 +67,49 @@ class IncidentLocationService {
   }
 
   /// Solicita el permiso o abre los ajustes del sistema según el estado actual
-  static Future<GpsStatus> requestOrOpenSettings() async {
+  static Future<GpsStatus> requestOrOpenSettings({
+    ValueChanged<String>? onSettingsOpenFailed,
+  }) async {
     final current = await checkStatus();
 
     if (!current.serviceEnabled) {
-      await Geolocator.openLocationSettings();
+      var opened = false;
+      try {
+        opened = await Geolocator.openLocationSettings();
+      } catch (_) {
+        opened = false;
+      }
+      if (!opened) {
+        onSettingsOpenFailed?.call(
+          'No se pudieron abrir los ajustes de ubicación. Activa el GPS manualmente en la configuración del dispositivo.',
+        );
+      }
       return checkStatus();
     }
 
     if (current.isPermanentlyDenied) {
-      await Geolocator.openAppSettings();
+      var opened = false;
+      try {
+        opened = await Geolocator.openAppSettings();
+      } catch (_) {
+        opened = false;
+      }
+      if (!opened) {
+        onSettingsOpenFailed?.call(
+          'No se pudieron abrir los ajustes de la aplicación. Habilita el permiso de ubicación manualmente en la configuración del dispositivo.',
+        );
+      }
       return checkStatus();
     }
 
     if (!current.isGranted) {
-      await Geolocator.requestPermission();
+      final permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.deniedForever) {
+        _retainedPermanentlyDenied = true;
+      } else if (permission == LocationPermission.whileInUse ||
+          permission == LocationPermission.always) {
+        _retainedPermanentlyDenied = false;
+      }
       return checkStatus();
     }
 
@@ -88,10 +127,15 @@ class IncidentLocationService {
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
     }
-    if (permission == LocationPermission.denied ||
-        permission == LocationPermission.deniedForever) {
+    if (permission == LocationPermission.deniedForever) {
+      _retainedPermanentlyDenied = true;
       return null;
     }
+    if (permission == LocationPermission.denied) {
+      return null;
+    }
+
+    _retainedPermanentlyDenied = false;
 
     try {
       final pos = await Geolocator.getCurrentPosition(
@@ -122,12 +166,16 @@ class _GpsPermissionsSheetState extends State<_GpsPermissionsSheet>
     with WidgetsBindingObserver {
   bool _checking = true;
   bool _testingSignal = false;
+  bool _requestingPermission = false;
+  int _statusEpoch = 0;
+
   GpsStatus _status = (
     serviceEnabled: false,
     isGranted: false,
     isPermanentlyDenied: false,
   );
   String? _signalFeedback;
+  String? _actionFeedback;
 
   @override
   void initState() {
@@ -149,13 +197,27 @@ class _GpsPermissionsSheetState extends State<_GpsPermissionsSheet>
     }
   }
 
+  void _applyStatus(GpsStatus next, {bool clearChecking = false}) {
+    final changed = next != _status;
+    if (changed) {
+      _statusEpoch++;
+    }
+    setState(() {
+      if (changed) {
+        _status = next;
+        _signalFeedback = null;
+        _actionFeedback = null;
+      }
+      if (clearChecking) {
+        _checking = false;
+      }
+    });
+  }
+
   Future<void> _refreshStatus() async {
     final next = await IncidentLocationService.checkStatus();
     if (!mounted) return;
-    setState(() {
-      _status = next;
-      _checking = false;
-    });
+    _applyStatus(next, clearChecking: true);
   }
 
   String get _statusTitle {
@@ -169,16 +231,19 @@ class _GpsPermissionsSheetState extends State<_GpsPermissionsSheet>
   String get _statusSubtitle {
     if (_checking) return 'Consultando estado de ubicación en el equipo.';
     if (!_status.serviceEnabled) {
-      return 'Activa la ubicación del teléfono para georreferenciar incidentes y pacientes.';
+      return _actionFeedback ??
+          'Activa la ubicación del teléfono para georreferenciar incidentes y pacientes.';
     }
     if (_status.isGranted) {
       return _signalFeedback ??
           'Listo para capturar coordenadas en incidentes, evaluaciones y traslados.';
     }
     if (_status.isPermanentlyDenied) {
-      return 'Habilita el acceso a la ubicación desde la configuración del sistema.';
+      return _actionFeedback ??
+          'Habilita el acceso a la ubicación desde la configuración del sistema.';
     }
-    return 'Concede acceso al GPS para registrar la ubicación exacta de atención.';
+    return _actionFeedback ??
+        'Concede acceso al GPS para registrar la ubicación exacta de atención.';
   }
 
   String get _actionLabel {
@@ -189,28 +254,66 @@ class _GpsPermissionsSheetState extends State<_GpsPermissionsSheet>
   }
 
   Future<void> _handleAction() async {
+    if (_checking || _testingSignal || _requestingPermission) return;
+
     if (!_status.isGranted) {
-      final updated = await IncidentLocationService.requestOrOpenSettings();
-      if (!mounted) return;
-      setState(() => _status = updated);
+      setState(() {
+        _requestingPermission = true;
+        _actionFeedback = null;
+      });
+      try {
+        final updated = await IncidentLocationService.requestOrOpenSettings(
+          onSettingsOpenFailed: (message) {
+            if (!mounted) return;
+            setState(() => _actionFeedback = message);
+          },
+        );
+        if (!mounted) return;
+        _applyStatus(updated);
+      } catch (_) {
+        if (!mounted) return;
+        setState(() {
+          _actionFeedback =
+              'No se pudo completar la solicitud de ubicación. Inténtalo de nuevo.';
+        });
+      } finally {
+        if (mounted) {
+          setState(() => _requestingPermission = false);
+        }
+      }
       return;
     }
 
+    final requestEpoch = _statusEpoch;
     setState(() => _testingSignal = true);
-    final coords = await IncidentLocationService.getCurrentPosition();
-    if (!mounted) return;
+    try {
+      final coords = await IncidentLocationService.getCurrentPosition();
+      if (!mounted || requestEpoch != _statusEpoch) return;
 
-    setState(() {
-      _testingSignal = false;
-      _signalFeedback = coords != null
-          ? 'Señal confirmada (${coords.lat.toStringAsFixed(5)}, ${coords.lng.toStringAsFixed(5)})'
-          : IncidentLocationService.errorMessageForNullResult();
-    });
+      setState(() {
+        _signalFeedback = coords != null
+            ? 'Señal confirmada (${coords.lat.toStringAsFixed(5)}, ${coords.lng.toStringAsFixed(5)})'
+            : IncidentLocationService.errorMessageForNullResult();
+      });
+    } catch (_) {
+      if (!mounted || requestEpoch != _statusEpoch) return;
+      setState(() {
+        _signalFeedback =
+            'Error al probar la señal GPS. Verifica tu ubicación e inténtalo de nuevo.';
+      });
+    } finally {
+      if (mounted) {
+        setState(() => _testingSignal = false);
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final bottomInset = MediaQuery.of(context).padding.bottom;
+    final media = MediaQuery.of(context);
+    final bottomInset = media.padding.bottom;
+    final maxSheetHeight =
+        media.size.height - media.padding.top - (TriageSpacing.md * 2);
     final isReady = _status.isGranted;
 
     return Padding(
@@ -220,178 +323,204 @@ class _GpsPermissionsSheetState extends State<_GpsPermissionsSheet>
         TriageSpacing.md,
         bottomInset + TriageSpacing.md,
       ),
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(
-          TriageSpacing.lg,
-          TriageSpacing.md,
-          TriageSpacing.lg,
-          TriageSpacing.lg,
-        ),
-        decoration: BoxDecoration(
-          color: TriageColors.surface,
-          borderRadius: BorderRadius.circular(TriageRadii.xxl),
-          boxShadow: TriageShadows.floating,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Center(
-              child: Container(
-                width: 38,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: TriageColors.borderMedium,
-                  borderRadius: BorderRadius.circular(999),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxHeight: maxSheetHeight),
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(
+            TriageSpacing.lg,
+            TriageSpacing.md,
+            TriageSpacing.lg,
+            TriageSpacing.lg,
+          ),
+          decoration: BoxDecoration(
+            color: TriageColors.surface,
+            borderRadius: BorderRadius.circular(TriageRadii.xxl),
+            boxShadow: TriageShadows.floating,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Center(
+                child: Container(
+                  width: 38,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: TriageColors.borderMedium,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: TriageSpacing.md),
-            Row(
-              children: [
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: TriageColors.paramedicAccent.withValues(alpha: 0.10),
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: const Icon(
-                    Icons.location_on_outlined,
-                    color: TriageColors.paramedicAccent,
-                    size: 22,
-                  ),
-                ),
-                const SizedBox(width: TriageSpacing.md),
-                Expanded(
+              const SizedBox(height: TriageSpacing.md),
+              Flexible(
+                child: SingleChildScrollView(
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Text(
-                        'Privacidad y permisos',
-                        style: TriageTextStyles.titleMedium.copyWith(
-                          color: TriageColors.textPrimary,
-                          fontWeight: FontWeight.bold,
+                      Row(
+                        children: [
+                          Container(
+                            width: 44,
+                            height: 44,
+                            decoration: BoxDecoration(
+                              color: TriageColors.paramedicAccent.withValues(
+                                alpha: 0.10,
+                              ),
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            child: const Icon(
+                              Icons.location_on_outlined,
+                              color: TriageColors.paramedicAccent,
+                              size: 22,
+                            ),
+                          ),
+                          const SizedBox(width: TriageSpacing.md),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Privacidad y permisos',
+                                  style: TriageTextStyles.titleMedium.copyWith(
+                                    color: TriageColors.textPrimary,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                Text(
+                                  'Control de ubicación en turno',
+                                  style: TriageTextStyles.bodySmall.copyWith(
+                                    color: TriageColors.textSecondary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          TriageIconButton(
+                            icon: TriageIcons.close,
+                            tooltip: 'Cerrar',
+                            onPressed: () => Navigator.of(context).pop(),
+                            variant: TriageIconButtonVariant.plain,
+                            iconSize: TriageSizes.iconLarge,
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: TriageSpacing.md),
+                      const Divider(
+                        height: TriageSizes.hairline,
+                        thickness: TriageSizes.hairline,
+                        color: TriageColors.borderSubtle,
+                      ),
+                      const SizedBox(height: TriageSpacing.md),
+                      Container(
+                        padding: const EdgeInsets.all(TriageSpacing.md),
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).scaffoldBackgroundColor,
+                          borderRadius: BorderRadius.circular(
+                            TriageRadii.md + 2,
+                          ),
+                          border: Border.all(color: TriageColors.borderSubtle),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    _statusTitle,
+                                    style: TriageTextStyles.titleSmall.copyWith(
+                                      color: TriageColors.textPrimary,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: TriageSpacing.sm,
+                                    vertical: 3,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color:
+                                        (isReady
+                                                ? Colors.green.shade700
+                                                : TriageColors.paramedicAccent)
+                                            .withValues(alpha: 0.12),
+                                    borderRadius: BorderRadius.circular(999),
+                                  ),
+                                  child: Text(
+                                    _checking
+                                        ? '...'
+                                        : (isReady
+                                              ? 'Activo'
+                                              : 'Requiere acción'),
+                                    style: TriageTextStyles.labelSmall.copyWith(
+                                      color: isReady
+                                          ? Colors.green.shade800
+                                          : TriageColors.paramedicAccent,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: TriageSpacing.xs),
+                            Text(
+                              _statusSubtitle,
+                              style: TriageTextStyles.bodySmall.copyWith(
+                                color: TriageColors.textSecondary,
+                                height: 1.4,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
+                      const SizedBox(height: TriageSpacing.md),
                       Text(
-                        'Control de ubicación en turno',
+                        'La ubicación se consulta únicamente al crear incidentes, capturar pacientes, iniciar un traslado hospitalario o al pulsar «Probar señal GPS» para obtener y mostrar las coordenadas.',
                         style: TriageTextStyles.bodySmall.copyWith(
                           color: TriageColors.textSecondary,
+                          height: 1.4,
                         ),
                       ),
-                    ],
-                  ),
-                ),
-                TriageIconButton(
-                  icon: TriageIcons.close,
-                  tooltip: 'Cerrar',
-                  onPressed: () => Navigator.of(context).pop(),
-                  variant: TriageIconButtonVariant.plain,
-                  iconSize: TriageSizes.iconLarge,
-                ),
-              ],
-            ),
-            const SizedBox(height: TriageSpacing.md),
-            const Divider(
-              height: TriageSizes.hairline,
-              thickness: TriageSizes.hairline,
-              color: TriageColors.borderSubtle,
-            ),
-            const SizedBox(height: TriageSpacing.md),
-            Container(
-              padding: const EdgeInsets.all(TriageSpacing.md),
-              decoration: BoxDecoration(
-                color: Theme.of(context).scaffoldBackgroundColor,
-                borderRadius: BorderRadius.circular(TriageRadii.md + 2),
-                border: Border.all(color: TriageColors.borderSubtle),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          _statusTitle,
-                          style: TriageTextStyles.titleSmall.copyWith(
-                            color: TriageColors.textPrimary,
-                            fontWeight: FontWeight.bold,
+                      const SizedBox(height: TriageSpacing.lg),
+                      SizedBox(
+                        width: double.infinity,
+                        child: FilledButton(
+                          style: FilledButton.styleFrom(
+                            backgroundColor: TriageColors.paramedicAccent,
+                            foregroundColor: TriageColors.textInverse,
+                            padding: const EdgeInsets.symmetric(
+                              vertical: TriageSpacing.md + 2,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(
+                                TriageRadii.md + 4,
+                              ),
+                            ),
+                            elevation: 0,
                           ),
-                        ),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: TriageSpacing.sm,
-                          vertical: 3,
-                        ),
-                        decoration: BoxDecoration(
-                          color:
-                              (isReady
-                                      ? Colors.green.shade700
-                                      : TriageColors.paramedicAccent)
-                                  .withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                        child: Text(
-                          _checking
-                              ? '...'
-                              : (isReady ? 'Activo' : 'Requiere acción'),
-                          style: TriageTextStyles.labelSmall.copyWith(
-                            color: isReady
-                                ? Colors.green.shade800
-                                : TriageColors.paramedicAccent,
-                            fontWeight: FontWeight.bold,
+                          onPressed:
+                              (_checking ||
+                                  _testingSignal ||
+                                  _requestingPermission)
+                              ? null
+                              : _handleAction,
+                          child: Text(
+                            _actionLabel,
+                            style: TriageTextStyles.titleSmall.copyWith(
+                              color: TriageColors.textInverse,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: TriageSpacing.xs),
-                  Text(
-                    _statusSubtitle,
-                    style: TriageTextStyles.bodySmall.copyWith(
-                      color: TriageColors.textSecondary,
-                      height: 1.4,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: TriageSpacing.md),
-            Text(
-              'La ubicación se consulta únicamente al crear incidentes, capturar pacientes o iniciar un traslado hospitalario.',
-              style: TriageTextStyles.bodySmall.copyWith(
-                color: TriageColors.textSecondary,
-                height: 1.4,
-              ),
-            ),
-            const SizedBox(height: TriageSpacing.lg),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton(
-                style: FilledButton.styleFrom(
-                  backgroundColor: TriageColors.paramedicAccent,
-                  foregroundColor: TriageColors.textInverse,
-                  padding: const EdgeInsets.symmetric(
-                    vertical: TriageSpacing.md + 2,
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(TriageRadii.md + 4),
-                  ),
-                  elevation: 0,
-                ),
-                onPressed: (_checking || _testingSignal) ? null : _handleAction,
-                child: Text(
-                  _actionLabel,
-                  style: TriageTextStyles.titleSmall.copyWith(
-                    color: TriageColors.textInverse,
-                    fontWeight: FontWeight.bold,
-                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
