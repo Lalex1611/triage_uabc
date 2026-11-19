@@ -76,8 +76,12 @@ void main() {
     for (final label in ['Entrantes', 'Sala', 'Registrar', 'Perfil']) {
       await tester.tap(find.text(label));
     }
-    // Sala y Perfil aún no tienen pantalla
-    expect(tapped, [MedicoNavbar.incomingTab, MedicoNavbar.registerTab]);
+    expect(tapped, [
+      MedicoNavbar.incomingTab,
+      MedicoNavbar.wardTab,
+      MedicoNavbar.registerTab,
+      MedicoNavbar.profileTab,
+    ]);
     expect(find.bySemanticsLabel('Crear incidente'), findsNothing);
   });
 
@@ -93,12 +97,13 @@ void main() {
         MedicoNavbar(currentIndex: MedicoNavbar.incomingTab, onTap: (_) {}),
       ),
     );
-    expect(_textColor(tester, 'Entrantes'), TriageColors.hospitalAccent);
+    expect(_textColor(tester, 'Entrantes'), MedicoNavbar.activeColor);
     expect(_textColor(tester, 'Registrar'), TriageColors.textSecondary);
 
     for (final color in [
       TriageColors.paramedicAccent,
       TriageColors.hospitalAccent,
+      MedicoNavbar.activeColor,
       TriageColors.textSecondary,
     ]) {
       expect(_contrast(color, TriageColors.surface), greaterThanOrEqualTo(4.5));

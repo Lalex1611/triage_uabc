@@ -14,11 +14,15 @@ class MedicoNavbar extends StatelessWidget {
     required this.onTap,
   });
 
+  static const int incomingTab = 0;
+  static const int wardTab = 1;
+  static const int registerTab = 2;
+  static const int profileTab = 3;
+
+  static const Color activeColor = Color(0xFF005AA0);
+
   @override
   Widget build(BuildContext context) {
-    final activeColor = const Color(0xFF005AA0);
-    final inactiveColor = TriageColors.textSecondary;
-
     return AppModuleBottomNav(
       tabs: const [
         AppModuleBottomNavTab(
@@ -32,7 +36,7 @@ class MedicoNavbar extends StatelessWidget {
       currentIndex: currentIndex,
       onTap: onTap,
       activeColor: activeColor,
-      inactiveColor: inactiveColor,
+      inactiveColor: TriageColors.textSecondary,
     );
   }
 }
