@@ -3,10 +3,12 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:sistema_triage/core/util/map_launcher.dart';
 import 'package:sistema_triage/features/paramedico/presentation/map/paramedico_map_controller.dart';
 import 'package:sistema_triage/features/paramedico/data/repositories/paramedico_incidents_repository.dart';
+import 'package:sistema_triage/features/paramedico/domain/entities/map/map_patient_pin.dart';
 import 'package:sistema_triage/features/paramedico/presentation/map/services/map_geocoding_service.dart';
-import 'package:sistema_triage/features/paramedico/presentation/map/services/map_route_service.dart';
+import 'package:sistema_triage/features/paramedico/presentation/shared/paramedico_incidents_store.dart';
 
 /// Geocodificador que responde cuando el test lo decide
 class _ManualGeocoding extends MapGeocodingService {
@@ -17,17 +19,47 @@ class _ManualGeocoding extends MapGeocodingService {
       (requests[query] = Completer<LatLng?>()).future;
 }
 
-/// Servicio de rutas que responde cuando el test lo decide
-class _ManualRoutes extends MapRouteService {
-  final reply = Completer<List<LatLng>>();
+ParamedicoIncidentSummary _incident(String id) => ParamedicoIncidentSummary(
+  id: id,
+  generatedTitle: id,
+  emergencyType: 'otro',
+  createdAt: null,
+  createdBy: 'u',
+  latitude: 32.51,
+  longitude: -117.01,
+);
+
+/// La recarga devuelve "c" (recién creado) cuando el test abre [gate]
+class _GatedRepository extends ParamedicoIncidentsRepository {
+  final gate = Completer<void>();
 
   @override
-  Future<List<LatLng>> fetchDrivingRoute({
-    required double fromLat,
-    required double fromLng,
-    required double toLat,
-    required double toLng,
-  }) => reply.future;
+  Future<List<ParamedicoIncidentSummary>> listOpenIncidents() async {
+    await gate.future;
+    return [_incident('a'), _incident('b'), _incident('c')];
+  }
+
+  @override
+  Future<
+    ({
+      Map<String, IncidentPatientTriageCounts> counts,
+      List<MapPatientPin> pins,
+    })
+  >
+  patientsOverviewForIncidents(
+    Iterable<String> incidentIds, {
+    Map<String, LatLng> incidentCentersById = const {},
+  }) async => (
+    counts: <String, IncidentPatientTriageCounts>{},
+    pins: <MapPatientPin>[],
+  );
+}
+
+/// Controlador con dos incidentes cargados (sin Supabase ni GPS)
+ParamedicoMapController _controller() {
+  final store = ParamedicoIncidentsStore()
+    ..incidents = [_incident('a'), _incident('b')];
+  return ParamedicoMapController(store: store);
 }
 
 void main() {
@@ -71,30 +103,77 @@ void main() {
     expect(find.textContaining('No encontramos'), findsNothing);
   });
 
-  test('una ruta que llega tras soltar el incidente no se pinta', () async {
-    final routes = _ManualRoutes();
-    final c = ParamedicoMapController(routeService: routes);
+  test('tocar un incidente lo elige y tocar el mapa lo suelta', () {
+    final c = _controller();
     addTearDown(c.dispose);
-    c.userPosition = const LatLng(32.5, -117);
-    c.selectedIncidentId = 'a';
 
-    final pending = c.loadRouteTo(
-      ParamedicoIncidentSummary(
-        id: 'a',
-        generatedTitle: 'a',
-        emergencyType: 'otro',
-        createdAt: null,
-        createdBy: 'u',
-        latitude: 32.51,
-        longitude: -117.01,
+    c.onPinTap(_incident('a'));
+    expect(c.selectedIncident?.id, 'a');
+
+    c.onMapBackgroundTap();
+    expect(c.selectedIncidentId, isNull);
+  });
+
+  testWidgets('desde la ficha de un paciente se puede volver a ella', (
+    tester,
+  ) async {
+    final c = _controller();
+    addTearDown(c.dispose);
+
+    c.focusIncidentForView(_incident('a'), highlightPatientId: 'p');
+    await tester.pump();
+    expect(c.highlightedPatientId, 'p');
+    expect(c.returnToPatientId, 'p');
+
+    // Elegir otro incidente ya no tiene que ver con ese paciente
+    c.onPinTap(_incident('b'));
+    expect(c.highlightedPatientId, isNull);
+    expect(c.returnToPatientId, isNull);
+  });
+
+  testWidgets('un enfoque pendiente no pisa el incidente que se tocó después', (
+    tester,
+  ) async {
+    final repo = _GatedRepository();
+    final store = ParamedicoIncidentsStore(repository: repo)
+      ..incidents = [_incident('a'), _incident('b')];
+    final c = ParamedicoMapController(store: store);
+    addTearDown(c.dispose);
+    late BuildContext context;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (ctx) {
+            context = ctx;
+            return const SizedBox();
+          },
+        ),
       ),
     );
-    c.clearSelection();
-    routes.reply.complete(const [LatLng(32.5, -117), LatLng(32.51, -117.01)]);
-    await pending;
 
-    expect(c.routePoints, isEmpty);
-    expect(c.routing, isFalse);
+    // "c" aún no llegó: el enfoque espera a que se recarguen los datos
+    c.pendingFocusId = 'c';
+    final focus = c.applyPendingFocus(context);
+    c.onPinTap(_incident('b'));
+    repo.gate.complete();
+    await focus;
+
+    expect(c.selectedIncidentId, 'b');
+  });
+
+  test('"Cómo llegar" abre Google Maps navegando al incidente', () {
+    final uri = directionsUri(32.51, -117.01);
+
+    expect(uri.host, 'www.google.com');
+    expect(uri.path, '/maps/dir/');
+    expect(uri.queryParameters, {
+      'api': '1',
+      'destination': '32.51,-117.01',
+      'travelmode': 'driving',
+      'dir_action': 'navigate',
+    });
+    // Sin origen: Google Maps sale de donde esté el usuario en ese momento
+    expect(uri.queryParameters.containsKey('origin'), isFalse);
   });
 
   test('tras dispose, lo que termine tarde no avisa', () {

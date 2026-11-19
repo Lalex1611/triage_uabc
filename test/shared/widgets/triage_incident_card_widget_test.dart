@@ -63,6 +63,18 @@ void main() {
     expect(find.byType(TriageLevelCount), findsOneWidget);
   });
 
+  testWidgets('el tiempo va pegado a la esquina derecha, como en Figma', (
+    tester,
+  ) async {
+    await tester.pumpWidget(_wrap(_card()));
+    final contentRight = tester.getTopRight(find.byType(Divider)).dx;
+    expect(tester.getTopRight(find.text('hace 18 min')).dx, contentRight);
+    expect(
+      tester.getTopLeft(find.text('INC-729')).dx,
+      tester.getTopLeft(find.byType(Divider)).dx,
+    );
+  });
+
   testWidgets('"1 paciente" en singular', (tester) async {
     await tester.pumpWidget(_wrap(_card(patients: 1)));
     expect(find.text('1 paciente'), findsOneWidget);
