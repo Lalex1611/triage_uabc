@@ -3,14 +3,12 @@ import 'package:sistema_triage/core/constants/app_colors.dart';
 import 'package:sistema_triage/core/theme/app_theme.dart';
 import 'package:sistema_triage/features/medico/domain/entities/home/medico_patient_card_data.dart';
 import 'package:sistema_triage/features/medico/presentation/home/widgets/medico_patient_card_widget.dart';
+import 'package:sistema_triage/shared/widgets/triage_pressable_widget.dart';
 
 /// Caja única: tarjeta del incidente arriba y **debajo** (fuera de la tarjeta)
 /// los controles de ingreso en traslado (ACEPTAR / RECHAZAR)
 class MedicoPatientIncomingTransferShell extends StatelessWidget {
-  const MedicoPatientIncomingTransferShell({
-    super.key,
-    required this.data,
-  });
+  const MedicoPatientIncomingTransferShell({super.key, required this.data});
 
   final MedicoPatientCardData data;
 
@@ -50,18 +48,28 @@ class MedicoPatientIncomingTransferShell extends StatelessWidget {
             decoration: BoxDecoration(
               color: AppColors.primaryMedico.withValues(alpha: 0.06),
               border: Border(
-                top: BorderSide(
-                  color: Colors.black.withValues(alpha: 0.08),
-                ),
+                top: BorderSide(color: Colors.black.withValues(alpha: 0.08)),
               ),
             ),
             child: Padding(
               padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
               child: Row(
                 children: [
-                  Expanded(child: _chip(label: 'RECHAZAR', outlined: true, onTap: reject)),
+                  Expanded(
+                    child: _chip(
+                      label: 'Rechazar',
+                      outlined: true,
+                      onTap: reject,
+                    ),
+                  ),
                   const SizedBox(width: 10),
-                  Expanded(child: _chip(label: 'ACEPTAR', outlined: false, onTap: accept)),
+                  Expanded(
+                    child: _chip(
+                      label: 'Revisar y aceptar',
+                      outlined: false,
+                      onTap: accept,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -76,29 +84,26 @@ class MedicoPatientIncomingTransferShell extends StatelessWidget {
     required bool outlined,
     required VoidCallback onTap,
   }) {
-    return GestureDetector(
+    return TriagePressable(
       onTap: onTap,
-      child: Container(
+      builder: (context, pressed) => Container(
         height: 36,
         alignment: Alignment.center,
         decoration: BoxDecoration(
           color: outlined ? Colors.white : AppColors.primaryMedico,
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: AppColors.primaryMedico, width: 1),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: outlined ? 0.06 : 0.12),
-              blurRadius: 4,
-              offset: const Offset(0, 2),
-            ),
-          ],
+          border: Border.all(
+            color: outlined ? const Color(0xFFD9D9D9) : AppColors.primaryMedico,
+            width: 1,
+          ),
+          boxShadow: triagePressedShadow(pressed: pressed),
         ),
         child: Text(
           label,
           style: AppTextStyles.ESC_Bold_titleSmall.copyWith(
             fontSize: 11,
             letterSpacing: 0.35,
-            color: outlined ? AppColors.primaryMedico : Colors.white,
+            color: outlined ? Colors.black87 : Colors.white,
           ),
         ),
       ),

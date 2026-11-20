@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:sistema_triage/core/constants/app_colors.dart';
 import 'package:sistema_triage/core/theme/app_theme.dart';
 import 'package:sistema_triage/features/medico/domain/constants/medico_patient_filter.dart';
 import 'package:sistema_triage/features/medico/domain/entities/home/medico_triage_filters_data.dart';
+import 'package:sistema_triage/shared/widgets/triage_pressable_widget.dart';
 
-// Barra de filtros horizontales para segmentar la lista de pacientes del médico
+// Barra de filtros horizontales para segmentar la lista de pacientes del médico (mockup 01)
 class MedicoTriageFilters extends StatelessWidget {
   final MedicoTriageFiltersData data;
 
@@ -15,22 +15,16 @@ class MedicoTriageFilters extends StatelessWidget {
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       physics: const BouncingScrollPhysics(),
-      padding: const EdgeInsets.only(left: 25),
+      padding: const EdgeInsets.only(left: 16, right: 16),
       child: Row(
-        children: MedicoPatientFilter.values.asMap().entries.map((entry) {
-          final filter = entry.value;
-          final isLast = entry.key == MedicoPatientFilter.values.length - 1;
-
-          double paddingRight = 15;
-          if (isLast) {
-            paddingRight = 0;
-          }
-
-          return Padding(
-            padding: EdgeInsets.only(right: paddingRight),
-            child: _buildChip(filter),
-          );
-        }).toList(),
+        children: [
+          ...MedicoPatientFilter.values.map((filter) {
+            return Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: _buildChip(filter),
+            );
+          }),
+        ],
       ),
     );
   }
@@ -38,28 +32,23 @@ class MedicoTriageFilters extends StatelessWidget {
   Widget _buildChip(MedicoPatientFilter filter) {
     final isSelected = data.activeFilter == filter;
 
-    Color currentColor = AppColors.inactive;
-    if (isSelected) {
-      currentColor = AppColors.primaryMedico;
-    }
-
-    return GestureDetector(
+    return TriagePressable(
       onTap: () => data.onFilterChanged(filter),
-      child: Container(
-        height: 25.56,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5.65),
+      builder: (context, pressed) => Container(
+        height: 32,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16.39),
-          border: Border.all(color: currentColor, width: 0.36),
+          color: isSelected ? Colors.black : const Color(0xFFF2F2F7),
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: triagePressedShadow(pressed: pressed),
         ),
         alignment: Alignment.center,
         child: Text(
           filter.label,
           style: AppTextStyles.ESC_Regular_bodyMedium.copyWith(
-            color: currentColor,
-            fontSize: 10.58,
-            fontWeight: FontWeight.w300,
+            color: isSelected ? Colors.white : Colors.black87,
+            fontSize: 13,
+            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
           ),
         ),
       ),

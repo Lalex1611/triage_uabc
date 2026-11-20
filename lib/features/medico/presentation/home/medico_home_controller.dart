@@ -3,8 +3,11 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:sistema_triage/core/config/supabase_env.dart';
 import 'package:sistema_triage/core/session/auth_gate.dart';
+import 'package:sistema_triage/features/medico/data/repositories/medico_profile_repository.dart';
 import 'package:sistema_triage/features/medico/data/repositories/patients_repository.dart';
 import 'package:sistema_triage/features/medico/domain/constants/medico_patient_filter.dart';
+import 'package:sistema_triage/features/medico/domain/constants/medico_queue_filter.dart';
+import 'package:sistema_triage/features/medico/domain/constants/medico_queue_patient_status.dart';
 import 'package:sistema_triage/features/medico/domain/entities/home/medico_notification_item.dart';
 import 'package:sistema_triage/features/medico/domain/entities/home/medico_patient_card_data.dart';
 import 'package:sistema_triage/features/medico/domain/entities/home/medico_user_stats.dart';
@@ -16,12 +19,29 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 class MedicoHomeController extends ChangeNotifier {
   MedicoHomeController({
     PatientsRepository? repository,
+    MedicoProfileRepository? profileRepository,
     TextEditingController? searchController,
+    TextEditingController? salaSearchController,
   }) : _repo = repository ?? PatientsRepository(),
-       searchController = searchController ?? TextEditingController();
+       _profileRepo = profileRepository ?? MedicoProfileRepository(),
+       searchController = searchController ?? TextEditingController(),
+       salaSearchController = salaSearchController ?? TextEditingController();
 
   final PatientsRepository _repo;
+  final MedicoProfileRepository _profileRepo;
+
+  /// "Hospital · Área" del médico para el encabezado (null mientras carga)
+  String? hospitalLabel;
   final TextEditingController searchController;
+
+  /// Búsqueda propia de la pestaña Sala (independiente de Entrantes)
+  final TextEditingController salaSearchController;
+  MedicoQueueFilter salaFilter = MedicoQueueFilter.todos;
+  String salaSearchQuery = '';
+
+  /// Hora en que cada paciente pasó a `recibido` / `alta_medica`
+  Map<String, DateTime> receivedAt = {};
+  Map<String, DateTime> dischargedAt = {};
 
   List<MedicoPatientCardData> patients = [];
   List<MedicoPatientCardData> rejectedPatients = [];
@@ -34,8 +54,131 @@ class MedicoHomeController extends ChangeNotifier {
 
   static const Duration _notificationPollInterval = Duration(seconds: 8);
 
+  /// Red de seguridad por si Realtime se cae (o un cambio no llega por el
+  /// filtro, p. ej. otro médico rechaza y el paciente queda sin hospital)
+  static const Duration _patientsPollInterval = Duration(seconds: 30);
+
+  /// Agrupa varios cambios seguidos en una sola recarga
+  static const Duration _refreshDebounce = Duration(milliseconds: 600);
+
+  Timer? _patientsPollTimer;
+  Timer? _refreshDebounceTimer;
+  RealtimeChannel? _patientsRealtimeChannel;
+  bool _refreshing = false;
+  bool _refreshPending = false;
+  bool _disposed = false;
+
+  /// Ids de notificaciones ya vistas; una nueva dispara recarga de pacientes
+  final Set<String> _seenNotificationIds = {};
+  bool _notificationsPrimed = false;
+
   Timer? _notificationPollTimer;
   RealtimeChannel? _notificationRealtimeChannel;
+
+  /// Mantiene al día la campana y la lista de pacientes ("Llegando ahora",
+  /// Sala) sin que el médico tenga que recargar
+  void startLiveUpdates() {
+    startNotificationSubscription();
+    _startPatientsSubscription();
+  }
+
+  void stopLiveUpdates() {
+    stopNotificationSubscription();
+    _stopPatientsSubscription();
+  }
+
+  /// Realtime sobre `patients` del hospital del médico + polling de respaldo
+  void _startPatientsSubscription() {
+    _stopPatientsSubscription();
+    if (!SupabaseEnv.isConfigured) return;
+
+    _patientsPollTimer = Timer.periodic(
+      _patientsPollInterval,
+      (_) => requestSilentRefresh(),
+    );
+
+    final hid = AuthGate.instance.hospitalId;
+    if (hid == null || hid.isEmpty) return;
+
+    try {
+      final channel = Supabase.instance.client.channel('medico_patients_$hid');
+      channel.onPostgresChanges(
+        event: PostgresChangeEvent.all,
+        schema: 'public',
+        table: 'patients',
+        filter: PostgresChangeFilter(
+          type: PostgresChangeFilterType.eq,
+          column: 'hospital_id',
+          value: hid,
+        ),
+        callback: (_) => requestSilentRefresh(),
+      );
+      _patientsRealtimeChannel = channel;
+      channel.subscribe();
+    } catch (_) {
+      // Sin Realtime quedan el polling y las notificaciones como respaldo
+    }
+  }
+
+  void _stopPatientsSubscription() {
+    _patientsPollTimer?.cancel();
+    _patientsPollTimer = null;
+    _refreshDebounceTimer?.cancel();
+    _refreshDebounceTimer = null;
+    final ch = _patientsRealtimeChannel;
+    _patientsRealtimeChannel = null;
+    if (ch != null && SupabaseEnv.isConfigured) {
+      try {
+        unawaited(Supabase.instance.client.removeChannel(ch));
+      } catch (_) {}
+    }
+  }
+
+  /// Pide una recarga de pacientes sin indicador de carga (agrupada)
+  void requestSilentRefresh() {
+    if (_disposed) return;
+    _refreshDebounceTimer?.cancel();
+    _refreshDebounceTimer = Timer(_refreshDebounce, () {
+      unawaited(_silentRefresh());
+    });
+  }
+
+  Future<void> _silentRefresh() async {
+    if (_disposed || !SupabaseEnv.isConfigured) return;
+    if (loading || _refreshing) {
+      _refreshPending = true;
+      return;
+    }
+    _refreshing = true;
+    unawaited(_loadHospitalLabel());
+
+    try {
+      await _fetchPatients();
+      if (_disposed) return;
+      error = null;
+      notifyListeners();
+    } catch (_) {
+      // Se conservan los datos anteriores; el siguiente cambio reintenta
+    } finally {
+      _refreshing = false;
+      if (_refreshPending) {
+        _refreshPending = false;
+        requestSilentRefresh();
+      }
+    }
+  }
+
+  /// Si llegó una notificación que no habíamos visto, la lista de pacientes
+  /// probablemente cambió (traslado nuevo, registro de otro médico, etc.)
+  void _onNotificationsFetched(List<MedicoNotificationItem> items) {
+    final ids = items.map((n) => n.id).toSet();
+    final hasNew = ids.difference(_seenNotificationIds).isNotEmpty;
+    _seenNotificationIds
+      ..clear()
+      ..addAll(ids);
+    if (_notificationsPrimed && hasNew) requestSilentRefresh();
+    _notificationsPrimed = true;
+  }
 
   /// Polling + Realtime (si la tabla está en `supabase_realtime`) para que la campana
   /// y el panel vean notificaciones nuevas sin salir del home
@@ -95,7 +238,7 @@ class MedicoHomeController extends ChangeNotifier {
         .where(
           (p) =>
               p.status == PatientStatus.trasladando ||
-              p.status == PatientStatus.enEspera
+              p.status == PatientStatus.enEspera,
         )
         .length;
     final rojo = list
@@ -112,24 +255,41 @@ class MedicoHomeController extends ChangeNotifier {
     );
   }
 
-  bool matchesChip(MedicoPatientFilter f, TriageCategory t) {
+  bool _matchesColor(MedicoPatientFilter f, MedicoPatientCardData p) {
     switch (f) {
       case MedicoPatientFilter.todos:
         return true;
       case MedicoPatientFilter.rojo:
-        return t == TriageCategory.rojo;
+        return p.triageCategory == TriageCategory.rojo;
       case MedicoPatientFilter.naranja:
-        return t == TriageCategory.naranja;
+        return p.triageCategory == TriageCategory.naranja;
       case MedicoPatientFilter.amarillo:
-        return t == TriageCategory.amarillo;
+        return p.triageCategory == TriageCategory.amarillo;
       case MedicoPatientFilter.verde:
-        return t == TriageCategory.verde;
+        return p.triageCategory == TriageCategory.verde;
     }
   }
 
   List<MedicoPatientCardData> filteredByChip() {
+    return patients.where((p) => _matchesColor(activeFilter, p)).toList();
+  }
+
+  /// Pacientes aún no recibidos por el hospital, filtrados por color de triage
+  /// y por la búsqueda de Entradas (nombre o id; vacía = todos)
+  List<MedicoPatientCardData> incomingPatientsFiltered() {
+    final rejectedIds = _rejectedPatientIds();
+    final q = searchQuery.trim().toLowerCase();
     return patients
-        .where((p) => matchesChip(activeFilter, p.triageCategory))
+        .where(
+          (p) =>
+              (p.status == PatientStatus.trasladando ||
+                  p.status == PatientStatus.enEspera) &&
+              !rejectedIds.contains(p.patientRecordId) &&
+              _matchesColor(activeFilter, p) &&
+              (q.isEmpty ||
+                  p.name.toLowerCase().contains(q) ||
+                  p.id.toLowerCase().contains(q)),
+        )
         .toList();
   }
 
@@ -208,6 +368,7 @@ class MedicoHomeController extends ChangeNotifier {
     }
     try {
       medicoNotifications = await _repo.fetchMedicoNotifications();
+      _onNotificationsFetched(medicoNotifications);
       notifyListeners();
     } catch (_) {}
   }
@@ -219,8 +380,133 @@ class MedicoHomeController extends ChangeNotifier {
     } catch (_) {}
   }
 
+  // ---------------------------------------------------------------------------
+  // Sala (mockup 05)
+  // ---------------------------------------------------------------------------
+
+  /// Estado visible en Sala; null si el paciente no está en sala
+  MedicoQueuePatientStatus? salaStatusOf(MedicoPatientCardData p) {
+    switch (p.status) {
+      case PatientStatus.alta:
+        return MedicoQueuePatientStatus.alta;
+      case PatientStatus.recibido:
+        return p.incidentId == null
+            ? MedicoQueuePatientStatus.enEspera
+            : MedicoQueuePatientStatus.recibido;
+      case PatientStatus.enEspera:
+      case PatientStatus.trasladando:
+        return null;
+    }
+  }
+
+  /// Pacientes en atención (recibidos, sin alta)
+  List<MedicoPatientCardData> salaInCare() =>
+      patients.where((p) => p.status == PatientStatus.recibido).toList();
+
+  /// Conteo de pacientes en atención por color de triage
+  int salaCountFor(TriageCategory category) =>
+      salaInCare().where((p) => p.triageCategory == category).length;
+
+  /// Lista de la Sala según chip + búsqueda.
+  /// En atención: por nivel (más grave primero) y luego por llegada más antigua.
+  /// Dados de alta: alta más reciente primero.
+  List<MedicoPatientCardData> salaPatientsFiltered() {
+    final q = salaSearchQuery.trim().toLowerCase();
+    final list = patients.where((p) {
+      final st = salaStatusOf(p);
+      if (st == null) return false;
+      final matchesChip = switch (salaFilter) {
+        MedicoQueueFilter.todos => st != MedicoQueuePatientStatus.alta,
+        MedicoQueueFilter.enEspera => st == MedicoQueuePatientStatus.enEspera,
+        MedicoQueueFilter.recibidos => st == MedicoQueuePatientStatus.recibido,
+        MedicoQueueFilter.dadosDeAlta => st == MedicoQueuePatientStatus.alta,
+      };
+      if (!matchesChip) return false;
+      if (q.isEmpty) return true;
+      return p.name.toLowerCase().contains(q) || p.id.toLowerCase().contains(q);
+    }).toList();
+
+    if (salaFilter == MedicoQueueFilter.dadosDeAlta) {
+      list.sort((a, b) {
+        final ta = salaDischargedAt(a) ?? DateTime(0);
+        final tb = salaDischargedAt(b) ?? DateTime(0);
+        return tb.compareTo(ta);
+      });
+    } else {
+      list.sort((a, b) {
+        final byLevel = _severityRank(
+          a.triageCategory,
+        ).compareTo(_severityRank(b.triageCategory));
+        if (byLevel != 0) return byLevel;
+        final ta = salaArrivedAt(a) ?? DateTime.now();
+        final tb = salaArrivedAt(b) ?? DateTime.now();
+        return ta.compareTo(tb);
+      });
+    }
+    return list;
+  }
+
+  /// Momento de llegada a sala: recepción del traslado o registro en ventanilla
+  DateTime? salaArrivedAt(MedicoPatientCardData p) =>
+      receivedAt[p.patientRecordId] ?? p.createdAt;
+
+  DateTime? salaDischargedAt(MedicoPatientCardData p) =>
+      dischargedAt[p.patientRecordId];
+
+  static int _severityRank(TriageCategory c) {
+    switch (c) {
+      case TriageCategory.negro:
+        return 0;
+      case TriageCategory.rojo:
+        return 1;
+      case TriageCategory.naranja:
+        return 2;
+      case TriageCategory.amarillo:
+        return 3;
+      case TriageCategory.verde:
+        return 4;
+      case TriageCategory.azul:
+        return 5;
+      case TriageCategory.todos:
+        return 6;
+    }
+  }
+
+  void setSalaFilter(MedicoQueueFilter filter) {
+    salaFilter = filter;
+    notifyListeners();
+  }
+
+  void onSalaSearchChanged(String value) {
+    salaSearchQuery = value;
+    notifyListeners();
+  }
+
+  Future<
+    ({Map<String, DateTime> receivedAt, Map<String, DateTime> dischargedAt})
+  >
+  _loadSalaTimestamps(List<MedicoPatientCardData> list) async {
+    final ids = list
+        .where(
+          (p) =>
+              p.status == PatientStatus.recibido ||
+              p.status == PatientStatus.alta,
+        )
+        .map((p) => p.patientRecordId)
+        .toList();
+    try {
+      return await _repo.fetchStatusTimestamps(ids);
+    } catch (_) {
+      // Sin historial: la Sala usa created_at como respaldo
+      return (
+        receivedAt: <String, DateTime>{},
+        dischargedAt: <String, DateTime>{},
+      );
+    }
+  }
+
   void setNavIndex(int index) {
-    navIndex = index.clamp(0, 1);
+    navIndex = index.clamp(0, 3);
     notifyListeners();
   }
 
@@ -249,28 +535,13 @@ class MedicoHomeController extends ChangeNotifier {
     loading = true;
     error = null;
     notifyListeners();
+    unawaited(_loadHospitalLabel());
 
     try {
-      final hid = AuthGate.instance.hospitalId;
-      final list = await _repo.fetchForMedico(hospitalIdFromProfile: hid);
-      rejectedPatients = [];
-      if (hid != null && hid.isNotEmpty) {
-        try {
-          rejectedPatients = await _repo.fetchRejectedTransfers(
-            hospitalId: hid,
-          );
-        } catch (_) {
-          rejectedPatients = [];
-        }
-      }
-      final rejectedIds = _rejectedPatientIds();
-      patients = rejectedIds.isEmpty
-          ? list
-          : list
-                .where((p) => !rejectedIds.contains(p.patientRecordId))
-                .toList();
+      await _fetchPatients();
       try {
         medicoNotifications = await _repo.fetchMedicoNotifications();
+        _onNotificationsFetched(medicoNotifications);
       } catch (_) {
         medicoNotifications = [];
       }
@@ -280,13 +551,80 @@ class MedicoHomeController extends ChangeNotifier {
       error = e.toString();
       loading = false;
       notifyListeners();
+    } finally {
+      // Un cambio que llegó durante la carga completa se aplica al terminar
+      if (_refreshPending) {
+        _refreshPending = false;
+        requestSilentRefresh();
+      }
     }
+  }
+
+  /// Nombre del hospital del médico; se lee una vez (cambia muy poco)
+  Future<void> _loadHospitalLabel() async {
+    if (hospitalLabel != null) return;
+    final hid = AuthGate.instance.hospitalId;
+    if (hid == null || hid.isEmpty) {
+      hospitalLabel = 'Sin hospital asignado';
+      notifyListeners();
+      return;
+    }
+    try {
+      hospitalLabel = await _profileRepo.fetchHospitalLabel(hid);
+      notifyListeners();
+    } catch (_) {
+      // Se reintenta en la siguiente carga
+    }
+  }
+
+  /// Número de la carga de pacientes más reciente; solo esa puede guardar
+  int _fetchGeneration = 0;
+
+  /// Pacientes del hospital, traslados rechazados y tiempos de la Sala.
+  /// Los datos se reemplazan solo si todo se obtuvo bien y si no empezó
+  /// otra carga mientras tanto (`load()` y la recarga silenciosa pueden
+  /// cruzarse; una respuesta vieja no debe pisar una más nueva).
+  Future<void> _fetchPatients() async {
+    final generation = ++_fetchGeneration;
+    final hid = AuthGate.instance.hospitalId;
+    final list = await _repo.fetchForMedico(hospitalIdFromProfile: hid);
+    var rejected = <MedicoPatientCardData>[];
+    if (hid != null && hid.isNotEmpty) {
+      try {
+        rejected = await _repo.fetchRejectedTransfers(hospitalId: hid);
+      } catch (_) {
+        rejected = [];
+      }
+    }
+    final rejectedIds = rejected
+        .map((p) => p.patientRecordId)
+        .where((id) => id.isNotEmpty)
+        .toSet();
+    final visible = rejectedIds.isEmpty
+        ? list
+        : list.where((p) => !rejectedIds.contains(p.patientRecordId)).toList();
+    final timestamps = await _loadSalaTimestamps(visible);
+
+    if (generation != _fetchGeneration) return;
+    rejectedPatients = rejected;
+    patients = visible;
+    receivedAt = timestamps.receivedAt;
+    dischargedAt = timestamps.dischargedAt;
+  }
+
+  /// Una carga puede terminar después de salir del inicio; en ese caso ya no
+  /// hay a quién avisar
+  @override
+  void notifyListeners() {
+    if (!_disposed) super.notifyListeners();
   }
 
   @override
   void dispose() {
-    stopNotificationSubscription();
+    _disposed = true;
+    stopLiveUpdates();
     searchController.dispose();
+    salaSearchController.dispose();
     super.dispose();
   }
 }

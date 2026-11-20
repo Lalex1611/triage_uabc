@@ -9,10 +9,7 @@ import 'package:sistema_triage/features/medico/domain/entities/queue/medico_queu
 import 'package:sistema_triage/features/medico/presentation/queue/widgets/medico_queue_filter_chips_widget.dart';
 
 void main() {
-  runApp(const MaterialApp(
-    debugShowCheckedModeBanner: false,
-    home: _Demo(),
-  ));
+  runApp(const MaterialApp(debugShowCheckedModeBanner: false, home: _Demo()));
 }
 
 class _Demo extends StatefulWidget {

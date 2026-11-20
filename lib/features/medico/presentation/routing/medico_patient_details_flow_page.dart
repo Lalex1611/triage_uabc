@@ -14,6 +14,7 @@ import 'package:sistema_triage/features/medico/domain/entities/register_patient/
 import 'package:sistema_triage/features/medico/domain/entities/register_patient/medico_register_triage_data.dart';
 import 'package:sistema_triage/features/medico/domain/entities/register_patient/medico_register_vital_signs_data.dart';
 import 'package:sistema_triage/features/medico/presentation/patient_details/medico_patient_details_page.dart';
+import 'package:sistema_triage/features/medico/presentation/patient_review/medico_incoming_review_page.dart';
 import 'package:sistema_triage/features/medico/presentation/patient_details/widgets/medico_details_app_bar_widget.dart';
 import 'package:sistema_triage/features/medico/presentation/patient_details/widgets/medico_triage_history_widget.dart';
 import 'package:sistema_triage/features/medico/presentation/register_patient/widgets/medico_register_actions_widget.dart';
@@ -25,6 +26,9 @@ import 'package:sistema_triage/features/medico/presentation/register_patient/wid
 import 'package:sistema_triage/features/medico/presentation/register_patient/widgets/medico_register_status_dropdown_widget.dart';
 import 'package:sistema_triage/features/medico/presentation/register_patient/widgets/medico_register_triage_widget.dart';
 import 'package:sistema_triage/features/medico/presentation/register_patient/widgets/medico_register_vital_signs_widget.dart';
+import 'package:sistema_triage/features/medico/presentation/room_patient/medico_room_format.dart';
+import 'package:sistema_triage/features/medico/presentation/room_patient/medico_room_patient_page.dart';
+import 'package:sistema_triage/features/medico/presentation/room_patient/widgets/medico_room_photos_history_widget.dart';
 import 'package:sistema_triage/features/medico/presentation/routing/medico_patient_details_controller.dart';
 import 'package:sistema_triage/features/paramedico/domain/services/incident_presentation_formatters.dart';
 
@@ -91,11 +95,20 @@ class _MedicoPatientDetailsFlowPageState
       );
     }
 
-    final d = c.detail!;
-    final demo = d.demographics;
-    final displayName = d.displayName;
-    final patientIdShort = IncidentPresentationFormatters.shortPatientId(d.id);
-    final dt = IncidentPresentationFormatters.formatDateTime(d.createdAt);
+    // Paciente en camino: revisión para aceptar o rechazar (mockup 02)
+    final review = c.summary;
+    if (c.showAcceptReject && review != null) {
+      return MedicoIncomingReviewPage(
+        review: review,
+        busy: c.actionBusy,
+        onBackTap: () => c.onBack(context),
+        onAcceptTap: () => unawaited(c.onAccept(context)),
+        onRejectTap: () => unawaited(c.onRejectFlow(context)),
+      );
+    }
+
+    // Paciente recibido o dado de alta: vista en sala (mockup 06)
+    if (c.showRoomView) return _roomView(context, c);
 
     Widget? bottomActions;
     if (c.showAcceptReject) {
@@ -120,9 +133,100 @@ class _MedicoPatientDetailsFlowPageState
       );
     }
 
+    return _fullRecord(context, c, () => c.onBack(context), bottomActions);
+  }
+
+  Widget _roomView(BuildContext context, MedicoPatientDetailsController c) {
+    final d = c.detail!;
+    final discharged = d.status == 'alta_medica';
+    final now = DateTime.now();
+    final photos = [...c.summary!.photoUrls, ...c.photosForUi()];
+    final history = [
+      for (final e in c.triageHistory.take(8))
+        MedicoRoomHistoryItem(
+          time: MedicoRoomFormat.historyTime(e.changedAt.toLocal(), now),
+          event: MedicoRoomFormat.historyEvent(e),
+          actor: e.actorRole == null ? null : e.actorRoleLabel,
+        ),
+    ];
+
+    return MedicoRoomPatientPage(
+      summary: c.summary!,
+      discharged: discharged,
+      receivedAt: c.receivedAt,
+      dischargedAt: c.dischargedAt,
+      consultationCode: c.consultationCode,
+      photos: photos,
+      history: history,
+      notes: c.attentionNotes,
+      notesLoadFailed: c.attentionNotesLoadFailed,
+      discharge: c.discharge,
+      dischargeLoadFailed: c.dischargeLoadFailed,
+      onRetryRecordsTap: () => unawaited(c.retryRoomRecords()),
+      busy: c.roomBusy,
+      now: now,
+      onBackTap: () => c.onBack(context),
+      onEditPatientTap: () => unawaited(c.openEditPatient(context)),
+      onShowQrTap: () => unawaited(c.onShowConsultationQr(context)),
+      onEditTriageTap: discharged
+          ? null
+          : () => unawaited(c.changeTriageFromRoom(context)),
+      onAddPhotoTap: discharged ? null : () => _pickPhotoSource(context, c),
+      onAddNoteTap: discharged
+          ? null
+          : () => unawaited(c.addAttentionNote(context)),
+      onDischargeTap: discharged
+          ? null
+          : () => unawaited(c.dischargeFromRoom(context)),
+    );
+  }
+
+  Future<void> _pickPhotoSource(
+    BuildContext context,
+    MedicoPatientDetailsController c,
+  ) async {
+    final src = await showModalBottomSheet<ImageSource>(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.photo_camera_outlined),
+              title: const Text('Tomar foto'),
+              onTap: () => Navigator.pop(ctx, ImageSource.camera),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library_outlined),
+              title: const Text('Elegir de la galería'),
+              onTap: () => Navigator.pop(ctx, ImageSource.gallery),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (src != null && context.mounted) await c.addRoomPhoto(context, src);
+  }
+
+  Widget _fullRecord(
+    BuildContext context,
+    MedicoPatientDetailsController c,
+    VoidCallback back,
+    Widget? bottomActions,
+  ) {
+    final d = c.detail!;
+    final demo = d.demographics;
+    final displayName = d.displayName;
+    final patientIdShort = IncidentPresentationFormatters.shortPatientId(d.id);
+    final dt = IncidentPresentationFormatters.formatDateTime(d.createdAt);
+
     return MedicoPatientDetailsPage(
       appBar: MedicoDetailsAppBarWidget(
-        data: MedicoDetailsAppBarData(onBackTap: () => c.onBack(context)),
+        data: MedicoDetailsAppBarData(onBackTap: back),
       ),
       bottomActions: bottomActions,
       bodyChildren: [
@@ -251,9 +355,7 @@ class _MedicoPatientDetailsFlowPageState
         ),
         const SizedBox(height: 26),
         MedicoTriageHistoryWidget(
-          data: MedicoTriageHistoryData(
-            entries: c.triageHistory,
-          ),
+          data: MedicoTriageHistoryData(entries: c.triageHistory),
         ),
         if (c.assignedHospital != null &&
             (c.assignedHospital!.name).isNotEmpty) ...[

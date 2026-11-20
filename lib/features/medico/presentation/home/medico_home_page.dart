@@ -1,22 +1,27 @@
 import 'package:flutter/material.dart';
-import 'package:sistema_triage/core/constants/app_colors.dart';
-import 'package:sistema_triage/core/constants/app_icons.dart';
 import 'package:sistema_triage/core/layout/app_responsive.dart';
 import 'package:sistema_triage/features/medico/domain/constants/medico_patient_filter.dart';
-import 'package:sistema_triage/features/medico/domain/entities/home/medico_patient_list_header_data.dart';
 import 'package:sistema_triage/features/medico/domain/entities/home/medico_triage_filters_data.dart';
 import 'package:sistema_triage/features/medico/domain/entities/home/medico_user_stats.dart';
 import 'package:sistema_triage/features/medico/presentation/home/widgets/medico_minidash_widget.dart';
-import 'package:sistema_triage/features/medico/presentation/home/widgets/medico_patient_list_header_widget.dart';
 import 'package:sistema_triage/features/medico/presentation/home/widgets/medico_search_bar_widget.dart';
 import 'package:sistema_triage/features/medico/presentation/home/widgets/medico_triage_filters_widget.dart';
 import 'package:sistema_triage/features/medico/presentation/navigation/medico_navbar_widget.dart';
-import 'package:sistema_triage/shared/widgets/app_header.dart';
 import 'package:sistema_triage/shared/widgets/home_screen_body.dart';
+import 'package:sistema_triage/features/medico/presentation/home/widgets/medico_home_header_widget.dart';
 
 // Cascarón del home médico: layout según Figma; sin lógica de negocio
 class MedicoHomePage extends StatelessWidget {
   final Widget walkInRegisterTab;
+
+  /// Contenido de la pestaña Sala (navIndex 1, mockup 05) con encabezado propio
+  final Widget? salaTab;
+
+  /// Contenido de la pestaña Perfil (navIndex 3, mockup 13) con encabezado propio
+  final Widget? profileTab;
+
+  /// "Hospital · Área" del médico en el encabezado (vacío mientras carga)
+  final String hospitalLabel;
 
   const MedicoHomePage({
     super.key,
@@ -26,7 +31,6 @@ class MedicoHomePage extends StatelessWidget {
     required this.userStats,
     required this.searchController,
     required this.onSearchChanged,
-    required this.patientCount,
     required this.activeFilter,
     required this.onFilterChanged,
     required this.showTriageFilters,
@@ -36,6 +40,9 @@ class MedicoHomePage extends StatelessWidget {
     required this.contentSlivers,
     this.onProfileTap,
     required this.walkInRegisterTab,
+    this.salaTab,
+    this.profileTab,
+    this.hospitalLabel = '',
     this.hasUnreadNotifications = false,
     this.onNotificationTap,
   });
@@ -46,7 +53,6 @@ class MedicoHomePage extends StatelessWidget {
   final MedicoUserStats userStats;
   final TextEditingController searchController;
   final ValueChanged<String> onSearchChanged;
-  final int patientCount;
   final MedicoPatientFilter activeFilter;
   final ValueChanged<MedicoPatientFilter> onFilterChanged;
   final bool showTriageFilters;
@@ -58,49 +64,38 @@ class MedicoHomePage extends StatelessWidget {
   final bool hasUnreadNotifications;
   final VoidCallback? onNotificationTap;
 
-  /// [navIndex] solo distingue Entrantes (0) y Registro (1); Sala y Perfil
-  /// aún no tienen pantalla y están desactivadas
-  Widget _navbar() => MedicoNavbar(
-    currentIndex: navIndex == 1
-        ? MedicoNavbar.registerTab
-        : MedicoNavbar.incomingTab,
-    onTap: (tab) => onNavTap(tab == MedicoNavbar.registerTab ? 1 : 0),
-  );
-
   @override
   Widget build(BuildContext context) {
-    if (navIndex == 1) {
+    if (navIndex == 1 && salaTab != null) {
       return Scaffold(
-        backgroundColor: Colors.white,
+        backgroundColor: const Color(0xFFF5F5F7),
         resizeToAvoidBottomInset: false,
-        body: SafeArea(
-          bottom: false,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _header(),
-              Padding(
-                padding: EdgeInsets.fromLTRB(
-                  context.horizontalPadding,
-                  10,
-                  context.horizontalPadding,
-                  4,
-                ),
-                child: Text(
-                  'Registro cuando el paciente llega por su cuenta al hospital '
-                  '(no viene en ambulancia ni en traslado). Quedará como '
-                  '«Recibido» en su hospital.',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Colors.black87,
-                    height: 1.4,
-                  ),
-                ),
-              ),
-              Expanded(child: walkInRegisterTab),
-            ],
-          ),
+        body: salaTab,
+        bottomNavigationBar: MedicoNavbar(
+          currentIndex: navIndex,
+          onTap: onNavTap,
         ),
-        bottomNavigationBar: _navbar(),
+      );
+    }
+
+    if (navIndex == 3 && profileTab != null) {
+      return Scaffold(
+        backgroundColor: const Color(0xFFEEF2F6),
+        resizeToAvoidBottomInset: false,
+        body: profileTab,
+        bottomNavigationBar: MedicoNavbar(
+          currentIndex: navIndex,
+          onTap: onNavTap,
+        ),
+      );
+    }
+
+    // Registrar (mockups 07-08): flujo a pantalla completa con su propio
+    // encabezado y botonera; se sale con X / Cancelar.
+    if (navIndex == 2) {
+      return Scaffold(
+        backgroundColor: const Color(0xFFEEF2F6),
+        body: walkInRegisterTab,
       );
     }
 
@@ -112,26 +107,13 @@ class MedicoHomePage extends StatelessWidget {
       body: HomeScreenBody(
         header: [
           _header(),
-          Stack(
-            clipBehavior: Clip.none,
-            children: [
-              MedicoMinidash(userstats: userStats),
-              Positioned(
-                left: 0,
-                right: 0,
-                bottom: -30.5,
-                child: MedicoSearchBar(
-                  controller: searchController,
-                  onChanged: onSearchChanged,
-                ),
-              ),
-            ],
+          MedicoMinidash(userstats: userStats),
+          const SizedBox(height: 18),
+          MedicoSearchBar(
+            controller: searchController,
+            onChanged: onSearchChanged,
           ),
-          const SizedBox(height: 40.5),
-          MedicoPatientListHeader(
-            data: MedicoPatientListHeaderData(patientCount: patientCount),
-          ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 18),
           if (showTriageFilters)
             MedicoTriageFilters(
               data: MedicoTriageFiltersData(
@@ -155,20 +137,18 @@ class MedicoHomePage extends StatelessWidget {
         onRefresh: onRefresh,
         slivers: contentSlivers,
       ),
-      bottomNavigationBar: _navbar(),
+      bottomNavigationBar: MedicoNavbar(
+        currentIndex: navIndex,
+        onTap: onNavTap,
+      ),
     );
   }
 
-  PreferredSizeWidget _header() {
-    return AppHeader(
-      type: HeaderType.home,
-      color: AppColors.primaryMedico,
-      isConnected: isConnected,
+  Widget _header() {
+    return MedicoHomeHeader(
+      userName: userStats.userName,
+      hospitalLabel: hospitalLabel,
       hasNotifications: hasUnreadNotifications,
-      subtitle: 'Cruz Roja - Tijuana',
-      logoPath: AppIcons.medicoHeaderLogo,
-      notificationIconPath: AppIcons.medicoHeaderNotification,
-      profileIconPath: AppIcons.medicoHeaderProfile,
       onNotificationTap: onNotificationTap,
       onProfileTap: onProfileTap,
     );
