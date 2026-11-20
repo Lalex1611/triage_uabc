@@ -133,39 +133,8 @@ class MedicoQueuePatientCardWidget extends StatelessWidget {
               color: status.foreground,
               letterSpacing: 0.4,
             ),
-            const SizedBox(width: 6),
-            _buildStatusPill(),
-          ],
-        ),
-        const SizedBox(height: 4),
-        Text(
-          data.subtitle,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: AppTextStyles.ESC_Regular_bodyMedium.copyWith(
-            color: AppColors.inactive,
-            fontSize: 11,
           ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildStatusPill() {
-    final s = data.status;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: s.background,
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: Text(
-        '• ${s.label}',
-        style: AppTextStyles.ESC_SemiBold_bodyMedium.copyWith(
-          color: s.foreground,
-          fontSize: 9,
-          letterSpacing: 0.3,
-        ),
+        ],
       ),
     );
   }
