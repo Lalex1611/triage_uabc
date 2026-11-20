@@ -151,7 +151,17 @@ class MedicoPatientCard extends StatelessWidget {
       ),
     );
 
-    if (panelOnly) return inner;
+    // Dentro del contenedor de traslado: sin sombra ni fondo propios, pero el
+    // cuerpo sigue abriendo al paciente (los botones van fuera de este panel)
+    if (panelOnly) {
+      final onTap = data.onCardTap;
+      if (onTap == null) return inner;
+      return GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: inner,
+      );
+    }
 
     return TriagePressable(
       onTap: data.onCardTap,

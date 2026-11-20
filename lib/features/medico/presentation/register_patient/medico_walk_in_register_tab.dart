@@ -63,6 +63,10 @@ class _MedicoWalkInRegisterTabState extends State<MedicoWalkInRegisterTab> {
   /// Resultado del registro; cuando no es null se muestra la confirmación
   ({String patientId, String consultationCode, String name})? _registered;
 
+  /// Se registró al menos un paciente desde que se abrió la pestaña;
+  /// "Registrar otro paciente" no lo borra (el inicio debe recargar al cerrar)
+  bool _anyRegistered = false;
+
   // Paso 1
   String? _photoPath;
   final _name = TextEditingController();
@@ -186,6 +190,26 @@ class _MedicoWalkInRegisterTabState extends State<MedicoWalkInRegisterTab> {
     return m;
   }
 
+  /// Signos vitales escritos que no son un número (p. ej. "36..5")
+  String? _vitalsError() {
+    final fields = [
+      ('presión sistólica', _systolic),
+      ('presión diastólica', _diastolic),
+      ('frecuencia cardiaca', _heartRate),
+      ('frecuencia respiratoria', _respiratoryRate),
+      ('temperatura', _temperature),
+      ('saturación de oxígeno', _oxygen),
+      ('glucosa', _glucose),
+    ];
+    for (final (label, c) in fields) {
+      final t = c.text.trim().replaceAll(',', '.');
+      if (t.isNotEmpty && double.tryParse(t) == null) {
+        return 'Revisa el valor de $label.';
+      }
+    }
+    return null;
+  }
+
   static String _triageSql(MedicoTriageCategory c) => c.name;
 
   // ---------------------------------------------------------------------------
@@ -245,6 +269,11 @@ class _MedicoWalkInRegisterTabState extends State<MedicoWalkInRegisterTab> {
       );
       return;
     }
+    final vitalsError = _vitalsError();
+    if (vitalsError != null) {
+      showAppSnackBar(context, vitalsError, isError: true);
+      return;
+    }
     if (!SupabaseEnv.isConfigured) {
       showAppSnackBar(context, 'Supabase no configurado.', isError: true);
       return;
@@ -269,6 +298,7 @@ class _MedicoWalkInRegisterTabState extends State<MedicoWalkInRegisterTab> {
         vitalSigns: _buildVitals(),
         reasonForVisit: _reason.text,
       );
+      _anyRegistered = true;
       if (!mounted) return;
       setState(
         () => _registered = (
@@ -303,7 +333,7 @@ class _MedicoWalkInRegisterTabState extends State<MedicoWalkInRegisterTab> {
     if (_scrollController.hasClients) _scrollController.jumpTo(0);
   }
 
-  void _close() => widget.onClose(registered: _registered != null);
+  void _close() => widget.onClose(registered: _anyRegistered);
 
   Future<void> _showFamilyCode() async {
     final r = _registered;
@@ -520,7 +550,10 @@ class _MedicoWalkInRegisterTabState extends State<MedicoWalkInRegisterTab> {
     return MedicoWalkInAssessmentStep(
       data: MedicoWalkInAssessmentData(
         selectedLevel: _triage,
-        onLevelSelected: (c) => setState(() => _triage = c),
+        onLevelSelected: (c) {
+          if (_saving) return;
+          setState(() => _triage = c);
+        },
         reasonController: _reason,
         allergiesController: _allergies,
         systolicController: _systolic,

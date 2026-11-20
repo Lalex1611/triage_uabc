@@ -46,23 +46,30 @@ class _MedicoProfileTabState extends State<MedicoProfileTab> {
     unawaited(_load());
   }
 
+  /// Número de la carga más reciente; solo esa aplica su resultado (al
+  /// abrir, al deslizar y tras editar pueden cruzarse varias)
+  int _loadGeneration = 0;
+
   Future<void> _load() async {
+    final generation = ++_loadGeneration;
+    bool isCurrent() => mounted && generation == _loadGeneration;
+
     setState(() {
       _loading = true;
       _error = null;
     });
     try {
       final s = await _repo.fetchSummary();
-      if (mounted) setState(() => _summary = s);
+      if (isCurrent()) setState(() => _summary = s);
     } catch (e) {
-      if (mounted) {
+      if (isCurrent()) {
         setState(
           () =>
               _error = 'No se pudo cargar el perfil. Desliza para reintentar.',
         );
       }
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (isCurrent()) setState(() => _loading = false);
     }
   }
 
@@ -191,7 +198,10 @@ class _MedicoProfileTabState extends State<MedicoProfileTab> {
     final s = _summary;
     final hospitalLabel = s == null
         ? (_loading ? 'Cargando hospital…' : 'Hospital no disponible')
-        : [s.hospitalName, ?s.hospitalAreaLabel].join(' · ');
+        : MedicoProfileSummary.hospitalLabel(
+            s.hospitalName,
+            s.hospitalAreaLabel,
+          );
 
     return MedicoProfilePage(
       userName: widget.userName,

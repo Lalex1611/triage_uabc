@@ -22,6 +22,22 @@ class MedicoProfileRepository {
     return x;
   }
 
+  /// "Nombre · Área" del hospital, para el encabezado del inicio; null si no
+  /// se encuentra
+  Future<String?> fetchHospitalLabel(String hospitalId) async {
+    final row = await _c
+        .from('hospitals')
+        .select('name, center_kind')
+        .eq('id', hospitalId)
+        .maybeSingle();
+    final name = (row?['name'] as String?)?.trim();
+    if (name == null || name.isEmpty) return null;
+    return MedicoProfileSummary.hospitalLabel(
+      name,
+      MedicoProfileSummary.areaLabelOf(row?['center_kind'] as String?),
+    );
+  }
+
   Future<MedicoProfileSummary> fetchSummary() async {
     final res = await _c.rpc('medico_profile_summary');
     return MedicoProfileSummary.fromJson(Map<String, dynamic>.from(res as Map));

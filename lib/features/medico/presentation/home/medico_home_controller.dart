@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:sistema_triage/core/config/supabase_env.dart';
 import 'package:sistema_triage/core/session/auth_gate.dart';
+import 'package:sistema_triage/features/medico/data/repositories/medico_profile_repository.dart';
 import 'package:sistema_triage/features/medico/data/repositories/patients_repository.dart';
 import 'package:sistema_triage/features/medico/domain/constants/medico_patient_filter.dart';
 import 'package:sistema_triage/features/medico/domain/constants/medico_queue_filter.dart';
@@ -18,13 +19,19 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 class MedicoHomeController extends ChangeNotifier {
   MedicoHomeController({
     PatientsRepository? repository,
+    MedicoProfileRepository? profileRepository,
     TextEditingController? searchController,
     TextEditingController? salaSearchController,
   }) : _repo = repository ?? PatientsRepository(),
+       _profileRepo = profileRepository ?? MedicoProfileRepository(),
        searchController = searchController ?? TextEditingController(),
        salaSearchController = salaSearchController ?? TextEditingController();
 
   final PatientsRepository _repo;
+  final MedicoProfileRepository _profileRepo;
+
+  /// "Hospital · Área" del médico para el encabezado (null mientras carga)
+  String? hospitalLabel;
   final TextEditingController searchController;
 
   /// Búsqueda propia de la pestaña Sala (independiente de Entrantes)
@@ -143,9 +150,11 @@ class MedicoHomeController extends ChangeNotifier {
       return;
     }
     _refreshing = true;
+    unawaited(_loadHospitalLabel());
+
     try {
-      await _fetchPatients();
-      if (_disposed) return;
+      final applied = await _fetchPatients();
+      if (_disposed || !applied) return;
       error = null;
       notifyListeners();
     } catch (_) {
@@ -266,15 +275,20 @@ class MedicoHomeController extends ChangeNotifier {
   }
 
   /// Pacientes aún no recibidos por el hospital, filtrados por color de triage
+  /// y por la búsqueda de Entradas (nombre o id; vacía = todos)
   List<MedicoPatientCardData> incomingPatientsFiltered() {
     final rejectedIds = _rejectedPatientIds();
+    final q = searchQuery.trim().toLowerCase();
     return patients
         .where(
           (p) =>
               (p.status == PatientStatus.trasladando ||
                   p.status == PatientStatus.enEspera) &&
               !rejectedIds.contains(p.patientRecordId) &&
-              _matchesColor(activeFilter, p),
+              _matchesColor(activeFilter, p) &&
+              (q.isEmpty ||
+                  p.name.toLowerCase().contains(q) ||
+                  p.id.toLowerCase().contains(q)),
         )
         .toList();
   }
@@ -298,7 +312,7 @@ class MedicoHomeController extends ChangeNotifier {
         .toList();
   }
 
-  /// Pacientes aún no recibidos por el hospital (mismo criterio que el filtro «En camino»)
+  /// Pacientes aún no recibidos por el hospital (en espera o trasladando)
   List<MedicoPatientCardData> incomingPatients(
     List<MedicoPatientCardData> list,
   ) {
@@ -468,8 +482,11 @@ class MedicoHomeController extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> _loadSalaTimestamps() async {
-    final ids = patients
+  Future<
+    ({Map<String, DateTime> receivedAt, Map<String, DateTime> dischargedAt})
+  >
+  _loadSalaTimestamps(List<MedicoPatientCardData> list) async {
+    final ids = list
         .where(
           (p) =>
               p.status == PatientStatus.recibido ||
@@ -478,13 +495,13 @@ class MedicoHomeController extends ChangeNotifier {
         .map((p) => p.patientRecordId)
         .toList();
     try {
-      final r = await _repo.fetchStatusTimestamps(ids);
-      receivedAt = r.receivedAt;
-      dischargedAt = r.dischargedAt;
+      return await _repo.fetchStatusTimestamps(ids);
     } catch (_) {
       // Sin historial: la Sala usa created_at como respaldo
-      receivedAt = {};
-      dischargedAt = {};
+      return (
+        receivedAt: <String, DateTime>{},
+        dischargedAt: <String, DateTime>{},
+      );
     }
   }
 
@@ -518,6 +535,7 @@ class MedicoHomeController extends ChangeNotifier {
     loading = true;
     error = null;
     notifyListeners();
+    unawaited(_loadHospitalLabel());
 
     try {
       await _fetchPatients();
@@ -542,9 +560,33 @@ class MedicoHomeController extends ChangeNotifier {
     }
   }
 
+  /// Nombre del hospital del médico; se lee una vez (cambia muy poco)
+  Future<void> _loadHospitalLabel() async {
+    if (hospitalLabel != null) return;
+    final hid = AuthGate.instance.hospitalId;
+    if (hid == null || hid.isEmpty) {
+      hospitalLabel = 'Sin hospital asignado';
+      notifyListeners();
+      return;
+    }
+    try {
+      hospitalLabel = await _profileRepo.fetchHospitalLabel(hid);
+      notifyListeners();
+    } catch (_) {
+      // Se reintenta en la siguiente carga
+    }
+  }
+
+  /// Número de la carga de pacientes más reciente; solo esa puede guardar
+  int _fetchGeneration = 0;
+
   /// Pacientes del hospital, traslados rechazados y tiempos de la Sala.
-  /// Los datos se reemplazan solo si todo se obtuvo bien.
-  Future<void> _fetchPatients() async {
+  /// Los datos se reemplazan solo si todo se obtuvo bien y si no empezó
+  /// otra carga mientras tanto (`load()` y la recarga silenciosa pueden
+  /// cruzarse; una respuesta vieja no debe pisar una más nueva).
+  /// Devuelve false si otra carga más nueva la reemplazó.
+  Future<bool> _fetchPatients() async {
+    final generation = ++_fetchGeneration;
     final hid = AuthGate.instance.hospitalId;
     final list = await _repo.fetchForMedico(hospitalIdFromProfile: hid);
     var rejected = <MedicoPatientCardData>[];
@@ -555,12 +597,21 @@ class MedicoHomeController extends ChangeNotifier {
         rejected = [];
       }
     }
-    rejectedPatients = rejected;
-    final rejectedIds = _rejectedPatientIds();
-    patients = rejectedIds.isEmpty
+    final rejectedIds = rejected
+        .map((p) => p.patientRecordId)
+        .where((id) => id.isNotEmpty)
+        .toSet();
+    final visible = rejectedIds.isEmpty
         ? list
         : list.where((p) => !rejectedIds.contains(p.patientRecordId)).toList();
-    await _loadSalaTimestamps();
+    final timestamps = await _loadSalaTimestamps(visible);
+
+    if (generation != _fetchGeneration) return false;
+    rejectedPatients = rejected;
+    patients = visible;
+    receivedAt = timestamps.receivedAt;
+    dischargedAt = timestamps.dischargedAt;
+    return true;
   }
 
   /// Una carga puede terminar después de salir del inicio; en ese caso ya no
