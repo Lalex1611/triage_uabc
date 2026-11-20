@@ -1018,4 +1018,19 @@ class MedicoPatientDetailsController extends ChangeNotifier {
       }
     }
   }
+
+  /// Una lectura o acción puede terminar después de salir de la ruta; en ese
+  /// caso ya no hay a quién avisar
+  bool _disposed = false;
+
+  @override
+  void notifyListeners() {
+    if (!_disposed) super.notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
+  }
 }
