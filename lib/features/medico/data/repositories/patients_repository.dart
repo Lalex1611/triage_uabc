@@ -166,31 +166,6 @@ class PatientsRepository {
         .eq('id', patientId);
   }
 
-  /// Agrega una foto al expediente en el servidor (RPC
-  /// `medico_append_patient_photo`): solo concatena la ruta a
-  /// `demographics.photo_local_paths`, sin reescribir el resto del JSON
-  Future<void> appendPatientPhoto({
-    required String patientId,
-    required String path,
-  }) async {
-    await _c.rpc(
-      'medico_append_patient_photo',
-      params: {'p_patient_id': patientId, 'p_path': path},
-    );
-  }
-
-  /// Cambia el triage hospitalario de un paciente en sala (RPC
-  /// `medico_set_hospital_triage`; el médico no puede hacerlo con un UPDATE)
-  Future<void> setHospitalTriage({
-    required String patientId,
-    required String triageColor,
-  }) async {
-    await _c.rpc(
-      'medico_set_hospital_triage',
-      params: {'p_patient_id': patientId, 'p_triage_color': triageColor},
-    );
-  }
-
   /// Notas de atención del paciente, de la más reciente a la más antigua
   Future<List<MedicoAttentionNote>> fetchAttentionNotes(
     String patientId,

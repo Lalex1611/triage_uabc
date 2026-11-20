@@ -37,7 +37,10 @@ class MedicoRegisterTriageWidget extends StatelessWidget {
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.requiredAsterisk, width: 1.4),
+              border: Border.all(
+                color: AppColors.requiredAsterisk,
+                width: 1.4,
+              ),
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withValues(alpha: 0.06),

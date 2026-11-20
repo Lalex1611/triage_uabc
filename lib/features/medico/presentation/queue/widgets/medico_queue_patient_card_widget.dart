@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:sistema_triage/core/constants/app_colors.dart';
 import 'package:sistema_triage/core/theme/app_theme.dart';
 import 'package:sistema_triage/features/medico/domain/entities/queue/medico_queue_patient_card_data.dart';
-import 'package:sistema_triage/shared/widgets/triage_pressable_widget.dart';
 
-/// Tarjeta de paciente en la Sala (mockup 05): nivel, nombre, estado y origen
+/// Tarjeta de paciente de la Sala (mockup 05): nivel, nombre, estado y
+/// subtítulo. Al tocarla se abre el paciente ([MedicoQueuePatientCardData.onTap]).
 class MedicoQueuePatientCardWidget extends StatelessWidget {
   final MedicoQueuePatientCardData data;
 
@@ -11,38 +12,42 @@ class MedicoQueuePatientCardWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return TriagePressable(
+    return GestureDetector(
       onTap: data.onTap,
-      builder: (context, pressed) => Container(
-        width: double.infinity,
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
         padding: const EdgeInsets.fromLTRB(12, 12, 8, 12),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(14),
-          boxShadow: triagePressedShadow(pressed: pressed),
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.08),
+              blurRadius: 6,
+              offset: const Offset(0, 2),
+            ),
+          ],
         ),
         child: Row(
           children: [
-            _levelBadge(),
-            const SizedBox(width: 12),
-            Expanded(child: _content()),
-            const Icon(Icons.chevron_right, color: Colors.black38, size: 24),
+            _buildLevelBox(),
+            const SizedBox(width: 10),
+            Expanded(child: _buildContent()),
+            const Icon(Icons.chevron_right, color: AppColors.inactive),
           ],
         ),
       ),
     );
   }
 
-  Widget _levelBadge() {
-    final fg = data.levelColor.computeLuminance() > 0.5
-        ? Colors.black87
-        : Colors.white;
+  Widget _buildLevelBox() {
     return Container(
       width: 44,
-      height: 50,
+      height: 44,
       decoration: BoxDecoration(
         color: data.levelColor,
-        borderRadius: BorderRadius.circular(9),
+        borderRadius: BorderRadius.circular(8),
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -50,19 +55,18 @@ class MedicoQueuePatientCardWidget extends StatelessWidget {
           Text(
             'NIVEL',
             style: AppTextStyles.ESC_SemiBold_bodyMedium.copyWith(
-              color: fg.withValues(alpha: 0.85),
+              color: Colors.white,
               fontSize: 8,
-              letterSpacing: 0.4,
+              letterSpacing: 0.5,
               height: 1,
             ),
           ),
-          const SizedBox(height: 2),
           Text(
             data.level?.toString() ?? '—',
-            style: AppTextStyles.ESC_Bold_displayLarge.copyWith(
-              color: fg,
-              fontSize: 24,
-              height: 1,
+            style: AppTextStyles.ESC_Black_displayLarge.copyWith(
+              color: Colors.white,
+              fontSize: 22,
+              height: 1.1,
             ),
           ),
         ],
@@ -70,7 +74,7 @@ class MedicoQueuePatientCardWidget extends StatelessWidget {
     );
   }
 
-  Widget _content() {
+  Widget _buildContent() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
@@ -82,14 +86,14 @@ class MedicoQueuePatientCardWidget extends StatelessWidget {
                 data.name,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: AppTextStyles.ESC_Bold_titleLarge.copyWith(
-                  fontSize: 15,
+                style: AppTextStyles.ESC_Bold_titleSmall.copyWith(
                   color: Colors.black,
+                  fontSize: 13,
                 ),
               ),
             ),
-            const SizedBox(width: 8),
-            _statusPill(),
+            const SizedBox(width: 6),
+            _buildStatusPill(),
           ],
         ),
         const SizedBox(height: 4),
@@ -98,43 +102,29 @@ class MedicoQueuePatientCardWidget extends StatelessWidget {
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: AppTextStyles.ESC_Regular_bodyMedium.copyWith(
-            fontSize: 12,
-            color: Colors.black54,
+            color: AppColors.inactive,
+            fontSize: 11,
           ),
         ),
       ],
     );
   }
 
-  Widget _statusPill() {
-    final status = data.status;
+  Widget _buildStatusPill() {
+    final s = data.status;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: status.background,
-        borderRadius: BorderRadius.circular(8),
+        color: s.background,
+        borderRadius: BorderRadius.circular(6),
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 6,
-            height: 6,
-            decoration: BoxDecoration(
-              color: status.foreground,
-              shape: BoxShape.circle,
-            ),
-          ),
-          const SizedBox(width: 5),
-          Text(
-            status.label,
-            style: AppTextStyles.ESC_Bold_titleSmall.copyWith(
-              fontSize: 10,
-              color: status.foreground,
-              letterSpacing: 0.4,
-            ),
-          ),
-        ],
+      child: Text(
+        '• ${s.label}',
+        style: AppTextStyles.ESC_SemiBold_bodyMedium.copyWith(
+          color: s.foreground,
+          fontSize: 9,
+          letterSpacing: 0.3,
+        ),
       ),
     );
   }

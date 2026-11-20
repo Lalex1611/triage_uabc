@@ -1,50 +1,45 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:sistema_triage/core/config/supabase_env.dart';
 import 'package:sistema_triage/core/session/auth_gate.dart';
 import 'package:sistema_triage/core/ui/app_snackbar.dart';
 import 'package:sistema_triage/features/medico/data/repositories/patients_repository.dart';
-import 'package:sistema_triage/features/medico/domain/constants/medico_insurance_institution.dart';
+import 'package:sistema_triage/features/medico/domain/constants/medico_insurance_option.dart';
 import 'package:sistema_triage/features/medico/domain/constants/medico_patient_gender.dart';
+import 'package:sistema_triage/features/medico/domain/constants/medico_patient_status.dart';
 import 'package:sistema_triage/features/medico/domain/constants/medico_triage_category.dart';
-import 'package:sistema_triage/features/medico/domain/constants/medico_walk_in_insurance.dart';
-import 'package:sistema_triage/features/medico/domain/entities/register_patient/medico_walk_in_assessment_data.dart';
-import 'package:sistema_triage/features/medico/domain/entities/register_patient/medico_walk_in_bottom_bar_data.dart';
-import 'package:sistema_triage/features/medico/domain/entities/register_patient/medico_walk_in_header_data.dart';
-import 'package:sistema_triage/features/medico/domain/entities/register_patient/medico_walk_in_identification_data.dart';
-import 'package:sistema_triage/features/medico/domain/entities/register_patient/medico_walk_in_success_data.dart';
-import 'package:sistema_triage/features/medico/domain/services/medico_patient_form_validators.dart';
-import 'package:sistema_triage/features/medico/domain/constants/medico_triage_level.dart';
-import 'package:sistema_triage/features/medico/presentation/register_patient/widgets/medico_walk_in_assessment_step_widget.dart';
-import 'package:sistema_triage/features/medico/presentation/register_patient/widgets/medico_walk_in_bottom_bar_widget.dart';
-import 'package:sistema_triage/features/medico/presentation/register_patient/widgets/medico_walk_in_form_widgets.dart';
-import 'package:sistema_triage/features/medico/presentation/register_patient/widgets/medico_walk_in_header_widget.dart';
-import 'package:sistema_triage/features/medico/presentation/register_patient/widgets/medico_walk_in_identification_step_widget.dart';
-import 'package:sistema_triage/features/medico/presentation/register_patient/widgets/medico_walk_in_success_widget.dart';
-import 'package:sistema_triage/features/paramedico/domain/constants/triage_catalog.dart';
-import 'package:sistema_triage/features/paramedico/domain/services/incident_presentation_formatters.dart';
-import 'package:sistema_triage/features/paramedico/domain/constants/patient_blood_type.dart';
+import 'package:sistema_triage/features/medico/domain/entities/register_patient/medico_register_actions_data.dart';
+import 'package:sistema_triage/features/medico/domain/entities/register_patient/medico_register_description_data.dart';
+import 'package:sistema_triage/features/medico/domain/entities/register_patient/medico_register_extra_data_data.dart';
+import 'package:sistema_triage/features/medico/domain/entities/register_patient/medico_register_header_data.dart';
+import 'package:sistema_triage/features/medico/domain/entities/register_patient/medico_register_personal_data.dart';
+import 'package:sistema_triage/features/medico/domain/entities/register_patient/medico_register_photo_data.dart';
+import 'package:sistema_triage/features/medico/domain/entities/register_patient/medico_register_status_data.dart';
+import 'package:sistema_triage/features/medico/domain/entities/register_patient/medico_register_triage_data.dart';
+import 'package:sistema_triage/features/medico/domain/entities/register_patient/medico_register_vital_signs_data.dart';
+import 'package:sistema_triage/features/medico/presentation/register_patient/widgets/medico_register_actions_widget.dart';
+import 'package:sistema_triage/features/medico/presentation/register_patient/widgets/medico_register_description_widget.dart';
+import 'package:sistema_triage/features/medico/presentation/register_patient/widgets/medico_register_extra_data_widget.dart';
+import 'package:sistema_triage/features/medico/presentation/register_patient/widgets/medico_register_header_widget.dart';
+import 'package:sistema_triage/features/medico/presentation/register_patient/widgets/medico_register_personal_data_widget.dart';
+import 'package:sistema_triage/features/medico/presentation/register_patient/widgets/medico_register_photo_widget.dart';
+import 'package:sistema_triage/features/medico/presentation/register_patient/widgets/medico_register_status_dropdown_widget.dart';
+import 'package:sistema_triage/features/medico/presentation/register_patient/widgets/medico_register_triage_widget.dart';
+import 'package:sistema_triage/features/medico/presentation/register_patient/widgets/medico_register_vital_signs_widget.dart';
 import 'package:sistema_triage/shared/patient/consultation_code_qr_dialog.dart';
+import 'package:image_picker/image_picker.dart';
 
-/// Registro en dos pasos de un paciente que llega por su cuenta al hospital
-/// (sin traslado / sin incidente). Mockups 07 (identificación), 08 (valoración)
-/// y 09 (confirmación). El paciente queda como «recibido» en el hospital del médico.
+/// Formulario de registro cuando el médico admite un paciente que llega por su cuenta
+/// al hospital (sin traslado / sin incidente)
 class MedicoWalkInRegisterTab extends StatefulWidget {
   const MedicoWalkInRegisterTab({
     super.key,
     required this.onSuccessfullyRegistered,
-    required this.onClose,
     this.repository,
   });
 
-  /// "Ver en la sala" en la confirmación (mockup 09)
   final Future<void> Function(String patientId) onSuccessfullyRegistered;
-
-  /// Cierra el registro (botón X / "Cancelar"). Si ya se registró a alguien,
-  /// [registered] es true para que quien lo use recargue la lista.
-  final void Function({required bool registered}) onClose;
   final PatientsRepository? repository;
 
   @override
@@ -52,59 +47,9 @@ class MedicoWalkInRegisterTab extends StatefulWidget {
       _MedicoWalkInRegisterTabState();
 }
 
-class _MedicoWalkInRegisterTabState extends State<MedicoWalkInRegisterTab> {
+class _MedicoWalkInRegisterTabState extends State<MedicoWalkInRegisterTab>
+    with AutomaticKeepAliveClientMixin {
   late final PatientsRepository _patientsRepo;
-  final _scrollController = ScrollController();
-
-  /// 1 = identificación, 2 = valoración
-  int _step = 1;
-  bool _saving = false;
-
-  /// Resultado del registro; cuando no es null se muestra la confirmación
-  ({String patientId, String consultationCode, String name})? _registered;
-
-  // Paso 1
-  String? _photoPath;
-  final _name = TextEditingController();
-  final _birthDay = TextEditingController();
-  final _birthMonth = TextEditingController();
-  final _birthYear = TextEditingController();
-  final _phone = TextEditingController();
-  MedicoPatientGender? _gender;
-  PatientBloodType? _bloodType;
-  MedicoWalkInInsurance? _insurance;
-  String? _institution;
-  final _otherInstitution = TextEditingController();
-
-  // Paso 2
-  MedicoTriageCategory? _triage;
-  final _reason = TextEditingController();
-  final _allergies = TextEditingController();
-  final _systolic = TextEditingController();
-  final _diastolic = TextEditingController();
-  final _heartRate = TextEditingController();
-  final _respiratoryRate = TextEditingController();
-  final _temperature = TextEditingController();
-  final _oxygen = TextEditingController();
-  final _glucose = TextEditingController();
-
-  List<TextEditingController> get _controllers => [
-    _name,
-    _birthDay,
-    _birthMonth,
-    _birthYear,
-    _phone,
-    _otherInstitution,
-    _reason,
-    _allergies,
-    _systolic,
-    _diastolic,
-    _heartRate,
-    _respiratoryRate,
-    _temperature,
-    _oxygen,
-    _glucose,
-  ];
 
   @override
   void initState() {
@@ -112,67 +57,98 @@ class _MedicoWalkInRegisterTabState extends State<MedicoWalkInRegisterTab> {
     _patientsRepo = widget.repository ?? PatientsRepository();
   }
 
+  String _patientName = '';
+  MedicoTriageCategory? _triageSel;
+  final List<String> _photos = [];
+
+  String? _birthDay;
+  String? _birthMonth;
+  String? _birthYear;
+  MedicoPatientGender? _gender;
+  String? _contactNumber;
+  MedicoInsuranceOption? _insurance;
+  String _description = '';
+
+  String? _systolic;
+  String? _diastolic;
+  String? _heartRate;
+  String? _respiratoryRate;
+  String? _temperature;
+  String? _oxygen;
+  String? _glucose;
+
+  String? _allergies;
+  String? _medications;
+  String? _medicalHistory;
+
+  bool _saving = false;
+
   @override
-  void dispose() {
-    for (final c in _controllers) {
-      c.dispose();
-    }
-    _scrollController.dispose();
-    super.dispose();
+  bool get wantKeepAlive => true;
+
+  static String _formatNow(DateTime d) {
+    String p2(int n) => n.toString().padLeft(2, '0');
+    return '${p2(d.day)}/${p2(d.month)}/${d.year} ${p2(d.hour)}:${p2(d.minute)}:${p2(d.second)}';
   }
 
-  // ---------------------------------------------------------------------------
-  // Validación y armado del payload
-  // ---------------------------------------------------------------------------
-
-  String? _birthDateError() => MedicoPatientFormValidators.birthDateError(
-    _birthDay.text,
-    _birthMonth.text,
-    _birthYear.text,
-  );
-
-  String? _phoneError() => MedicoPatientFormValidators.phoneError(_phone.text);
-
-  /// Nombre de la institución elegida ("Otra" toma lo escrito)
-  String _institutionText() => _institution == MedicoInsuranceInstitution.other
-      ? _otherInstitution.text.trim()
-      : (_institution ?? '');
+  static String _triageSql(MedicoTriageCategory c) {
+    switch (c) {
+      case MedicoTriageCategory.rojo:
+        return 'rojo';
+      case MedicoTriageCategory.naranja:
+        return 'naranja';
+      case MedicoTriageCategory.amarillo:
+        return 'amarillo';
+      case MedicoTriageCategory.verde:
+        return 'verde';
+      case MedicoTriageCategory.azul:
+        return 'azul';
+    }
+  }
 
   Map<String, dynamic> _buildDemographics() {
     final demo = <String, dynamic>{
-      'description': _reason.text.trim(),
-      'photo_local_paths': [?_photoPath],
+      'description': _description.trim(),
+      'photo_local_paths': List<String>.from(_photos),
     };
 
-    final bd = int.tryParse(_birthDay.text.trim());
-    final bm = int.tryParse(_birthMonth.text.trim());
-    final by = int.tryParse(_birthYear.text.trim());
+    final bd = _parseTinyInt(_birthDay);
+    final bm = _parseTinyInt(_birthMonth);
+    final by = _parseTinyInt(_birthYear);
     if (bd != null) demo['birth_day'] = bd;
     if (bm != null) demo['birth_month'] = bm;
     if (by != null) demo['birth_year'] = by;
     if (_gender != null) demo['gender'] = _gender!.name;
-    if (_bloodType != null) demo['blood_type'] = _bloodType!.name;
 
-    final phone = _phone.text.trim();
-    if (phone.isNotEmpty) demo['emergency_contact'] = phone;
+    final contact = (_contactNumber ?? '').trim();
+    if (contact.isNotEmpty) demo['emergency_contact'] = contact;
 
-    final insurance = _insurance?.storedValue;
-    if (insurance != null) demo['seguro_medico'] = insurance;
-    final institution = _institutionText();
-    if (_insurance == MedicoWalkInInsurance.si && institution.isNotEmpty) {
-      demo['insurance_institution'] = institution;
+    if (_insurance != null) {
+      demo['seguro_medico'] = _insurance == MedicoInsuranceOption.si
+          ? 'si'
+          : 'no';
     }
 
-    final allergies = _allergies.text.trim();
-    if (allergies.isNotEmpty) demo['allergies'] = allergies;
+    final a = (_allergies ?? '').trim();
+    final m = (_medications ?? '').trim();
+    final h = (_medicalHistory ?? '').trim();
+    if (a.isNotEmpty) demo['allergies'] = a;
+    if (m.isNotEmpty) demo['medications'] = m;
+    if (h.isNotEmpty) demo['medical_history'] = h;
 
     return demo;
   }
 
+  int? _parseTinyInt(String? s) {
+    final t = (s ?? '').trim();
+    if (t.isEmpty) return null;
+    return int.tryParse(t);
+  }
+
   Map<String, dynamic> _buildVitals() {
     final m = <String, dynamic>{};
-    void put(String k, TextEditingController c) {
-      final t = c.text.trim().replaceAll(',', '.');
+    void put(String k, String? v) {
+      final t = (v ?? '').trim();
       if (t.isNotEmpty) m[k] = t;
     }
 
@@ -183,72 +159,61 @@ class _MedicoWalkInRegisterTabState extends State<MedicoWalkInRegisterTab> {
     put('temperature', _temperature);
     put('oxygen_saturation', _oxygen);
     put('glucose', _glucose);
+
     return m;
   }
 
-  static String _triageSql(MedicoTriageCategory c) => c.name;
-
-  // ---------------------------------------------------------------------------
-  // Navegación entre pasos
-  // ---------------------------------------------------------------------------
-
-  void _goToStep(int step) {
-    FocusScope.of(context).unfocus();
-    setState(() => _step = step);
-    if (_scrollController.hasClients) _scrollController.jumpTo(0);
+  void _clearForm() {
+    setState(() {
+      _patientName = '';
+      _triageSel = null;
+      _photos.clear();
+      _birthDay = null;
+      _birthMonth = null;
+      _birthYear = null;
+      _gender = null;
+      _contactNumber = null;
+      _insurance = null;
+      _description = '';
+      _systolic = null;
+      _diastolic = null;
+      _heartRate = null;
+      _respiratoryRate = null;
+      _temperature = null;
+      _oxygen = null;
+      _glucose = null;
+      _allergies = null;
+      _medications = null;
+      _medicalHistory = null;
+    });
   }
 
-  void _onContinue() {
-    if (_name.text.trim().isEmpty) {
-      showAppSnackBar(
-        context,
-        'Escribe el nombre del paciente o "desconocido".',
-        isError: true,
-      );
-      return;
-    }
-    final dateError = _birthDateError();
-    if (dateError != null) {
-      showAppSnackBar(context, dateError, isError: true);
-      return;
-    }
-    final phoneError = _phoneError();
-    if (phoneError != null) {
-      showAppSnackBar(context, phoneError, isError: true);
-      return;
-    }
-    if (_insurance == MedicoWalkInInsurance.si &&
-        _institution == MedicoInsuranceInstitution.other &&
-        _otherInstitution.text.trim().isEmpty) {
-      showAppSnackBar(
-        context,
-        'Escribe el nombre de la institución del seguro.',
-        isError: true,
-      );
-      return;
-    }
-    _goToStep(2);
-  }
-
-  Future<void> _onSubmit() async {
+  Future<void> _onSubmit(BuildContext context) async {
     if (_saving) return;
 
-    if (_triage == null) {
-      showAppSnackBar(context, 'Selecciona un nivel de triage.', isError: true);
-      return;
-    }
-    if (_reason.text.trim().isEmpty) {
+    final name = _patientName.trim();
+    if (name.isEmpty) {
       showAppSnackBar(
         context,
-        'Describe el motivo de consulta.',
+        'Indique el nombre del paciente.',
         isError: true,
       );
       return;
     }
+    if (_triageSel == null) {
+      showAppSnackBar(
+        context,
+        'Seleccione una clasificación hospitalaria.',
+        isError: true,
+      );
+      return;
+    }
+
     if (!SupabaseEnv.isConfigured) {
       showAppSnackBar(context, 'Supabase no configurado.', isError: true);
       return;
     }
+
     final hosp = AuthGate.instance.hospitalId;
     if (hosp == null || hosp.isEmpty) {
       showAppSnackBar(
@@ -259,278 +224,196 @@ class _MedicoWalkInRegisterTabState extends State<MedicoWalkInRegisterTab> {
       return;
     }
 
-    FocusScope.of(context).unfocus();
     setState(() => _saving = true);
     try {
+      final vitals = _buildVitals();
       final result = await _patientsRepo.registerWalkInPatient(
-        triageColor: _triageSql(_triage!),
-        displayName: _name.text,
+        triageColor: _triageSql(_triageSel!),
+        displayName: name,
         demographics: _buildDemographics(),
-        vitalSigns: _buildVitals(),
-        reasonForVisit: _reason.text,
+        vitalSigns: vitals.isEmpty ? null : vitals,
       );
-      if (!mounted) return;
-      setState(
-        () => _registered = (
-          patientId: result.patientId,
-          consultationCode: result.consultationCode,
-          name: _name.text.trim(),
-        ),
-      );
-      if (_scrollController.hasClients) _scrollController.jumpTo(0);
+      if (!context.mounted) return;
+      try {
+        await ConsultationCodeQrDialog.show(
+          context,
+          code: result.consultationCode,
+          title: 'Paciente registrado',
+          confirmLabel: 'Continuar',
+        );
+      } catch (_) {}
+      if (!context.mounted) return;
+      showAppSnackBar(context, 'Paciente registrado. Ya figura como recibido.');
+      _clearForm();
+      await widget.onSuccessfullyRegistered(result.patientId);
     } catch (e) {
-      if (mounted) showAppSnackBar(context, _errorText(e), isError: true);
+      if (context.mounted) showAppSnackBar(context, '$e', isError: true);
     } finally {
       if (mounted) setState(() => _saving = false);
     }
   }
 
-  /// "Registrar otro paciente": limpia todo y vuelve al paso 1
-  void _resetForm() {
-    for (final c in _controllers) {
-      c.clear();
-    }
-    setState(() {
-      _registered = null;
-      _step = 1;
-      _photoPath = null;
-      _gender = null;
-      _bloodType = null;
-      _insurance = null;
-      _institution = null;
-      _triage = null;
-    });
-    if (_scrollController.hasClients) _scrollController.jumpTo(0);
-  }
-
-  void _close() => widget.onClose(registered: _registered != null);
-
-  Future<void> _showFamilyCode() async {
-    final r = _registered;
-    if (r == null) return;
-    await ConsultationCodeQrDialog.show(
-      context,
-      code: r.consultationCode,
-      title: 'Código para la familia',
-    );
-  }
-
-  static String _errorText(Object e) {
-    final s = e.toString();
-    // PostgrestException(message: ..., code: ...) → solo el mensaje
-    final match = RegExp(r'message: ([^,]+)').firstMatch(s);
-    return match?.group(1)?.trim() ?? s;
-  }
-
-  Future<void> _pickPhoto() async {
-    final source = await showModalBottomSheet<ImageSource>(
-      context: context,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.photo_camera_outlined),
-              title: const Text('Tomar foto'),
-              onTap: () => Navigator.pop(ctx, ImageSource.camera),
-            ),
-            ListTile(
-              leading: const Icon(Icons.photo_library_outlined),
-              title: const Text('Elegir de la galería'),
-              onTap: () => Navigator.pop(ctx, ImageSource.gallery),
-            ),
-          ],
-        ),
-      ),
-    );
-    if (source == null) return;
-    try {
-      final img = await ImagePicker().pickImage(
-        source: source,
-        imageQuality: 80,
-      );
-      if (img != null && mounted) setState(() => _photoPath = img.path);
-    } catch (_) {
-      if (mounted) {
-        showAppSnackBar(
-          context,
-          'No se pudo abrir la cámara o la galería.',
-          isError: true,
-        );
-      }
-    }
-  }
-
-  // ---------------------------------------------------------------------------
-  // UI
-  // ---------------------------------------------------------------------------
-
   @override
   Widget build(BuildContext context) {
-    if (_registered != null) return _buildSuccess(_registered!);
-    final isFirst = _step == 1;
+    super.build(context);
+    final dt = _formatNow(DateTime.now());
 
-    return PopScope(
-      canPop: isFirst,
-      onPopInvokedWithResult: (didPop, _) {
-        if (!didPop && !_saving) _goToStep(1);
-      },
-      child: ColoredBox(
-        color: MedicoWalkInColors.background,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            SafeArea(
-              bottom: false,
-              child: MedicoWalkInHeader(
-                data: MedicoWalkInHeaderData(
-                  title: 'Registrar paciente',
-                  subtitle: isFirst ? 'Llegó por su cuenta' : 'Valoración',
-                  currentStep: _step,
-                  totalSteps: 2,
-                  leadingIcon: isFirst ? Icons.close : Icons.arrow_back,
-                  onLeadingTap: isFirst
-                      ? _close
-                      : () {
-                          if (!_saving) _goToStep(1);
-                        },
-                ),
-              ),
-            ),
-            Expanded(
-              child: SingleChildScrollView(
-                controller: _scrollController,
-                keyboardDismissBehavior:
-                    ScrollViewKeyboardDismissBehavior.onDrag,
-                padding: const EdgeInsets.fromLTRB(16, 18, 16, 32),
-                child: isFirst ? _identificationStep() : _assessmentStep(),
-              ),
-            ),
-            MedicoWalkInBottomBar(
-              data: isFirst
-                  ? MedicoWalkInBottomBarData(
-                      primaryLabel: 'Continuar a valoración',
-                      onPrimaryTap: _onContinue,
-                    )
-                  : MedicoWalkInBottomBarData(
-                      primaryLabel: 'Registrar paciente',
-                      onPrimaryTap: () => unawaited(_onSubmit()),
-                      isLoading: _saving,
-                      secondaryLabel: 'Cancelar',
-                      onSecondaryTap: _close,
-                    ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  /// Confirmación del registro (mockup 09)
-  Widget _buildSuccess(
-    ({String patientId, String consultationCode, String name}) r,
-  ) {
-    final triage = _triage ?? MedicoTriageCategory.azul;
-    final level =
-        MedicoTriageLevel.levelOf(TriageCategory.values.byName(triage.name)) ??
-        5;
-    final folio = IncidentPresentationFormatters.shortPatientId(r.patientId);
-
-    return PopScope(
-      canPop: false,
-      onPopInvokedWithResult: (didPop, _) {
-        if (!didPop) _close();
-      },
-      child: ColoredBox(
-        color: MedicoWalkInColors.background,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            SafeArea(
-              bottom: false,
-              child: MedicoWalkInHeader(
-                data: MedicoWalkInHeaderData(
-                  title: 'Paciente registrado',
-                  subtitle: '$folio · ${r.name}',
-                  leadingIcon: Icons.close,
-                  onLeadingTap: _close,
-                ),
-              ),
-            ),
-            Expanded(
-              child: SingleChildScrollView(
-                controller: _scrollController,
-                padding: const EdgeInsets.fromLTRB(16, 18, 16, 32),
-                child: MedicoWalkInSuccess(
-                  data: MedicoWalkInSuccessData(
-                    patientName: r.name,
-                    level: level,
-                    levelColorName: triage.code.toLowerCase(),
-                    consultationCode: r.consultationCode,
-                    isFemale: _gender == MedicoPatientGender.femenino,
-                    onFamilyCodeTap: () => unawaited(_showFamilyCode()),
+    return Column(
+      children: [
+        Expanded(
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _headerWithStatus(dt),
+                const SizedBox(height: 30),
+                MedicoRegisterPhotoWidget(
+                  data: MedicoRegisterPhotoData(
+                    photos: _photos,
+                    isReadOnly: false,
+                    onCameraTap: () => unawaited(_pick(ImageSource.camera)),
+                    onAddImageTap: () => unawaited(_pick(ImageSource.gallery)),
+                    onRemovePhotoTap: (i) =>
+                        setState(() => _photos.removeAt(i)),
                   ),
                 ),
-              ),
+                const SizedBox(height: 24),
+                MedicoRegisterTriageWidget(
+                  data: MedicoRegisterTriageData(
+                    selectedCategory: _triageSel,
+                    isEditingEnabled: true,
+                    onCategorySelected: (c) => setState(() => _triageSel = c),
+                  ),
+                ),
+                const SizedBox(height: 26),
+                MedicoRegisterPersonalDataWidget(
+                  data: MedicoRegisterPersonalData(
+                    birthDay: _birthDay,
+                    birthMonth: _birthMonth,
+                    birthYear: _birthYear,
+                    gender: _gender,
+                    contactNumber: _contactNumber,
+                    insurance: _insurance,
+                    isReadOnly: false,
+                    onDayChanged: (v) => setState(() => _birthDay = v),
+                    onMonthChanged: (v) => setState(() => _birthMonth = v),
+                    onYearChanged: (v) => setState(() => _birthYear = v),
+                    onGenderChanged: (g) => setState(() => _gender = g),
+                    onContactNumberChanged: (v) =>
+                        setState(() => _contactNumber = v),
+                    onInsuranceChanged: (i) => setState(() => _insurance = i),
+                  ),
+                ),
+                const SizedBox(height: 22),
+                MedicoRegisterDescriptionWidget(
+                  data: MedicoRegisterDescriptionData(
+                    descriptionText: _description,
+                    isReadOnly: false,
+                    onDescriptionChanged: (v) =>
+                        setState(() => _description = v),
+                  ),
+                ),
+                const SizedBox(height: 26),
+                MedicoRegisterVitalSignsWidget(
+                  data: MedicoRegisterVitalSignsData(
+                    systolicPressure: _systolic,
+                    diastolicPressure: _diastolic,
+                    heartRate: _heartRate,
+                    respiratoryRate: _respiratoryRate,
+                    temperature: _temperature,
+                    oxygenSaturation: _oxygen,
+                    glucose: _glucose,
+                    isReadOnly: false,
+                    onSystolicPressureChanged: (v) =>
+                        setState(() => _systolic = v),
+                    onDiastolicPressureChanged: (v) =>
+                        setState(() => _diastolic = v),
+                    onHeartRateChanged: (v) => setState(() => _heartRate = v),
+                    onRespiratoryRateChanged: (v) =>
+                        setState(() => _respiratoryRate = v),
+                    onTemperatureChanged: (v) =>
+                        setState(() => _temperature = v),
+                    onOxygenSaturationChanged: (v) =>
+                        setState(() => _oxygen = v),
+                    onGlucoseChanged: (v) => setState(() => _glucose = v),
+                  ),
+                ),
+                const SizedBox(height: 22),
+                MedicoRegisterExtraDataWidget(
+                  data: MedicoRegisterExtraDataData(
+                    allergies: _allergies,
+                    medications: _medications,
+                    medicalHistory: _medicalHistory,
+                    isReadOnly: false,
+                    onAllergiesChanged: (v) => setState(() => _allergies = v),
+                    onMedicationsChanged: (v) =>
+                        setState(() => _medications = v),
+                    onMedicalHistoryChanged: (v) =>
+                        setState(() => _medicalHistory = v),
+                  ),
+                ),
+                const SizedBox(height: 88),
+              ],
             ),
-            MedicoWalkInBottomBar(
-              data: MedicoWalkInBottomBarData(
-                primaryLabel: 'Ver en la sala',
-                onPrimaryTap: () =>
-                    unawaited(widget.onSuccessfullyRegistered(r.patientId)),
-                secondaryLabel: 'Registrar otro paciente',
-                onSecondaryTap: _resetForm,
-              ),
-            ),
-          ],
+          ),
         ),
-      ),
+        MedicoRegisterActionsWidget(
+          data: MedicoRegisterActionsData(
+            cancelLabel: 'LIMPIAR',
+            confirmLabel: _saving ? 'GUARDANDO…' : 'REGISTRAR',
+            onCancelTap: _saving ? () {} : () => _clearForm(),
+            onConfirmTap: _saving ? () {} : () => unawaited(_onSubmit(context)),
+          ),
+        ),
+      ],
     );
   }
 
-  Widget _identificationStep() {
-    return MedicoWalkInIdentificationStep(
-      data: MedicoWalkInIdentificationData(
-        photoPath: _photoPath,
-        onAddPhotoTap: () => unawaited(_pickPhoto()),
-        onRemovePhotoTap: () => setState(() => _photoPath = null),
-        nameController: _name,
-        birthDayController: _birthDay,
-        birthMonthController: _birthMonth,
-        birthYearController: _birthYear,
-        phoneController: _phone,
-        gender: _gender,
-        onGenderChanged: (g) => setState(() => _gender = g),
-        bloodType: _bloodType,
-        onBloodTypeChanged: (b) => setState(() => _bloodType = b),
-        insurance: _insurance,
-        onInsuranceChanged: (i) => setState(() => _insurance = i),
-        institution: _institution,
-        onInstitutionChanged: (v) => setState(() => _institution = v),
-        otherInstitutionController: _otherInstitution,
-      ),
-    );
+  Future<void> _pick(ImageSource src) async {
+    final picker = ImagePicker();
+    try {
+      final img = await picker.pickImage(source: src, imageQuality: 80);
+      if (img != null && mounted) setState(() => _photos.add(img.path));
+    } catch (_) {}
   }
 
-  Widget _assessmentStep() {
-    return MedicoWalkInAssessmentStep(
-      data: MedicoWalkInAssessmentData(
-        selectedLevel: _triage,
-        onLevelSelected: (c) => setState(() => _triage = c),
-        reasonController: _reason,
-        allergiesController: _allergies,
-        systolicController: _systolic,
-        diastolicController: _diastolic,
-        heartRateController: _heartRate,
-        respiratoryRateController: _respiratoryRate,
-        temperatureController: _temperature,
-        oxygenController: _oxygen,
-        glucoseController: _glucose,
-      ),
+  Widget _headerWithStatus(String registrationDateTime) {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        MedicoRegisterHeaderWidget(
+          data: MedicoRegisterHeaderData(
+            patientId:
+                'Ingreso sin traslado — el ID aparece después de registrar',
+            patientName: _patientName,
+            registrationDateTime: registrationDateTime,
+            showAsterisk: true,
+            isReadOnly: false,
+            onNameChanged: (v) => _patientName = v,
+            onEditNameTap: () {},
+            onEditDateTap: () {},
+            isQrEnabled: false,
+            qrButtonLabel: 'QR disponible\nal registrar',
+            onGenerateQrTap: () {
+              showAppSnackBar(
+                context,
+                'Primero registra al paciente. Después podrás abrir su expediente y generar el código QR.',
+              );
+            },
+          ),
+        ),
+        Positioned(
+          right: 20,
+          bottom: -16,
+          child: MedicoRegisterStatusDropdownWidget(
+            data: MedicoRegisterStatusData(
+              currentStatus: MedicoPatientStatus.recibido,
+              canEdit: false,
+              onStatusChanged: (_) {},
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
