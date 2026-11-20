@@ -9,6 +9,7 @@ import 'package:sistema_triage/core/constants/app_colors.dart';
 import 'package:sistema_triage/core/constants/app_icons.dart';
 import 'package:sistema_triage/features/medico/domain/constants/medico_patient_sorting_options.dart';
 import 'package:sistema_triage/features/medico/domain/constants/medico_queue_filter.dart';
+import 'package:sistema_triage/features/medico/domain/constants/medico_queue_patient_status.dart';
 import 'package:sistema_triage/features/medico/domain/constants/medico_triage_category.dart';
 import 'package:sistema_triage/features/medico/domain/entities/queue/medico_queue_filter_chips_data.dart';
 import 'package:sistema_triage/features/medico/domain/entities/queue/medico_queue_patient_card_data.dart';
@@ -26,10 +27,9 @@ import 'package:sistema_triage/features/medico/presentation/queue/widgets/medico
 import 'package:sistema_triage/shared/widgets/app_header.dart';
 
 void main() {
-  runApp(const MaterialApp(
-    debugShowCheckedModeBanner: false,
-    home: _Sandbox(),
-  ));
+  runApp(
+    const MaterialApp(debugShowCheckedModeBanner: false, home: _Sandbox()),
+  );
 }
 
 class _Sandbox extends StatefulWidget {
@@ -50,54 +50,44 @@ class _SandboxState extends State<_Sandbox> {
   List<MedicoQueuePatientCardData> _buildMockPatients() {
     return [
       MedicoQueuePatientCardData(
-        patientId: 'PAC-28320',
         level: 1,
-        category: MedicoTriageCategory.rojo,
-        patientLine: 'Paciente Numero 1 - 12-Mar-2026 14:32 - Blvd. 2000',
-        ingressLabel: 'Ingresó hace 5 minutos',
-        registrationDateTime: '12/03/206 14:32:54',
-        onCardTap: () => debugPrint('open patient 1'),
-        onCallTap: () => debugPrint('call patient 1'),
+        levelColor: MedicoTriageCategory.rojo.color,
+        name: 'Alberto Pérez',
+        status: MedicoQueuePatientStatus.recibido,
+        subtitle: 'Hace 4 min · del incidente INC-729',
+        onTap: () => debugPrint('open patient 1'),
       ),
       MedicoQueuePatientCardData(
-        patientId: 'PAC-28320',
+        level: 1,
+        levelColor: MedicoTriageCategory.rojo.color,
+        name: 'Paciente sin identificar',
+        status: MedicoQueuePatientStatus.recibido,
+        subtitle: 'Hace 9 min · del incidente INC-729',
+        onTap: () => debugPrint('open patient 2'),
+      ),
+      MedicoQueuePatientCardData(
         level: 2,
-        category: MedicoTriageCategory.amarillo,
-        patientLine: 'Paciente Numero 2 - 12-Mar-2026 14:32 - Blvd. 2000',
-        ingressLabel: 'Ingresó hace 12 minutos',
-        registrationDateTime: '12/03/206 14:32:54',
-        onCardTap: () => debugPrint('open patient 2'),
-        onCallTap: () => debugPrint('call patient 2'),
+        levelColor: MedicoTriageCategory.naranja.color,
+        name: 'Lourdes Carrillo',
+        status: MedicoQueuePatientStatus.enEspera,
+        subtitle: 'Hace 22 min · llegó por su cuenta',
+        onTap: () => debugPrint('open patient 3'),
       ),
       MedicoQueuePatientCardData(
-        patientId: 'PAC-28320',
-        level: 2,
-        category: MedicoTriageCategory.amarillo,
-        patientLine: 'Paciente Numero 3 - 12-Mar-2026 14:32 - Blvd. 2000',
-        ingressLabel: 'Ingresó hace 10 minutos',
-        registrationDateTime: '12/03/206 14:32:54',
-        onCardTap: () => debugPrint('open patient 3'),
-        onCallTap: () => debugPrint('call patient 3'),
-      ),
-      MedicoQueuePatientCardData(
-        patientId: 'PAC-28320',
-        level: 2,
-        category: MedicoTriageCategory.verde,
-        patientLine: 'Paciente Numero 4 - 12-Mar-2026 14:32 - Blvd. 2000',
-        ingressLabel: 'Ingresó hace 20 minutos',
-        registrationDateTime: '12/03/206 14:32:54',
-        onCardTap: () => debugPrint('open patient 4'),
-        onCallTap: () => debugPrint('call patient 4'),
-      ),
-      MedicoQueuePatientCardData(
-        patientId: 'PAC-28320',
         level: 3,
-        category: MedicoTriageCategory.naranja,
-        patientLine: 'Paciente Numero 5 - 12-Mar-2026 14:32 - Blvd. 2000',
-        ingressLabel: 'Ingresó hace 30 minutos',
-        registrationDateTime: '12/03/206 14:32:54',
-        onCardTap: () => debugPrint('open patient 5'),
-        onCallTap: () => debugPrint('call patient 5'),
+        levelColor: MedicoTriageCategory.amarillo.color,
+        name: 'Ramiro Hernández',
+        status: MedicoQueuePatientStatus.enEspera,
+        subtitle: 'Hace 35 min · del incidente INC-731',
+        onTap: () => debugPrint('open patient 4'),
+      ),
+      MedicoQueuePatientCardData(
+        level: 4,
+        levelColor: MedicoTriageCategory.verde.color,
+        name: 'Sofía Ibarra',
+        status: MedicoQueuePatientStatus.alta,
+        subtitle: 'Hace 51 min · llegó por su cuenta',
+        onTap: () => debugPrint('open patient 5'),
       ),
     ];
   }
