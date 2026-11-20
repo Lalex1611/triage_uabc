@@ -298,7 +298,7 @@ class MedicoHomeController extends ChangeNotifier {
         .toList();
   }
 
-  /// Pacientes aún no recibidos por el hospital (mismo criterio que el filtro «En camino»)
+  /// Pacientes aún no recibidos por el hospital (en espera o trasladando)
   List<MedicoPatientCardData> incomingPatients(
     List<MedicoPatientCardData> list,
   ) {
