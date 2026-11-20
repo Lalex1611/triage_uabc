@@ -1,9 +1,10 @@
-// Catálogo de filtros de pacientes para Home del médico
+// Catálogo de filtros de pacientes para Home del médico (mockup 01: por color de triage)
 enum MedicoPatientFilter {
-  enCamino('En camino'),
-  recibidos('Recibidos'),
-  independientes('Independientes'),
-  triageHospitalario('TRIAGE - HOSPITALARIO');
+  todos('Todos'),
+  rojo('Rojo'),
+  naranja('Naranja'),
+  amarillo('Amarillo'),
+  verde('Verde');
 
   final String label;
   const MedicoPatientFilter(this.label);

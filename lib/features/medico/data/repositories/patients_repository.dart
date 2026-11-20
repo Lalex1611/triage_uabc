@@ -1,18 +1,19 @@
-
 import 'package:sistema_triage/core/config/supabase_env.dart';
 import 'package:sistema_triage/core/geo/geo_location_parser.dart';
 import 'package:sistema_triage/features/medico/domain/constants/medico_triage_category.dart';
 import 'package:sistema_triage/features/medico/domain/entities/home/medico_notification_item.dart';
 import 'package:sistema_triage/features/medico/domain/entities/home/medico_patient_card_data.dart';
+import 'package:sistema_triage/features/medico/domain/entities/patient_review/medico_incoming_review.dart';
+import 'package:sistema_triage/features/medico/domain/entities/room_patient/medico_attention_note.dart';
+import 'package:sistema_triage/features/medico/domain/entities/room_patient/medico_discharge_info.dart';
 import 'package:sistema_triage/features/medico/domain/entities/patient_details/patient_triage_history_entry.dart';
 import 'package:sistema_triage/features/paramedico/domain/constants/patient_status.dart';
 import 'package:sistema_triage/features/paramedico/domain/constants/triage_catalog.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:uuid/uuid.dart';
 
 class PatientsRepository {
   static const _patientCardSelect =
-      'id, sync_client_id, display_name, triage_color, status, created_at, location, '
+      'id, sync_client_id, incident_id, display_name, triage_color, status, created_at, location, '
       'regulation_folio, descriptive_notes, estimated_arrival_at, '
       'ambulancias_unidades ( numero_economico )';
 
@@ -25,7 +26,10 @@ class PatientsRepository {
 
   SupabaseClient get _c {
     final x = _client;
-    if (x == null) throw Exception('El servicio no se encuentra configurado en este momento');
+    if (x == null)
+      throw Exception(
+        'El servicio no se encuentra configurado en este momento',
+      );
     return x;
   }
 
@@ -48,6 +52,174 @@ class PatientsRepository {
       for (var i = 0; i < list.length; i++)
         _mapRow(list[i] as Map<String, dynamic>, number: i + 1),
     ];
+  }
+
+  /// Momento más reciente en que cada paciente entró a `recibido` y a
+  /// `alta_medica` (según `patient_state_history`). Usado por la Sala.
+  Future<
+    ({Map<String, DateTime> receivedAt, Map<String, DateTime> dischargedAt})
+  >
+  fetchStatusTimestamps(List<String> patientIds) async {
+    final received = <String, DateTime>{};
+    final discharged = <String, DateTime>{};
+    final ids = patientIds.where((id) => id.isNotEmpty).toList();
+    if (ids.isEmpty) return (receivedAt: received, dischargedAt: discharged);
+
+    final rows = await _c
+        .from('patient_state_history')
+        .select('patient_id, new_status, created_at')
+        .inFilter('patient_id', ids)
+        .inFilter('new_status', ['recibido', 'alta_medica'])
+        // Solo cambios de estado reales, no cambios de triage con el mismo estado
+        .contains('changed_fields', ['status'])
+        .order('created_at', ascending: false);
+
+    for (final r in rows as List<dynamic>) {
+      final m = r as Map<String, dynamic>;
+      final pid = m['patient_id'] as String?;
+      final at = DateTime.tryParse(m['created_at'] as String? ?? '');
+      if (pid == null || at == null) continue;
+      final target = m['new_status'] == 'recibido' ? received : discharged;
+      // Orden descendente: el primero visto es el más reciente
+      target.putIfAbsent(pid, () => at.toLocal());
+    }
+    return (receivedAt: received, dischargedAt: discharged);
+  }
+
+  static const _incidentPhotosBucket = 'incident_photos';
+
+  /// Datos para revisar a un paciente que viene en camino (mockup 02):
+  /// paciente + incidente + unidad + paramédico, hora de clasificación y
+  /// enlaces temporales de las fotos del incidente.
+  Future<MedicoIncomingReview?> fetchIncomingReview(String patientId) async {
+    final row = await _c
+        .from('patients')
+        .select(
+          'id, display_name, triage_color, status, created_at, incident_id, '
+          'regulation_folio, descriptive_notes, demographics, estimated_arrival_at, '
+          'incidents ( generated_title, emergency_type, photo_local_paths ), '
+          'ambulancias_unidades ( numero_economico ), '
+          'creator:profiles!created_by ( full_name )',
+        )
+        .eq('id', patientId)
+        .eq('is_deleted', false)
+        .maybeSingle();
+    if (row == null) return null;
+
+    // Última vez que se asignó o cambió el color de triage
+    DateTime? classifiedAt;
+    try {
+      final hist = await _c
+          .from('patient_state_history')
+          .select('created_at')
+          .eq('patient_id', patientId)
+          .contains('changed_fields', ['triage_color'])
+          .order('created_at', ascending: false)
+          .limit(1)
+          .maybeSingle();
+      classifiedAt = DateTime.tryParse(
+        hist?['created_at'] as String? ?? '',
+      )?.toLocal();
+    } catch (_) {}
+
+    // Fotos del incidente en Storage (las que empiezan con / son rutas
+    // locales antiguas del teléfono del paramédico y no se pueden mostrar)
+    final photoUrls = <String>[];
+    final incident = row['incidents'];
+    if (incident is Map && incident['photo_local_paths'] is List) {
+      final stored = [
+        for (final p in incident['photo_local_paths'] as List)
+          if (p is String && p.isNotEmpty && !p.startsWith('/')) p,
+      ];
+      if (stored.isNotEmpty) {
+        try {
+          final signed = await _c.storage
+              .from(_incidentPhotosBucket)
+              .createSignedUrls(stored, const Duration(hours: 1).inSeconds);
+          photoUrls.addAll(signed.map((s) => s.signedUrl));
+        } catch (_) {}
+      }
+    }
+
+    return MedicoIncomingReview.fromRow(
+      Map<String, dynamic>.from(row),
+      photoUrls: photoUrls,
+      classifiedAt: classifiedAt,
+    );
+  }
+
+  /// Guarda los datos editables de un paciente en sala (nombre, datos
+  /// demográficos y signos vitales) en una sola actualización
+  Future<void> updatePatientInfo({
+    required String patientId,
+    required String displayName,
+    required Map<String, dynamic> demographics,
+    required Map<String, dynamic> vitalSigns,
+  }) async {
+    await _c
+        .from('patients')
+        .update({
+          'display_name': displayName.trim(),
+          'demographics': demographics,
+          'vital_signs': vitalSigns.isEmpty ? null : vitalSigns,
+        })
+        .eq('id', patientId);
+  }
+
+  /// Notas de atención del paciente, de la más reciente a la más antigua
+  Future<List<MedicoAttentionNote>> fetchAttentionNotes(
+    String patientId,
+  ) async {
+    final rows = await _c
+        .from('patient_attention_notes')
+        .select('id, body, created_at, author:profiles!author_id ( full_name )')
+        .eq('patient_id', patientId)
+        .order('created_at', ascending: false);
+    return [
+      for (final r in rows as List<dynamic>)
+        MedicoAttentionNote.fromRow(Map<String, dynamic>.from(r as Map)),
+    ];
+  }
+
+  /// Agrega una nota de atención a nombre del médico en sesión
+  Future<void> addAttentionNote({
+    required String patientId,
+    required String body,
+  }) async {
+    await _c.from('patient_attention_notes').insert({
+      'patient_id': patientId,
+      'body': body.trim(),
+    });
+  }
+
+  /// Da de alta al paciente: guarda destino y nota y lo pasa a `alta_medica`
+  /// en una sola transacción (RPC `medico_discharge_patient`)
+  Future<void> dischargePatient({
+    required String patientId,
+    required String destination,
+    String? note,
+  }) async {
+    await _c.rpc(
+      'medico_discharge_patient',
+      params: {
+        'p_patient_id': patientId,
+        'p_destination': destination,
+        'p_note': note?.trim(),
+      },
+    );
+  }
+
+  /// Alta registrada del paciente, o null si no tiene
+  Future<MedicoDischargeInfo?> fetchDischarge(String patientId) async {
+    final row = await _c
+        .from('patient_discharges')
+        .select(
+          'destination, note, created_at, by:profiles!discharged_by ( full_name )',
+        )
+        .eq('patient_id', patientId)
+        .maybeSingle();
+    if (row == null) return null;
+    return MedicoDischargeInfo.fromRow(Map<String, dynamic>.from(row));
   }
 
   Future<void> updateLifecycleStatus({
@@ -119,10 +291,7 @@ class PatientsRepository {
         .order('created_at', ascending: false);
 
     final list = rows as List<dynamic>;
-    return [
-      for (final r in list)
-        _mapHistoryRow(r as Map<String, dynamic>),
-    ];
+    return [for (final r in list) _mapHistoryRow(r as Map<String, dynamic>)];
   }
 
   static PatientTriageHistoryEntry _mapHistoryRow(Map<String, dynamic> row) {
@@ -167,44 +336,38 @@ class PatientsRepository {
   }
 
   /// Registra un ingreso al hospital sin traslado quedando en estado recibido
+  /// Registra a un paciente que llegó por su cuenta (sin traslado) como
+  /// `recibido` en el hospital del médico y genera su código de consulta.
+  /// Todo ocurre en una sola transacción (RPC `medico_register_walk_in_patient`).
   Future<({String patientId, String consultationCode})> registerWalkInPatient({
-    required String hospitalId,
     required String triageColor,
     required String displayName,
     required Map<String, dynamic> demographics,
     Map<String, dynamic>? vitalSigns,
+    String? reasonForVisit,
   }) async {
-    final uidAuth = _c.auth.currentUser?.id;
-    if (uidAuth == null) throw Exception('La sesión no es válida o ha expirado');
-
-    final insertRow = <String, dynamic>{
-      'sync_client_id': const Uuid().v4(),
-      'hospital_id': hospitalId,
-      'triage_color': triageColor,
-      'status': 'recibido',
-      'created_by': uidAuth,
-      'demographics': demographics,
-    };
-    final dn = displayName.trim();
-    if (dn.isNotEmpty) insertRow['display_name'] = dn;
-    if (vitalSigns != null && vitalSigns.isNotEmpty) {
-      insertRow['vital_signs'] = vitalSigns;
+    if (_c.auth.currentUser == null) {
+      throw Exception('La sesión no es válida o ha expirado');
     }
 
-final inserted = await _c
-    .from('patients')
-    .insert(insertRow)
-    .select('id')
-    .single();
+    final result = await _c.rpc(
+      'medico_register_walk_in_patient',
+      params: {
+        'p_display_name': displayName.trim(),
+        'p_triage_color': triageColor,
+        'p_demographics': demographics,
+        'p_vital_signs': (vitalSigns == null || vitalSigns.isEmpty)
+            ? null
+            : vitalSigns,
+        'p_descriptive_notes': reasonForVisit?.trim(),
+      },
+    );
 
-final patientId = inserted['id'] as String;
-
-final code = await _c.rpc(
-  'create_consultation_code',
-  params: {'p_patient_id': patientId},
-) as String;
-
-return (patientId: patientId, consultationCode: code);
+    final m = Map<String, dynamic>.from(result as Map);
+    return (
+      patientId: m['patient_id'] as String,
+      consultationCode: m['consultation_code'] as String,
+    );
   }
 
   Future<List<MedicoPatientCardData>> fetchRejectedTransfers({
@@ -277,9 +440,12 @@ return (patientId: patientId, consultationCode: code);
         ? folio
         : (notes != null && notes.isNotEmpty)
         ? notes.split('\n').first
-        : 'Paciente ${id.substring(0, 8)}';
+        : 'Paciente sin identificar';
 
-    final dt = createdAt != null ? DateTime.tryParse(createdAt) : null;
+    final dt = createdAt != null
+        ? DateTime.tryParse(createdAt)?.toLocal()
+        : null;
+    final incidentId = row['incident_id'] as String?;
     final dateStr = dt != null ? _fmt(dt) : '—';
 
     final coords = _coordsFromLocation(location);
@@ -307,6 +473,10 @@ return (patientId: patientId, consultationCode: code);
       eta: eta,
       ambulanceUnit: unitLabel,
       status: _lifecycleFromDb(statusRaw),
+      incidentId: (incidentId != null && incidentId.isNotEmpty)
+          ? incidentId
+          : null,
+      createdAt: dt,
       footerNote: null,
     );
   }

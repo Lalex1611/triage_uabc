@@ -8,6 +8,9 @@ class MedicoNotificationItem {
   final DateTime createdAt;
   final DateTime? readAt;
 
+  /// Datos extra según [kind] (color de triage, incidente, unidad, etc.)
+  final Map<String, dynamic> metadata;
+
   const MedicoNotificationItem({
     required this.id,
     required this.title,
@@ -16,6 +19,7 @@ class MedicoNotificationItem {
     this.patientId,
     required this.createdAt,
     this.readAt,
+    this.metadata = const {},
   });
 
   bool get isUnread => readAt == null;
@@ -29,11 +33,13 @@ class MedicoNotificationItem {
       body: row['body'] as String? ?? '',
       kind: row['kind'] as String? ?? 'generic',
       patientId: row['patient_id'] as String?,
-      createdAt:
-          createdRaw != null
-              ? DateTime.tryParse(createdRaw) ?? DateTime.now()
-              : DateTime.now(),
+      createdAt: createdRaw != null
+          ? DateTime.tryParse(createdRaw) ?? DateTime.now()
+          : DateTime.now(),
       readAt: readRaw != null ? DateTime.tryParse(readRaw) : null,
+      metadata: row['metadata'] is Map
+          ? Map<String, dynamic>.from(row['metadata'] as Map)
+          : const {},
     );
   }
 }
