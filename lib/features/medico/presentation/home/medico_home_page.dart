@@ -20,6 +20,9 @@ class MedicoHomePage extends StatelessWidget {
   /// Contenido de la pestaña Perfil (navIndex 3, mockup 13) con encabezado propio
   final Widget? profileTab;
 
+  /// "Hospital · Área" del médico en el encabezado (vacío mientras carga)
+  final String hospitalLabel;
+
   const MedicoHomePage({
     super.key,
     required this.navIndex,
@@ -39,6 +42,7 @@ class MedicoHomePage extends StatelessWidget {
     required this.walkInRegisterTab,
     this.salaTab,
     this.profileTab,
+    this.hospitalLabel = '',
     this.hasUnreadNotifications = false,
     this.onNotificationTap,
   });
@@ -143,7 +147,7 @@ class MedicoHomePage extends StatelessWidget {
   Widget _header() {
     return MedicoHomeHeader(
       userName: userStats.userName,
-      hospitalLabel: 'Hospital General de Tijuana · Urgencias',
+      hospitalLabel: hospitalLabel,
       hasNotifications: hasUnreadNotifications,
       onNotificationTap: onNotificationTap,
       onProfileTap: onProfileTap,

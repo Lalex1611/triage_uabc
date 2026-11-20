@@ -101,6 +101,7 @@ class _MedicoHomeFlowPageState extends State<MedicoHomeFlowPage>
       onNotificationTap: () => unawaited(_openNotifications(context)),
       onProfileTap: () => c.setNavIndex(3),
       salaTab: _buildSalaTab(context),
+      hospitalLabel: c.hospitalLabel ?? '',
       profileTab: MedicoProfileTab(
         userName: c.statsFor(c.patients).userName,
         onBack: () => c.setNavIndex(0),

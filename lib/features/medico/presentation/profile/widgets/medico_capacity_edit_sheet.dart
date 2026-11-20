@@ -20,6 +20,9 @@ class MedicoCapacityEditSheet extends StatefulWidget {
     required MedicoHospitalCapacity initial,
     required Future<void> Function(MedicoHospitalCapacity) onSave,
   }) async {
+    // Último guardado iniciado: si la hoja se cierra mientras guarda (toque
+    // fuera, arrastre o Atrás), se espera aquí para no perder la recarga
+    Future<void>? pending;
     final ok = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
@@ -27,9 +30,20 @@ class MedicoCapacityEditSheet extends StatefulWidget {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (_) => MedicoCapacityEditSheet(initial: initial, onSave: onSave),
+      builder: (_) => MedicoCapacityEditSheet(
+        initial: initial,
+        onSave: (c) => pending = onSave(c),
+      ),
     );
-    return ok == true;
+    if (ok == true) return true;
+    // Cancelado antes de guardar
+    if (pending == null) return false;
+    try {
+      await pending;
+      return true;
+    } catch (_) {
+      return false;
+    }
   }
 
   @override
@@ -84,7 +98,9 @@ class _MedicoCapacityEditSheetState extends State<MedicoCapacityEditSheet> {
         MediaQuery.viewInsetsOf(context).bottom +
         MediaQuery.paddingOf(context).bottom;
 
-    return Padding(
+    // Desplazable: en pantallas bajas (o con letra grande) Guardar y el error
+    // siguen al alcance; la hoja nunca pasa de la altura disponible
+    return SingleChildScrollView(
       padding: EdgeInsets.fromLTRB(20, 12, 20, 16 + bottom),
       child: Column(
         mainAxisSize: MainAxisSize.min,
