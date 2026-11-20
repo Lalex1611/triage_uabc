@@ -3,11 +3,12 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:go_router/go_router.dart';
-import 'package:sistema_triage/core/theme/triage_tokens.dart';
+import 'package:sistema_triage/shared/widgets/triage_ui.dart';
+import 'package:sistema_triage/features/paramedico/presentation/create_incident/create_incident_sheet.dart';
+import 'package:sistema_triage/features/paramedico/presentation/incidents/paramedico_incidents_sheet.dart';
 import 'package:sistema_triage/features/paramedico/presentation/navigation/paramedico_navbar_widget.dart';
 import 'package:sistema_triage/features/paramedico/presentation/shared/paramedico_session_actions.dart';
-import 'package:sistema_triage/features/paramedico/presentation/incidents/paramedico_incidents_sheet.dart';
-import 'package:sistema_triage/features/paramedico/presentation/create_incident/create_incident_sheet.dart';
+import 'package:sistema_triage/features/paramedico/presentation/start_guide/paramedico_start_guide.dart';
 
 /// Deja que el mapa oculte la barra de navegación mientras hay un incidente
 /// elegido (B03), como en Figma
@@ -48,6 +49,10 @@ class _ParamedicoShellPageState extends State<ParamedicoShellPage> {
   /// se oculta, como en Figma (B02)
   bool _incidentsOpen = false;
 
+  /// La hoja de Guía rápida START está abierta (B19): su pestaña se marca y el
+  /// "+" se oculta
+  bool _guideOpen = false;
+
   final _navbarHidden = ValueNotifier(false);
 
   @override
@@ -80,8 +85,11 @@ class _ParamedicoShellPageState extends State<ParamedicoShellPage> {
   int get _branchIndex =>
       _shell.currentIndex < _navBranchCount ? _shell.currentIndex : -1;
 
-  int get _navIndex =>
-      _incidentsOpen ? ParamedicoNavbar.incidentsTab : _branchIndex;
+  int get _navIndex {
+    if (_incidentsOpen) return ParamedicoNavbar.incidentsTab;
+    if (_guideOpen) return ParamedicoNavbar.guideTab;
+    return _branchIndex;
+  }
 
   /// Navegador de la rama actual. Lo que se abre en él queda dentro del cuerpo
   /// del Scaffold, así que la barra de navegación se pinta por delante.
@@ -89,16 +97,25 @@ class _ParamedicoShellPageState extends State<ParamedicoShellPage> {
       _shell.route.branches[_shell.currentIndex].navigatorKey.currentContext ??
       context;
 
-  /// Cierra la hoja de incidentes y lo que se haya abierto encima (ordenar,
-  /// filtrar), sin tocar las pantallas de la rama
-  void _closeIncidents() =>
+  /// Cierra la hoja activa (incidentes o guía START) y lo que se haya abierto
+  /// encima, sin tocar las pantallas de la rama
+  void _closeActiveSheets() =>
       Navigator.of(_branchContext).popUntil((route) => route is! PopupRoute);
 
   Future<void> _openIncidents() async {
     if (_incidentsOpen) return;
+    if (_guideOpen) _closeActiveSheets();
     setState(() => _incidentsOpen = true);
     await showParamedicoIncidentsSheet(context, host: _branchContext);
     if (mounted) setState(() => _incidentsOpen = false);
+  }
+
+  Future<void> _openGuide() async {
+    if (_guideOpen) return;
+    if (_incidentsOpen) _closeActiveSheets();
+    setState(() => _guideOpen = true);
+    await ParamedicoStartGuide.show(context, host: _branchContext);
+    if (mounted) setState(() => _guideOpen = false);
   }
 
   void _onNavTap(int index) {
@@ -106,12 +123,16 @@ class _ParamedicoShellPageState extends State<ParamedicoShellPage> {
       unawaited(_openIncidents());
       return;
     }
-    if (_incidentsOpen) _closeIncidents();
+    if (index == ParamedicoNavbar.guideTab) {
+      unawaited(_openGuide());
+      return;
+    }
+    if (_incidentsOpen || _guideOpen) _closeActiveSheets();
     if (index == ParamedicoNavbar.profileTab) {
       ParamedicoSessionActions.openProfileSheet(context);
       return;
     }
-    if (index == ParamedicoNavbar.mapTab && !_incidentsOpen) {
+    if (index == ParamedicoNavbar.mapTab && !_incidentsOpen && !_guideOpen) {
       _shell.goBranch(index, initialLocation: index == _shell.currentIndex);
     }
   }

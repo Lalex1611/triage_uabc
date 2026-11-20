@@ -41,7 +41,7 @@ as $$
     );
 $$;
 
-revoke all on function public.paramedic_recipients_for_patient(uuid, uuid) from public;
+revoke all on function public.paramedic_recipients_for_patient(uuid, uuid) from public, anon, authenticated;
 
 -- Traslado aceptado (trasladando → recibido) ---------------------------------------
 create or replace function public.notify_paramedics_transfer_accepted()

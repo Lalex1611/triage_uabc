@@ -715,7 +715,10 @@ class MedicoPatientDetailsController extends ChangeNotifier {
 
   MedicoInsuranceOption? insuranceUi(Map<String, dynamic> demo) {
     final v =
-        demo['seguro_medico'] ?? demo['has_insurance'] ?? demo['insurance'];
+        demo['seguro_medico'] ??
+        demo['has_medical_insurance'] ??
+        demo['has_insurance'] ??
+        demo['insurance'];
     if (v == true) return MedicoInsuranceOption.si;
     if (v == false) return MedicoInsuranceOption.no;
     if (v is String) {

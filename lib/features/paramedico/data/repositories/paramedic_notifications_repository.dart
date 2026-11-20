@@ -4,13 +4,18 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 class ParamedicNotificationsRepository {
   ParamedicNotificationsRepository({SupabaseClient? client})
-      : _client = client ?? (SupabaseEnv.isConfigured ? Supabase.instance.client : null);
+    : _client =
+          client ??
+          (SupabaseEnv.isConfigured ? Supabase.instance.client : null);
 
   final SupabaseClient? _client;
 
   SupabaseClient get _c {
     final x = _client;
-    if (x == null) throw Exception('El servicio no se encuentra configurado en este momento');
+    if (x == null)
+      throw Exception(
+        'El servicio no se encuentra configurado en este momento',
+      );
     return x;
   }
 
@@ -24,19 +29,20 @@ class ParamedicNotificationsRepository {
     if (uid == null) return [];
     final rows = await _c
         .from('paramedic_notifications')
-        .select('id, title, body, kind, patient_id, metadata, created_at, read_at')
+        .select(
+          'id, title, body, kind, patient_id, metadata, created_at, read_at',
+        )
         .eq('recipient_id', uid)
         .order('created_at', ascending: false)
         .limit(limit);
-    return (rows as List)
-        .map((e) => _map(e as Map<String, dynamic>))
-        .toList();
+    return (rows as List).map((e) => _map(e as Map<String, dynamic>)).toList();
   }
 
   Future<void> markRead(String notificationId) async {
-    await _c.from('paramedic_notifications').update({
-      'read_at': DateTime.now().toUtc().toIso8601String(),
-    }).eq('id', notificationId);
+    await _c
+        .from('paramedic_notifications')
+        .update({'read_at': DateTime.now().toUtc().toIso8601String()})
+        .eq('id', notificationId);
   }
 
   ParamedicNotification _map(Map<String, dynamic> j) {
@@ -53,7 +59,9 @@ class ParamedicNotificationsRepository {
       patientId: j['patient_id'] as String?,
       patientDisplayName: patientName,
       createdAt: DateTime.parse(j['created_at'] as String),
-      readAt: j['read_at'] == null ? null : DateTime.tryParse(j['read_at'] as String),
+      readAt: j['read_at'] == null
+          ? null
+          : DateTime.tryParse(j['read_at'] as String),
     );
   }
 }
