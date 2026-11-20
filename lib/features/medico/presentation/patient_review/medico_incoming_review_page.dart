@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:sistema_triage/features/medico/domain/constants/medico_triage_level.dart';
 import 'package:sistema_triage/features/medico/domain/entities/patient_review/medico_incoming_review.dart';
@@ -87,14 +89,19 @@ class MedicoIncomingReviewPage extends StatelessWidget {
             child: ListView(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
               children: [
-                MedicoReviewTriageBanner(
-                  color: color,
-                  darkText: r.triage == TriageCategory.amarillo,
-                  levelLabel: MedicoIncomingReviewFormat.levelBanner(r.triage),
-                  title: title,
-                  arrivalLabel: MedicoIncomingReviewFormat.arrivalLong(
-                    r,
-                    now ?? DateTime.now(),
+                _ArrivalClock(
+                  fixedNow: now,
+                  builder: (current) => MedicoReviewTriageBanner(
+                    color: color,
+                    darkText: r.triage == TriageCategory.amarillo,
+                    levelLabel: MedicoIncomingReviewFormat.levelBanner(
+                      r.triage,
+                    ),
+                    title: title,
+                    arrivalLabel: MedicoIncomingReviewFormat.arrivalLong(
+                      r,
+                      current,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -144,4 +151,41 @@ class MedicoIncomingReviewPage extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Reconstruye el banner cada 30 s para que "Llega en N minutos" no se quede
+/// congelado mientras la revisión está abierta. Con [fixedNow] (pruebas) no
+/// corre reloj.
+class _ArrivalClock extends StatefulWidget {
+  const _ArrivalClock({required this.fixedNow, required this.builder});
+
+  final DateTime? fixedNow;
+  final Widget Function(DateTime now) builder;
+
+  @override
+  State<_ArrivalClock> createState() => _ArrivalClockState();
+}
+
+class _ArrivalClockState extends State<_ArrivalClock> {
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.fixedNow == null) {
+      _timer = Timer.periodic(const Duration(seconds: 30), (_) {
+        if (mounted) setState(() {});
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) =>
+      widget.builder(widget.fixedNow ?? DateTime.now());
 }

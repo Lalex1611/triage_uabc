@@ -202,8 +202,7 @@ class _MedicoWalkInRegisterTabState extends State<MedicoWalkInRegisterTab> {
       ('glucosa', _glucose),
     ];
     for (final (label, c) in fields) {
-      final t = c.text.trim().replaceAll(',', '.');
-      if (t.isNotEmpty && double.tryParse(t) == null) {
+      if (!MedicoPatientFormValidators.isValidVital(c.text)) {
         return 'Revisa el valor de $label.';
       }
     }
@@ -404,10 +403,17 @@ class _MedicoWalkInRegisterTabState extends State<MedicoWalkInRegisterTab> {
     if (_registered != null) return _buildSuccess(_registered!);
     final isFirst = _step == 1;
 
+    // Es una pestaña del inicio: el Back del sistema nunca cierra la ruta
+    // que la contiene. En el paso 1 cierra el registro; en el 2 regresa al 1
     return PopScope(
-      canPop: isFirst,
+      canPop: false,
       onPopInvokedWithResult: (didPop, _) {
-        if (!didPop && !_saving) _goToStep(1);
+        if (didPop || _saving) return;
+        if (isFirst) {
+          _close();
+        } else {
+          _goToStep(1);
+        }
       },
       child: ColoredBox(
         color: MedicoWalkInColors.background,
