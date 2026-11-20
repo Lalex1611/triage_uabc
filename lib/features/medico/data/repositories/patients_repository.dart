@@ -156,14 +156,17 @@ class PatientsRepository {
     required Map<String, dynamic> demographics,
     required Map<String, dynamic> vitalSigns,
   }) async {
-    await _c
-        .from('patients')
-        .update({
-          'display_name': displayName.trim(),
-          'demographics': demographics,
-          'vital_signs': vitalSigns.isEmpty ? null : vitalSigns,
-        })
-        .eq('id', patientId);
+    // RPC `medico_update_patient_info`: conserva las fotos que ya están en el
+    // servidor (pudieron agregarse después de abrir el formulario)
+    await _c.rpc(
+      'medico_update_patient_info',
+      params: {
+        'p_patient_id': patientId,
+        'p_display_name': displayName.trim(),
+        'p_demographics': demographics,
+        'p_vital_signs': vitalSigns.isEmpty ? null : vitalSigns,
+      },
+    );
   }
 
   /// Agrega una foto al expediente en el servidor (RPC

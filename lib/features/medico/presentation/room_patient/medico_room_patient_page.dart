@@ -251,7 +251,8 @@ class MedicoRoomPatientPage extends StatelessWidget {
                 if (discharged && discharge != null) ...[
                   const SizedBox(height: 16),
                   _dischargeCard(discharge!, now ?? DateTime.now()),
-                ] else if (discharged && dischargeLoadFailed) ...[
+                ],
+                if (discharged && dischargeLoadFailed) ...[
                   const SizedBox(height: 16),
                   MedicoRoomLoadError(
                     message: 'No se pudo cargar el alta registrada.',
