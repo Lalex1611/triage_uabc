@@ -228,7 +228,6 @@ class _MedicoWalkInRegisterTabState extends State<MedicoWalkInRegisterTab>
     try {
       final vitals = _buildVitals();
       final result = await _patientsRepo.registerWalkInPatient(
-        hospitalId: hosp,
         triageColor: _triageSql(_triageSel!),
         displayName: name,
         demographics: _buildDemographics(),

@@ -64,8 +64,8 @@ abstract final class MedicoPatientFormValidators {
   /// Teléfono opcional: 10 dígitos (México / EE. UU.), u 11–12 con la lada
   /// del país (+1 / +52)
   static String? phoneError(String phone) {
+    if (phone.trim().isEmpty) return null;
     final digits = phone.replaceAll(RegExp(r'[^0-9]'), '');
-    if (digits.isEmpty) return null;
     if (digits.length < 10 || digits.length > 12) {
       return 'El teléfono debe tener 10 dígitos (o 11–12 con la lada del país).';
     }

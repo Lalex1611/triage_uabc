@@ -70,6 +70,8 @@ class PatientsRepository {
         .select('patient_id, new_status, created_at')
         .inFilter('patient_id', ids)
         .inFilter('new_status', ['recibido', 'alta_medica'])
+        // Solo cambios de estado reales, no cambios de triage con el mismo estado
+        .contains('changed_fields', ['status'])
         .order('created_at', ascending: false);
 
     for (final r in rows as List<dynamic>) {

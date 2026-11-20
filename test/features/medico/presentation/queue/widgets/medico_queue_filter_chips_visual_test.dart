@@ -23,7 +23,7 @@ class _Demo extends StatefulWidget {
 }
 
 class _DemoState extends State<_Demo> {
-  MedicoQueueFilter _filter = MedicoQueueFilter.enCamino;
+  MedicoQueueFilter _filter = MedicoQueueFilter.todos;
 
   @override
   Widget build(BuildContext context) {

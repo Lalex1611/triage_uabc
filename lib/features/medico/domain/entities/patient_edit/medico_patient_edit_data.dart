@@ -142,6 +142,16 @@ class MedicoPatientEditData {
     setOrRemove('allergies', allergies);
     setOrRemove('medications', medications);
     setOrRemove('medical_history', medicalHistory);
+
+    // Los signos vitales viven en `vital_signs` (ver [applyToVitalSigns]); se
+    // quitan las copias antiguas en demographics para que un valor borrado
+    // no reaparezca al reabrir
+    vitalKeys.forEach((key, aliases) {
+      out.remove(key);
+      for (final a in aliases) {
+        out.remove(a);
+      }
+    });
     return out;
   }
 

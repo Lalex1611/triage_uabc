@@ -42,7 +42,7 @@ class _Sandbox extends StatefulWidget {
 class _SandboxState extends State<_Sandbox> {
   /// La app ya no expone la pestaña Cola; el índice es solo decorativo en este sandbox.
   int _navIndex = 0;
-  MedicoQueueFilter _filter = MedicoQueueFilter.enCamino;
+  MedicoQueueFilter _filter = MedicoQueueFilter.todos;
   MedicoPatientSortOption _sort = MedicoPatientSortOption.recent;
 
   late final List<MedicoQueuePatientCardData> _patients = _buildMockPatients();
