@@ -54,11 +54,13 @@ class MedicoReviewRows extends StatelessWidget {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  rows[i].$1,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    color: Color(0xFF3F4850),
+                Flexible(
+                  child: Text(
+                    rows[i].$1,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      color: Color(0xFF3F4850),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 16),

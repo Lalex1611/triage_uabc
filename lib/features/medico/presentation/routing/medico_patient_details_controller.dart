@@ -14,6 +14,7 @@ import 'package:sistema_triage/features/medico/domain/entities/room_patient/medi
 import 'package:sistema_triage/features/medico/domain/entities/room_patient/medico_discharge_info.dart';
 import 'package:sistema_triage/features/medico/presentation/discharge/medico_discharge_page.dart';
 import 'package:sistema_triage/features/medico/presentation/room_patient/widgets/medico_attention_note_dialog.dart';
+import 'package:sistema_triage/features/medico/presentation/room_patient/widgets/medico_room_triage_sheet.dart';
 import 'package:sistema_triage/features/medico/presentation/patient_edit/medico_patient_edit_page.dart';
 import 'package:sistema_triage/features/medico/presentation/home/medico_incoming_transfer_interactions.dart';
 import 'package:sistema_triage/features/paramedico/data/repositories/paramedico_incidents_repository.dart';
@@ -52,6 +53,11 @@ class MedicoPatientDetailsController extends ChangeNotifier {
 
   /// Alta registrada (destino y nota); solo si el paciente ya tiene alta
   MedicoDischargeInfo? discharge;
+
+  /// La última lectura de notas / del alta falló (distinto de "no hay");
+  /// la vista en sala muestra un aviso con "Reintentar"
+  bool attentionNotesLoadFailed = false;
+  bool dischargeLoadFailed = false;
 
   /// Momento en que entró a `recibido` / `alta_medica` (vista en sala)
   DateTime? receivedAt;
@@ -110,13 +116,20 @@ class MedicoPatientDetailsController extends ChangeNotifier {
         final t = await _patientsRepo.fetchStatusTimestamps([patientId]);
         receivedAt = t.receivedAt[patientId];
         dischargedAt = t.dischargedAt[patientId];
-        attentionNotes = await _loadAttentionNotes();
-        discharge = d.status == 'alta_medica' ? await _loadDischarge() : null;
+        await _loadAttentionNotes();
+        if (d.status == 'alta_medica') {
+          await _loadDischarge();
+        } else {
+          discharge = null;
+          dischargeLoadFailed = false;
+        }
       } else {
         discharge = null;
         receivedAt = null;
         dischargedAt = null;
         attentionNotes = [];
+        attentionNotesLoadFailed = false;
+        dischargeLoadFailed = false;
       }
       detail = d;
       consultationCode = code;
@@ -134,21 +147,41 @@ class MedicoPatientDetailsController extends ChangeNotifier {
   /// Vista en sala (mockup 06): paciente recibido o dado de alta
   bool get showRoomView => summary != null && allowsClinicalEdit;
 
-  /// Si las notas no se pueden leer (p. ej. falta la migración) la vista en
-  /// sala se muestra igual, sin notas
-  Future<List<MedicoAttentionNote>> _loadAttentionNotes() async {
+  /// Si las notas no se pueden leer, la vista en sala se muestra igual: se
+  /// conservan las que ya se tenían y se marca el fallo para ofrecer reintento
+  Future<void> _loadAttentionNotes() async {
     try {
-      return await _patientsRepo.fetchAttentionNotes(patientId);
+      attentionNotes = await _patientsRepo.fetchAttentionNotes(patientId);
+      attentionNotesLoadFailed = false;
     } catch (_) {
-      return [];
+      attentionNotesLoadFailed = true;
     }
   }
 
-  Future<MedicoDischargeInfo?> _loadDischarge() async {
+  /// Igual que las notas: un fallo no se confunde con "sin alta registrada"
+  Future<void> _loadDischarge() async {
     try {
-      return await _patientsRepo.fetchDischarge(patientId);
+      discharge = await _patientsRepo.fetchDischarge(patientId);
+      dischargeLoadFailed = false;
     } catch (_) {
-      return null;
+      dischargeLoadFailed = true;
+    }
+  }
+
+  /// "Reintentar" en la vista en sala: vuelve a leer lo que falló
+  Future<void> retryRoomRecords() async {
+    final d = detail;
+    if (d == null || roomBusy) return;
+    roomBusy = true;
+    notifyListeners();
+    try {
+      if (attentionNotesLoadFailed) await _loadAttentionNotes();
+      if (dischargeLoadFailed && d.status == 'alta_medica') {
+        await _loadDischarge();
+      }
+    } finally {
+      roomBusy = false;
+      notifyListeners();
     }
   }
 
@@ -176,6 +209,26 @@ class MedicoPatientDetailsController extends ChangeNotifier {
     await load();
   }
 
+  /// Lápiz de la tarjeta de triage (vista en sala): elige el nivel y lo
+  /// guarda con la RPC del triage hospitalario
+  Future<void> changeTriageFromRoom(BuildContext context) async {
+    final d = detail;
+    final current = summary?.triage;
+    if (d == null || current == null || d.status != 'recibido' || roomBusy) {
+      return;
+    }
+    final picked = await MedicoRoomTriageSheet.show(context, current: current);
+    if (picked == null || picked == current || !context.mounted) return;
+    await _roomAction(
+      context,
+      () => _patientsRepo.setHospitalTriage(
+        patientId: d.id,
+        triageColor: picked.name,
+      ),
+      'Triage actualizado.',
+    );
+  }
+
   /// "Agregar nota de atención": pop-up para escribirla y guardarla
   Future<void> addAttentionNote(BuildContext context) async {
     final d = detail;
@@ -186,7 +239,7 @@ class MedicoPatientDetailsController extends ChangeNotifier {
           _patientsRepo.addAttentionNote(patientId: d.id, body: body),
     );
     if (!saved) return;
-    attentionNotes = await _loadAttentionNotes();
+    await _loadAttentionNotes();
     notifyListeners();
     if (context.mounted) showAppSnackBar(context, 'Nota de atención agregada.');
   }
@@ -262,15 +315,13 @@ class MedicoPatientDetailsController extends ChangeNotifier {
       return;
     }
     if (img == null || !context.mounted) return;
-    final demo = Map<String, dynamic>.from(d.demographics);
-    demo['photo_local_paths'] = [
-      ...PatientDemographicsMapper.photoPathsFromDemo(d.demographics),
-      img.path,
-    ];
+    final path = img.path;
+    // Se agrega en el servidor sobre la fila actual: no se reescribe
+    // demographics con la copia de antes de abrir la cámara (otro médico
+    // pudo editar al paciente mientras tanto)
     await _roomAction(
       context,
-      () =>
-          _detailRepo.updatePatientRecord(patientId: d.id, demographics: demo),
+      () => _patientsRepo.appendPatientPhoto(patientId: d.id, path: path),
       'Foto agregada.',
     );
   }
@@ -364,5 +415,20 @@ class MedicoPatientDetailsController extends ChangeNotifier {
         showAppSnackBar(context, '$e', isError: true);
       }
     }
+  }
+
+  /// Una lectura o acción puede terminar después de salir de la ruta; en ese
+  /// caso ya no hay a quién avisar
+  bool _disposed = false;
+
+  @override
+  void notifyListeners() {
+    if (!_disposed) super.notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
   }
 }

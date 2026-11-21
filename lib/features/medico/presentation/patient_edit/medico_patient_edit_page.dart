@@ -106,7 +106,12 @@ class _MedicoPatientEditPageState extends State<MedicoPatientEditPage> {
                 _institution == MedicoInsuranceInstitution.other &&
                 _otherInstitution.text.trim().isEmpty
             ? 'Escribe el nombre de la institución del seguro.'
-            : null);
+            : null) ??
+        (_vitals.values.every(
+              (c) => MedicoPatientFormValidators.isValidVital(c.text),
+            )
+            ? null
+            : 'Revisa los signos vitales: hay un valor que no es un número.');
   }
 
   MedicoPatientEditData _collect() {
@@ -176,29 +181,34 @@ class _MedicoPatientEditPageState extends State<MedicoPatientEditPage> {
               ),
             ),
             Expanded(
-              child: ListView(
-                keyboardDismissBehavior:
-                    ScrollViewKeyboardDismissBehavior.onDrag,
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-                children: [
-                  _identification(),
-                  const SizedBox(height: 16),
-                  _insuranceCard(),
-                  const SizedBox(height: 16),
-                  _additional(),
-                  const SizedBox(height: 16),
-                  _vitalsCard(),
-                  if (_error != null) ...[
-                    const SizedBox(height: 14),
-                    Text(
-                      _error!,
-                      style: const TextStyle(
-                        color: Color(0xFFC62828),
-                        fontSize: 13,
+              // Mientras se guarda no se puede seguir editando: lo que se
+              // envía es lo que había al tocar "Guardar"
+              child: AbsorbPointer(
+                absorbing: _busy,
+                child: ListView(
+                  keyboardDismissBehavior:
+                      ScrollViewKeyboardDismissBehavior.onDrag,
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+                  children: [
+                    _identification(),
+                    const SizedBox(height: 16),
+                    _insuranceCard(),
+                    const SizedBox(height: 16),
+                    _additional(),
+                    const SizedBox(height: 16),
+                    _vitalsCard(),
+                    if (_error != null) ...[
+                      const SizedBox(height: 14),
+                      Text(
+                        _error!,
+                        style: const TextStyle(
+                          color: Color(0xFFC62828),
+                          fontSize: 13,
+                        ),
                       ),
-                    ),
+                    ],
                   ],
-                ],
+                ),
               ),
             ),
             MedicoTransferBottomBar(

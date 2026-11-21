@@ -114,12 +114,18 @@ class _MedicoPatientDetailsFlowPageState
       photos: photos,
       history: history,
       notes: c.attentionNotes,
+      notesLoadFailed: c.attentionNotesLoadFailed,
       discharge: c.discharge,
+      dischargeLoadFailed: c.dischargeLoadFailed,
+      onRetryRecordsTap: () => unawaited(c.retryRoomRecords()),
       busy: c.roomBusy,
       now: now,
       onBackTap: () => c.onBack(context),
       onEditPatientTap: () => unawaited(c.openEditPatient(context)),
       onShowQrTap: () => unawaited(c.onShowConsultationQr(context)),
+      onEditTriageTap: discharged
+          ? null
+          : () => unawaited(c.changeTriageFromRoom(context)),
       onAddPhotoTap: discharged ? null : () => _pickPhotoSource(context, c),
       onAddNoteTap: discharged
           ? null

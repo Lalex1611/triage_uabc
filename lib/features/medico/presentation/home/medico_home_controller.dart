@@ -153,8 +153,8 @@ class MedicoHomeController extends ChangeNotifier {
     unawaited(_loadHospitalLabel());
 
     try {
-      await _fetchPatients();
-      if (_disposed) return;
+      final applied = await _fetchPatients();
+      if (_disposed || !applied) return;
       error = null;
       notifyListeners();
     } catch (_) {
@@ -441,8 +441,11 @@ class MedicoHomeController extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> _loadSalaTimestamps() async {
-    final ids = patients
+  Future<
+    ({Map<String, DateTime> receivedAt, Map<String, DateTime> dischargedAt})
+  >
+  _loadSalaTimestamps(List<MedicoPatientCardData> list) async {
+    final ids = list
         .where(
           (p) =>
               p.status == PatientStatus.recibido ||
@@ -451,13 +454,13 @@ class MedicoHomeController extends ChangeNotifier {
         .map((p) => p.patientRecordId)
         .toList();
     try {
-      final r = await _repo.fetchStatusTimestamps(ids);
-      receivedAt = r.receivedAt;
-      dischargedAt = r.dischargedAt;
+      return await _repo.fetchStatusTimestamps(ids);
     } catch (_) {
       // Sin historial: la Sala usa created_at como respaldo
-      receivedAt = {};
-      dischargedAt = {};
+      return (
+        receivedAt: <String, DateTime>{},
+        dischargedAt: <String, DateTime>{},
+      );
     }
   }
 
@@ -491,6 +494,7 @@ class MedicoHomeController extends ChangeNotifier {
     loading = true;
     error = null;
     notifyListeners();
+    unawaited(_loadHospitalLabel());
 
     try {
       await _fetchPatients();
@@ -532,9 +536,16 @@ class MedicoHomeController extends ChangeNotifier {
     }
   }
 
+  /// Número de la carga de pacientes más reciente; solo esa puede guardar
+  int _fetchGeneration = 0;
+
   /// Pacientes del hospital, traslados rechazados y tiempos de la Sala.
-  /// Los datos se reemplazan solo si todo se obtuvo bien.
-  Future<void> _fetchPatients() async {
+  /// Los datos se reemplazan solo si todo se obtuvo bien y si no empezó
+  /// otra carga mientras tanto (`load()` y la recarga silenciosa pueden
+  /// cruzarse; una respuesta vieja no debe pisar una más nueva).
+  /// Devuelve false si otra carga más nueva la reemplazó.
+  Future<bool> _fetchPatients() async {
+    final generation = ++_fetchGeneration;
     final hid = AuthGate.instance.hospitalId;
     final list = await _repo.fetchForMedico(hospitalIdFromProfile: hid);
     var rejected = <MedicoPatientCardData>[];
@@ -545,12 +556,21 @@ class MedicoHomeController extends ChangeNotifier {
         rejected = [];
       }
     }
-    rejectedPatients = rejected;
-    final rejectedIds = _rejectedPatientIds();
-    patients = rejectedIds.isEmpty
+    final rejectedIds = rejected
+        .map((p) => p.patientRecordId)
+        .where((id) => id.isNotEmpty)
+        .toSet();
+    final visible = rejectedIds.isEmpty
         ? list
         : list.where((p) => !rejectedIds.contains(p.patientRecordId)).toList();
-    await _loadSalaTimestamps();
+    final timestamps = await _loadSalaTimestamps(visible);
+
+    if (generation != _fetchGeneration) return false;
+    rejectedPatients = rejected;
+    patients = visible;
+    receivedAt = timestamps.receivedAt;
+    dischargedAt = timestamps.dischargedAt;
+    return true;
   }
 
   /// Una carga puede terminar después de salir del inicio; en ese caso ya no
