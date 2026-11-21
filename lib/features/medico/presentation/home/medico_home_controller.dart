@@ -233,7 +233,6 @@ class MedicoHomeController extends ChangeNotifier {
 
   MedicoUserStats statsFor(List<MedicoPatientCardData> list) {
     final name = AuthGate.instance.fullName ?? 'Médico';
-    final active = list.where((p) => p.status != PatientStatus.alta).length;
     final camino = list
         .where(
           (p) =>
@@ -254,7 +253,6 @@ class MedicoHomeController extends ChangeNotifier {
 
     return MedicoUserStats(
       userName: name,
-      totalActive: active,
       enCaminoCount: camino,
       rojoCriticoCount: rojo,
       enColaCount: cola,
@@ -300,10 +298,6 @@ class MedicoHomeController extends ChangeNotifier {
         _normalize(p.ambulanceUnit).contains(q);
   }
 
-  List<MedicoPatientCardData> filteredByChip() {
-    return patients.where((p) => _matchesColor(activeFilter, p)).toList();
-  }
-
   /// "Llegando ahora": pacientes aún no recibidos por el hospital, filtrados
   /// por color de triage y por el buscador
   List<MedicoPatientCardData> incomingPatientsFiltered() {
@@ -320,53 +314,6 @@ class MedicoHomeController extends ChangeNotifier {
         .toList();
   }
 
-  List<MedicoPatientCardData> visiblePatients(int navIdx) {
-    final List<MedicoPatientCardData> base;
-    if (navIdx == 0) {
-      base = patients.where((p) => p.status != PatientStatus.alta).toList();
-    } else {
-      base = filteredByChip();
-    }
-
-    final q = searchQuery.trim().toLowerCase();
-    if (q.isEmpty) return base;
-    return base
-        .where(
-          (p) =>
-              p.name.toLowerCase().contains(q) ||
-              p.id.toLowerCase().contains(q),
-        )
-        .toList();
-  }
-
-  /// Pacientes aún no recibidos por el hospital (en espera o trasladando)
-  List<MedicoPatientCardData> incomingPatients(
-    List<MedicoPatientCardData> list,
-  ) {
-    final rejectedIds = _rejectedPatientIds();
-    return list
-        .where(
-          (p) =>
-              (p.status == PatientStatus.trasladando ||
-                  p.status == PatientStatus.enEspera) &&
-              !rejectedIds.contains(p.patientRecordId),
-        )
-        .toList();
-  }
-
-  List<MedicoPatientCardData> acceptedPatients(
-    List<MedicoPatientCardData> list,
-  ) {
-    final rejectedIds = _rejectedPatientIds();
-    return list
-        .where(
-          (p) =>
-              p.status == PatientStatus.recibido &&
-              !rejectedIds.contains(p.patientRecordId),
-        )
-        .toList();
-  }
-
   Set<String> _rejectedPatientIds() => rejectedPatients
       .map((p) => p.patientRecordId)
       .where((id) => id.isNotEmpty)
@@ -374,18 +321,6 @@ class MedicoHomeController extends ChangeNotifier {
 
   bool get hasUnreadMedicoNotifications =>
       medicoNotifications.any((n) => n.isUnread);
-
-  List<MedicoPatientCardData> visibleRejected() {
-    final q = searchQuery.trim().toLowerCase();
-    if (q.isEmpty) return rejectedPatients;
-    return rejectedPatients
-        .where(
-          (p) =>
-              p.name.toLowerCase().contains(q) ||
-              p.id.toLowerCase().contains(q),
-        )
-        .toList();
-  }
 
   Future<void> reloadNotificationsOnly() async {
     if (!SupabaseEnv.isConfigured) {
