@@ -28,10 +28,14 @@ class MedicoRoomPatientPage extends StatelessWidget {
     required this.photos,
     required this.history,
     this.notes = const [],
+    this.notesLoadFailed = false,
     this.discharge,
+    this.dischargeLoadFailed = false,
+    this.onRetryRecordsTap,
     required this.onBackTap,
     required this.onEditPatientTap,
     required this.onShowQrTap,
+    this.onEditTriageTap,
     this.receivedAt,
     this.dischargedAt,
     this.consultationCode,
@@ -51,12 +55,24 @@ class MedicoRoomPatientPage extends StatelessWidget {
   final List<MedicoRoomHistoryItem> history;
   final List<MedicoAttentionNote> notes;
 
+  /// No se pudieron leer las notas (distinto de "sin notas")
+  final bool notesLoadFailed;
+
   /// Alta registrada (solo pacientes dados de alta)
   final MedicoDischargeInfo? discharge;
+
+  /// No se pudo leer el alta (distinto de "sin alta registrada")
+  final bool dischargeLoadFailed;
+
+  /// Vuelve a leer las notas / el alta que fallaron
+  final VoidCallback? onRetryRecordsTap;
 
   final VoidCallback onBackTap;
   final VoidCallback onEditPatientTap;
   final VoidCallback onShowQrTap;
+
+  /// Lápiz de la tarjeta de triage: cambiar el nivel hospitalario
+  final VoidCallback? onEditTriageTap;
   final VoidCallback? onAddPhotoTap;
   final VoidCallback? onAddNoteTap;
   final VoidCallback? onDischargeTap;
@@ -224,6 +240,7 @@ class MedicoRoomPatientPage extends StatelessWidget {
                   darkText: r.triage == TriageCategory.amarillo,
                   overline: overline,
                   title: title,
+                  onEditTap: busy ? null : onEditTriageTap,
                   subtitle: MedicoRoomFormat.stayLine(
                     discharged: discharged,
                     receivedAt: receivedAt,
@@ -234,6 +251,13 @@ class MedicoRoomPatientPage extends StatelessWidget {
                 if (discharged && discharge != null) ...[
                   const SizedBox(height: 16),
                   _dischargeCard(discharge!, now ?? DateTime.now()),
+                ],
+                if (discharged && dischargeLoadFailed) ...[
+                  const SizedBox(height: 16),
+                  MedicoRoomLoadError(
+                    message: 'No se pudo cargar el alta registrada.',
+                    onRetry: busy ? null : onRetryRecordsTap,
+                  ),
                 ],
                 const SizedBox(height: 16),
                 MedicoReviewCard(
@@ -247,7 +271,12 @@ class MedicoRoomPatientPage extends StatelessWidget {
                   onAddTap: busy ? null : onAddPhotoTap,
                 ),
                 const SizedBox(height: 16),
-                MedicoRoomNotes(notes: notes, now: now ?? DateTime.now()),
+                MedicoRoomNotes(
+                  notes: notes,
+                  now: now ?? DateTime.now(),
+                  loadFailed: notesLoadFailed,
+                  onRetry: busy ? null : onRetryRecordsTap,
+                ),
                 const SizedBox(height: 16),
                 _supportCard(),
               ],

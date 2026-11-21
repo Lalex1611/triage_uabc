@@ -44,6 +44,7 @@ export 'package:sistema_triage/shared/widgets/triage_patient_banner_widget.dart'
 export 'package:sistema_triage/shared/widgets/triage_patient_card_widget.dart';
 export 'package:sistema_triage/shared/widgets/triage_photo_viewer_widget.dart';
 export 'package:sistema_triage/shared/widgets/triage_photo_widget.dart';
+export 'package:sistema_triage/shared/widgets/triage_pressable_widget.dart';
 export 'package:sistema_triage/shared/widgets/triage_radio_option_widget.dart';
 export 'package:sistema_triage/shared/widgets/triage_search_bar_widget.dart';
 export 'package:sistema_triage/shared/widgets/triage_section_card_widget.dart';

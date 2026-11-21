@@ -10,6 +10,7 @@ class MedicoRoomTriageCard extends StatelessWidget {
     required this.title,
     required this.subtitle,
     this.darkText = false,
+    this.onEditTap,
   });
 
   final Color color;
@@ -25,6 +26,9 @@ class MedicoRoomTriageCard extends StatelessWidget {
 
   /// Texto oscuro para fondos claros (amarillo)
   final bool darkText;
+
+  /// Lápiz para cambiar el nivel; sin él no se muestra (p. ej. dado de alta)
+  final VoidCallback? onEditTap;
 
   @override
   Widget build(BuildContext context) {
@@ -70,6 +74,18 @@ class MedicoRoomTriageCard extends StatelessWidget {
               ],
             ),
           ),
+          if (onEditTap != null) ...[
+            const SizedBox(width: 12),
+            Material(
+              color: fg.withValues(alpha: 0.18),
+              shape: const CircleBorder(),
+              child: IconButton(
+                onPressed: onEditTap,
+                tooltip: 'Cambiar triage',
+                icon: Icon(Icons.edit_outlined, color: fg, size: 20),
+              ),
+            ),
+          ],
         ],
       ),
     );

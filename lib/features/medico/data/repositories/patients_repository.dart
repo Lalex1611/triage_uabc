@@ -70,6 +70,8 @@ class PatientsRepository {
         .select('patient_id, new_status, created_at')
         .inFilter('patient_id', ids)
         .inFilter('new_status', ['recibido', 'alta_medica'])
+        // Solo cambios de estado reales, no cambios de triage con el mismo estado
+        .contains('changed_fields', ['status'])
         .order('created_at', ascending: false);
 
     for (final r in rows as List<dynamic>) {
@@ -154,14 +156,42 @@ class PatientsRepository {
     required Map<String, dynamic> demographics,
     required Map<String, dynamic> vitalSigns,
   }) async {
-    await _c
-        .from('patients')
-        .update({
-          'display_name': displayName.trim(),
-          'demographics': demographics,
-          'vital_signs': vitalSigns.isEmpty ? null : vitalSigns,
-        })
-        .eq('id', patientId);
+    // RPC `medico_update_patient_info`: conserva las fotos que ya están en el
+    // servidor (pudieron agregarse después de abrir el formulario)
+    await _c.rpc(
+      'medico_update_patient_info',
+      params: {
+        'p_patient_id': patientId,
+        'p_display_name': displayName.trim(),
+        'p_demographics': demographics,
+        'p_vital_signs': vitalSigns.isEmpty ? null : vitalSigns,
+      },
+    );
+  }
+
+  /// Agrega una foto al expediente en el servidor (RPC
+  /// `medico_append_patient_photo`): solo concatena la ruta a
+  /// `demographics.photo_local_paths`, sin reescribir el resto del JSON
+  Future<void> appendPatientPhoto({
+    required String patientId,
+    required String path,
+  }) async {
+    await _c.rpc(
+      'medico_append_patient_photo',
+      params: {'p_patient_id': patientId, 'p_path': path},
+    );
+  }
+
+  /// Cambia el triage hospitalario de un paciente en sala (RPC
+  /// `medico_set_hospital_triage`; el médico no puede hacerlo con un UPDATE)
+  Future<void> setHospitalTriage({
+    required String patientId,
+    required String triageColor,
+  }) async {
+    await _c.rpc(
+      'medico_set_hospital_triage',
+      params: {'p_patient_id': patientId, 'p_triage_color': triageColor},
+    );
   }
 
   /// Notas de atención del paciente, de la más reciente a la más antigua

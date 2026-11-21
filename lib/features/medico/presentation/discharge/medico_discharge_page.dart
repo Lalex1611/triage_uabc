@@ -57,6 +57,16 @@ class _MedicoDischargePageState extends State<MedicoDischargePage> {
       setState(() => _error = 'Elige a dónde sale el paciente.');
       return;
     }
+    // La base cuenta caracteres Unicode (char_length); un emoji compuesto
+    // pasa el límite del campo pero cuenta como varios
+    if (_note.text.trim().runes.length > MedicoDischargeInfo.maxNoteLength) {
+      setState(
+        () => _error =
+            'La nota de alta no puede pasar de '
+            '${MedicoDischargeInfo.maxNoteLength} caracteres.',
+      );
+      return;
+    }
     FocusScope.of(context).unfocus();
     setState(() {
       _busy = true;

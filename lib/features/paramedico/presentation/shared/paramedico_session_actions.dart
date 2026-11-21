@@ -1,10 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:sistema_triage/core/constants/app_colors.dart';
+import 'package:sistema_triage/core/config/supabase_env.dart';
 import 'package:sistema_triage/core/session/auth_gate.dart';
-import 'package:sistema_triage/core/theme/app_theme.dart';
 import 'package:sistema_triage/core/ui/app_snackbar.dart';
+import 'package:sistema_triage/features/paramedico/data/repositories/paramedic_notifications_repository.dart';
 import 'package:sistema_triage/features/paramedico/data/repositories/paramedico_incidents_repository.dart';
+import 'package:sistema_triage/features/paramedico/domain/entities/notifications/paramedic_notification.dart';
+import 'package:sistema_triage/features/paramedico/presentation/create_incident/services/incident_location_service.dart';
+import 'package:sistema_triage/features/paramedico/presentation/notifications/widgets/paramedic_notifications_modal_widget.dart';
+import 'package:sistema_triage/shared/widgets/triage_ui.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// Acciones de sesión compartidas para el perfil de paramédico
 class ParamedicoSessionActions {
@@ -12,196 +17,144 @@ class ParamedicoSessionActions {
 
   static Future<void> openProfileSheet(BuildContext context) async {
     final parentContext = context;
-    final repo = ParamedicoIncidentsRepository();
-    final unitCodeFuture = repo.currentAmbulanceUnitCode();
+    final incidentsRepo = ParamedicoIncidentsRepository();
+    final notificationsRepo = ParamedicNotificationsRepository();
 
     await showModalBottomSheet<void>(
       context: context,
-      backgroundColor: Colors.transparent,
-      builder: (sheetContext) {
-        return SafeArea(
-          child: Container(
-            margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-            padding: const EdgeInsets.fromLTRB(18, 16, 18, 14),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.16),
-                  blurRadius: 18,
-                  offset: const Offset(0, 8),
-                ),
-              ],
-            ),
-            child: FutureBuilder<String?>(
-              future: unitCodeFuture,
-              builder: (_, snapshot) {
-                final code = snapshot.data;
-                final subtitle = snapshot.hasError
-                    ? 'No se pudo consultar la unidad'
-                    : snapshot.connectionState == ConnectionState.waiting
-                    ? 'Consultando unidad...'
-                    : code == null
-                    ? 'Sin unidad registrada'
-                    : 'Unidad actual: $code';
-
-                return Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Align(
-                      alignment: Alignment.center,
-                      child: Container(
-                        width: 42,
-                        height: 4,
-                        margin: const EdgeInsets.only(bottom: 14),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.14),
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                      ),
-                    ),
-                    Text(
-                      'Perfil paramédico',
-                      style: AppTextStyles.ESC_Bold_titleLarge.copyWith(
-                        fontSize: 18,
-                        color: Colors.black,
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      AuthGate.instance.fullName ?? 'Cuenta activa',
-                      style: AppTextStyles.ESC_Regular_bodyMedium.copyWith(
-                        fontSize: 12,
-                        color: Colors.black.withValues(alpha: 0.55),
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                    _ProfileActionTile(
-                      icon: Icons.local_shipping_outlined,
-                      title: 'Código de unidad',
-                      subtitle: subtitle,
-                      onTap: () async {
-                        Navigator.of(sheetContext).pop();
-                        if (!parentContext.mounted) return;
-                        await _openUnitCodeDialog(parentContext, repo, code);
-                      },
-                    ),
-                    const SizedBox(height: 10),
-                    _ProfileActionTile(
-                      icon: Icons.logout_rounded,
-                      title: 'Cerrar sesión',
-                      subtitle: 'Salir de esta cuenta',
-                      destructive: true,
-                      onTap: () async {
-                        Navigator.of(sheetContext).pop();
-                        if (!parentContext.mounted) return;
-                        await confirmSignOut(parentContext);
-                      },
-                    ),
-                  ],
-                );
-              },
-            ),
-          ),
-        );
-      },
+      isScrollControlled: true,
+      backgroundColor: TriageColors.surface.withValues(alpha: 0),
+      builder: (_) => _ParamedicoProfileSheet(
+        parentContext: parentContext,
+        repo: incidentsRepo,
+        notificationsRepo: notificationsRepo,
+      ),
     );
   }
 
-  static Future<void> _openUnitCodeDialog(
+  static Future<String?> _openUnitCodeDialog(
     BuildContext context,
     ParamedicoIncidentsRepository repo,
     String? initialCode,
-  ) async {
-    final parentContext = context;
-    final controller = TextEditingController(text: initialCode ?? '');
-    var saving = false;
-    await showDialog<void>(
+  ) {
+    return showDialog<String>(
       context: context,
       barrierDismissible: false,
-      builder: (dialogContext) {
-        return StatefulBuilder(
-          builder: (_, setState) {
-            return AlertDialog(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(15),
-              ),
-              title: const Text('Código de unidad'),
-              content: TextField(
-                controller: controller,
-                textCapitalization: TextCapitalization.characters,
-                decoration: const InputDecoration(
-                  hintText: 'Ej. AMB-12',
-                  labelText: 'Número económico',
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: saving
-                      ? null
-                      : () => Navigator.of(dialogContext).pop(),
-                  child: const Text('Cancelar'),
-                ),
-                FilledButton(
-                  onPressed: saving
-                      ? null
-                      : () async {
-                          setState(() => saving = true);
-                          try {
-                            final code = await repo.setCurrentAmbulanceUnitCode(
-                              controller.text,
-                            );
-                            if (dialogContext.mounted) {
-                              Navigator.of(dialogContext).pop();
-                            }
-                            if (parentContext.mounted) {
-                              showAppSnackBar(
-                                parentContext,
-                                'Unidad registrada: $code',
-                              );
-                            }
-                          } catch (e) {
-                            if (parentContext.mounted) {
-                              showAppSnackBar(
-                                parentContext,
-                                '$e',
-                                isError: true,
-                              );
-                            }
-                            setState(() => saving = false);
-                          }
-                        },
-                  child: Text(saving ? 'Guardando...' : 'Guardar'),
-                ),
-              ],
-            );
-          },
-        );
-      },
+      builder: (_) => _UnitCodeDialog(
+        parentContext: context,
+        repo: repo,
+        initialCode: initialCode,
+      ),
     );
-    controller.dispose();
   }
 
   static Future<void> confirmSignOut(BuildContext context) async {
-    final ok = await showDialog<bool>(
+    final ok = await showModalBottomSheet<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Cerrar sesión'),
-        content: const Text('¿Salir de la cuenta?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Salir'),
-          ),
-        ],
+      backgroundColor: TriageColors.surface.withValues(alpha: 0),
+      isScrollControlled: true,
+      builder: (ctx) => _ProfileFloatingSheet(
+        showDragHandle: false,
+        padding: const EdgeInsets.fromLTRB(
+          TriageSpacing.xl,
+          TriageSpacing.xl + 4,
+          TriageSpacing.xl,
+          TriageSpacing.lg,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 64,
+              height: 64,
+              decoration: BoxDecoration(
+                color: TriageColors.paramedicAccent.withValues(alpha: 0.10),
+                borderRadius: BorderRadius.circular(18),
+              ),
+              child: const Icon(
+                Icons.logout_rounded,
+                color: TriageColors.paramedicAccent,
+                size: 28,
+              ),
+            ),
+            const SizedBox(height: TriageSpacing.lg),
+            Text(
+              '¿Cerrar sesión?',
+              textAlign: TextAlign.center,
+              style: TriageTextStyles.titleLarge.copyWith(
+                color: TriageColors.textPrimary,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: TriageSpacing.sm),
+            Text(
+              'Si compartes el equipo, deja la sesión cerrada al terminar tu turno.',
+              textAlign: TextAlign.center,
+              style: TriageTextStyles.bodyMedium.copyWith(
+                color: TriageColors.textSecondary,
+                height: 1.4,
+              ),
+            ),
+            const SizedBox(height: TriageSpacing.xl),
+            DecoratedBox(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(TriageRadii.md + 4),
+                boxShadow: [
+                  BoxShadow(
+                    color: TriageColors.paramedicAccent.withValues(alpha: 0.28),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: TriageColors.paramedicAccent,
+                    foregroundColor: TriageColors.textInverse,
+                    padding: const EdgeInsets.symmetric(
+                      vertical: TriageSpacing.md + 2,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(TriageRadii.md + 4),
+                    ),
+                    elevation: 0,
+                  ),
+                  onPressed: () => Navigator.pop(ctx, true),
+                  child: Text(
+                    'Cerrar sesión',
+                    style: TriageTextStyles.titleSmall.copyWith(
+                      color: TriageColors.textInverse,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: TriageSpacing.sm),
+            TextButton(
+              style: TextButton.styleFrom(
+                foregroundColor: TriageColors.textSecondary,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: TriageSpacing.lg,
+                  vertical: TriageSpacing.sm + 2,
+                ),
+              ),
+              onPressed: () => Navigator.pop(ctx, false),
+              child: Text(
+                'Cancelar',
+                style: TriageTextStyles.labelLarge.copyWith(
+                  color: TriageColors.textSecondary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
+
     if (ok == true && context.mounted) {
       await AuthGate.instance.signOut();
       if (context.mounted) context.go('/auth');
@@ -209,77 +162,1187 @@ class ParamedicoSessionActions {
   }
 }
 
-class _ProfileActionTile extends StatelessWidget {
-  const _ProfileActionTile({
+class _ParamedicoProfileSheet extends StatefulWidget {
+  const _ParamedicoProfileSheet({
+    required this.parentContext,
+    required this.repo,
+    required this.notificationsRepo,
+  });
+
+  final BuildContext parentContext;
+  final ParamedicoIncidentsRepository repo;
+  final ParamedicNotificationsRepository notificationsRepo;
+
+  @override
+  State<_ParamedicoProfileSheet> createState() =>
+      _ParamedicoProfileSheetState();
+}
+
+class _ParamedicoProfileSheetState extends State<_ParamedicoProfileSheet> {
+  bool _loading = true;
+  bool _unitFailed = false;
+  bool _incidentsFailed = false;
+  bool _patientsFailed = false;
+  bool _notificationsLoaded = false;
+  bool _notificationsFailed = false;
+  bool _openingNotifications = false;
+
+  int _unitSaveGeneration = 0;
+  int _notificationsEpoch = 0;
+
+  String? _unitCode;
+  int _incidentsCount = 0;
+  int _patientsCount = 0;
+  int _transfersCount = 0;
+  List<ParamedicNotification> _notifications = const [];
+  late final String _lastSignInTime;
+
+  @override
+  void initState() {
+    super.initState();
+    _lastSignInTime = _resolveLastSignInTime();
+    _loadData();
+  }
+
+  String _resolveLastSignInTime() {
+    if (!SupabaseEnv.isConfigured) return '—';
+    final raw = Supabase.instance.client.auth.currentUser?.lastSignInAt;
+    if (raw == null || raw.isEmpty) return '—';
+    final parsed = DateTime.tryParse(raw)?.toLocal();
+    if (parsed == null) return '—';
+    final hh = parsed.hour.toString().padLeft(2, '0');
+    final mm = parsed.minute.toString().padLeft(2, '0');
+    return '$hh:$mm';
+  }
+
+  Future<bool> _fetchNotifications() async {
+    final epoch = ++_notificationsEpoch;
+    try {
+      final items = await widget.notificationsRepo.listRecent();
+      if (!mounted || epoch != _notificationsEpoch) return true;
+      setState(() {
+        _notifications = items;
+        _notificationsLoaded = true;
+        _notificationsFailed = false;
+      });
+      return true;
+    } catch (_) {
+      if (!mounted || epoch != _notificationsEpoch) return false;
+      setState(() {
+        _notificationsLoaded = true;
+        _notificationsFailed = true;
+      });
+      return false;
+    }
+  }
+
+  /// La bandeja del perfil es de consulta rápida: al tocar una notificación
+  /// únicamente la marca como leída tras confirmar la escritura en backend,
+  /// sin navegar fuera de la hoja de perfil.
+  Future<void> _handleNotificationTap(
+    ParamedicNotification notification,
+  ) async {
+    try {
+      await widget.notificationsRepo.markRead(notification.id);
+    } catch (_) {
+      // Si falla markRead, se conserva el estado previo sin marcar como leída.
+      return;
+    }
+    if (!mounted) return;
+    // Invalida cualquier consulta previa en vuelo para que no sobrescriba la lectura.
+    _notificationsEpoch++;
+    await _fetchNotifications();
+  }
+
+  Future<void> _openNotificationsModal() async {
+    if (_openingNotifications) return;
+    setState(() => _openingNotifications = true);
+
+    try {
+      if (!_notificationsLoaded || _notificationsFailed) {
+        final ok = await _fetchNotifications();
+        if (!mounted) return;
+        if (!ok) {
+          showAppSnackBar(
+            context,
+            'No se pudieron cargar las notificaciones. Intenta de nuevo.',
+            isError: true,
+          );
+          return;
+        }
+      }
+
+      if (!mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (_) => ParamedicNotificationsModal(
+          notifications: _notifications,
+          onNotificationTap: _handleNotificationTap,
+        ),
+      );
+      if (!mounted) return;
+      await _fetchNotifications();
+    } finally {
+      if (mounted) {
+        setState(() => _openingNotifications = false);
+      }
+    }
+  }
+
+  Future<void> _openSubSheet(Widget sheet) {
+    return showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: TriageColors.surface.withValues(alpha: 0),
+      isScrollControlled: true,
+      builder: (_) => sheet,
+    );
+  }
+
+  Future<void> _loadData() async {
+    setState(() => _loading = true);
+    final initialUnitGen = _unitSaveGeneration;
+
+    String? fetchedCode;
+    var unitOk = false;
+    var incidentsCount = 0;
+    var incidentsOk = false;
+    var patientsCount = 0;
+    var transfersCount = 0;
+    var patientsOk = false;
+
+    await Future.wait<void>([
+      () async {
+        try {
+          fetchedCode = await widget.repo.currentAmbulanceUnitCode();
+          unitOk = true;
+        } catch (_) {
+          unitOk = false;
+        }
+      }(),
+      () async {
+        try {
+          final incidents = await widget.repo.listOpenIncidents();
+          incidentsCount = incidents.length;
+          incidentsOk = true;
+        } catch (_) {
+          incidentsOk = false;
+        }
+      }(),
+      () async {
+        try {
+          final recentPatients = await widget.repo
+              .listRecentPatientsForCurrentUser(limit: 100);
+          final now = DateTime.now();
+          final dayStart = DateTime(now.year, now.month, now.day);
+          final dayEnd = dayStart.add(const Duration(days: 1));
+
+          final todayPatients = recentPatients.where((p) {
+            final created = p.createdAt?.toLocal();
+            if (created == null) return false;
+            return !created.isBefore(dayStart) && created.isBefore(dayEnd);
+          }).toList();
+
+          patientsCount = todayPatients.length;
+          transfersCount = todayPatients.where((p) {
+            return p.status == 'recibido' || p.status == 'alta_medica';
+          }).length;
+          patientsOk = true;
+        } catch (_) {
+          patientsOk = false;
+        }
+      }(),
+      _fetchNotifications().then((_) {}),
+    ]);
+
+    if (!mounted) return;
+    setState(() {
+      _unitFailed = !unitOk;
+      if (unitOk && _unitSaveGeneration == initialUnitGen) {
+        _unitCode = fetchedCode;
+      }
+
+      _incidentsFailed = !incidentsOk;
+      if (incidentsOk) {
+        _incidentsCount = incidentsCount;
+      }
+
+      _patientsFailed = !patientsOk;
+      if (patientsOk) {
+        _patientsCount = patientsCount;
+        _transfersCount = transfersCount;
+      }
+
+      _loading = false;
+    });
+  }
+
+  Future<void> _editUnit() async {
+    final newCode = await ParamedicoSessionActions._openUnitCodeDialog(
+      context,
+      widget.repo,
+      _unitCode,
+    );
+    if (newCode != null && mounted) {
+      setState(() {
+        _unitSaveGeneration++;
+        _unitFailed = false;
+        _unitCode = newCode;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final media = MediaQuery.of(context);
+    final sheetHeight = media.size.height - media.padding.top - 64;
+    final fullName = AuthGate.instance.fullName ?? 'Cuenta activa';
+    final unreadNotifications = _notifications.where((n) => n.isUnread).length;
+    final hasAnyMetricError =
+        !_loading && (_unitFailed || _incidentsFailed || _patientsFailed);
+
+    return Container(
+      height: sheetHeight,
+      decoration: BoxDecoration(
+        color: Theme.of(context).scaffoldBackgroundColor,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        boxShadow: [
+          BoxShadow(
+            color: TriageColors.textPrimary.withValues(alpha: 0.12),
+            blurRadius: 18,
+            offset: const Offset(0, -4),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          // Encabezado con manija superior y botón de regreso
+          Container(
+            padding: const EdgeInsets.fromLTRB(
+              TriageSpacing.sm,
+              TriageSpacing.sm,
+              TriageSpacing.lg,
+              TriageSpacing.md,
+            ),
+            decoration: const BoxDecoration(
+              color: TriageColors.surface,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              border: Border(
+                bottom: BorderSide(color: TriageColors.borderSubtle),
+              ),
+            ),
+            child: Column(
+              children: [
+                Container(
+                  width: 38,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: TriageColors.borderMedium,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                ),
+                const SizedBox(height: TriageSpacing.sm),
+                Row(
+                  children: [
+                    IconButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      icon: const Icon(
+                        Icons.arrow_back_rounded,
+                        color: TriageColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(width: TriageSpacing.xs),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Mi perfil',
+                          style: TriageTextStyles.titleMedium.copyWith(
+                            color: TriageColors.textPrimary,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        Text(
+                          'Turno actual',
+                          style: TriageTextStyles.bodySmall.copyWith(
+                            color: TriageColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+
+          // Cuerpo desplazable con tarjetas del turno
+          Expanded(
+            child: ListView(
+              padding: EdgeInsets.fromLTRB(
+                TriageSpacing.lg,
+                TriageSpacing.lg,
+                TriageSpacing.lg,
+                media.padding.bottom + 88,
+              ),
+              children: [
+                // 1. Tarjeta de identidad del paramédico
+                Container(
+                  padding: const EdgeInsets.all(TriageSpacing.lg),
+                  decoration: BoxDecoration(
+                    color: TriageColors.paramedicAccent,
+                    borderRadius: BorderRadius.circular(TriageRadii.md + 4),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 56,
+                        height: 56,
+                        decoration: BoxDecoration(
+                          color: TriageColors.textInverse.withValues(
+                            alpha: 0.16,
+                          ),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.person_outline_rounded,
+                          color: TriageColors.textInverse,
+                          size: 28,
+                        ),
+                      ),
+                      const SizedBox(width: TriageSpacing.md),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'PARAMÉDICO',
+                              style: TriageTextStyles.labelSmall.copyWith(
+                                color: TriageColors.textInverse.withValues(
+                                  alpha: 0.85,
+                                ),
+                                letterSpacing: 0.8,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              fullName,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TriageTextStyles.titleLarge.copyWith(
+                                color: TriageColors.textInverse,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              'Cruz Roja Mexicana · Tijuana',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TriageTextStyles.bodySmall.copyWith(
+                                color: TriageColors.textInverse.withValues(
+                                  alpha: 0.9,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: TriageSpacing.md),
+
+                // 2. Tarjeta de unidad asignada
+                TriageSectionCard(
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: TriageColors.paramedicAccent.withValues(
+                            alpha: 0.08,
+                          ),
+                          borderRadius: BorderRadius.circular(TriageRadii.md),
+                        ),
+                        child: const Center(
+                          child: TriageIcon(
+                            TriageIcons.ambulance,
+                            color: TriageColors.paramedicAccent,
+                            size: TriageSizes.icon,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: TriageSpacing.md),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'UNIDAD ASIGNADA',
+                              style: TriageTextStyles.labelSmall.copyWith(
+                                color: TriageColors.textSecondary,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              _loading
+                                  ? '...'
+                                  : (_unitFailed
+                                        ? 'No disponible'
+                                        : (_unitCode ?? 'Sin asignar')),
+                              style: TriageTextStyles.titleLarge.copyWith(
+                                color: TriageColors.textPrimary,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Material(
+                        color: TriageColors.borderSubtle,
+                        shape: const CircleBorder(),
+                        child: InkWell(
+                          customBorder: const CircleBorder(),
+                          onTap: _editUnit,
+                          child: const SizedBox(
+                            width: 38,
+                            height: 38,
+                            child: Icon(
+                              Icons.edit_outlined,
+                              size: 18,
+                              color: TriageColors.textPrimary,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: TriageSpacing.md),
+
+                // 3. Resumen del turno de hoy
+                TriageSectionCard(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              'Turno de hoy',
+                              style: TriageTextStyles.titleMedium.copyWith(
+                                color: TriageColors.textPrimary,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                          if (hasAnyMetricError)
+                            TextButton.icon(
+                              onPressed: _loadData,
+                              style: TextButton.styleFrom(
+                                foregroundColor: TriageColors.paramedicAccent,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: TriageSpacing.sm,
+                                  vertical: 4,
+                                ),
+                                minimumSize: Size.zero,
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              ),
+                              icon: const Icon(Icons.refresh_rounded, size: 16),
+                              label: Text(
+                                'Reintentar',
+                                style: TriageTextStyles.labelSmall.copyWith(
+                                  color: TriageColors.paramedicAccent,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: TriageSpacing.md),
+                      _ShiftMetricRow(
+                        label: 'Incidentes atendidos',
+                        value: _loading
+                            ? '—'
+                            : (_incidentsFailed
+                                  ? 'No disponible'
+                                  : '$_incidentsCount'),
+                      ),
+                      const SizedBox(height: TriageSpacing.md),
+                      _ShiftMetricRow(
+                        label: 'Pacientes registrados',
+                        value: _loading
+                            ? '—'
+                            : (_patientsFailed
+                                  ? 'No disponible'
+                                  : '$_patientsCount'),
+                      ),
+                      const SizedBox(height: TriageSpacing.md),
+                      _ShiftMetricRow(
+                        label: 'Traslados confirmados',
+                        value: _loading
+                            ? '—'
+                            : (_patientsFailed
+                                  ? 'No disponible'
+                                  : '$_transfersCount'),
+                      ),
+                      const SizedBox(height: TriageSpacing.md),
+                      _ShiftMetricRow(
+                        label: 'Inicio de turno',
+                        value: _lastSignInTime,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: TriageSpacing.md),
+
+                // 4. Opciones de configuración, privacidad y soporte
+                TriageSectionCard(
+                  child: Column(
+                    children: [
+                      _ProfileMenuRow(
+                        icon: Icons.notifications_none_rounded,
+                        title: 'Notificaciones',
+                        badgeCount: unreadNotifications,
+                        onTap: _openNotificationsModal,
+                      ),
+                      const SizedBox(height: TriageSpacing.lg),
+                      _ProfileMenuRow(
+                        icon: Icons.verified_user_outlined,
+                        title: 'Privacidad y permisos',
+                        onTap: () =>
+                            IncidentLocationService.showPermissionsSheet(
+                              context,
+                            ),
+                      ),
+                      const SizedBox(height: TriageSpacing.lg),
+                      _ProfileMenuRow(
+                        icon: Icons.info_outline_rounded,
+                        title: 'Ayuda y soporte',
+                        onTap: () => _openSubSheet(const _BasicGuideSheet()),
+                      ),
+                      const SizedBox(height: TriageSpacing.lg),
+                      _ProfileMenuRow(
+                        icon: Icons.description_outlined,
+                        title: 'Términos y aviso de privacidad',
+                        onTap: () =>
+                            _openSubSheet(const _InstitutionalTermsSheet()),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: TriageSpacing.md),
+
+                // 5. Botón independiente de cerrar sesión
+                DecoratedBox(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(TriageRadii.md + 4),
+                    boxShadow: [
+                      BoxShadow(
+                        color: TriageColors.textPrimary.withValues(alpha: 0.08),
+                        blurRadius: 10,
+                        offset: const Offset(0, 3),
+                      ),
+                    ],
+                  ),
+                  child: Material(
+                    color: TriageColors.surface,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(TriageRadii.md + 4),
+                      side: const BorderSide(color: TriageColors.borderMedium),
+                    ),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(TriageRadii.md + 4),
+                      onTap: () async {
+                        Navigator.of(context).pop();
+                        if (!widget.parentContext.mounted) return;
+                        await ParamedicoSessionActions.confirmSignOut(
+                          widget.parentContext,
+                        );
+                      },
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(
+                          vertical: TriageSpacing.md + 2,
+                        ),
+                        alignment: Alignment.center,
+                        child: Text(
+                          'Cerrar sesión',
+                          style: TriageTextStyles.titleSmall.copyWith(
+                            color: TriageColors.textPrimary,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _BasicGuideSheet extends StatelessWidget {
+  const _BasicGuideSheet();
+
+  @override
+  Widget build(BuildContext context) {
+    return _ProfileFloatingSheet(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const _ProfileSheetHeader(
+            icon: Icons.menu_book_outlined,
+            title: 'Guía básica de operación',
+            subtitle: 'Flujo rápido en campo y traslado',
+          ),
+          const SizedBox(height: TriageSpacing.md),
+          const _GuideStepItem(
+            step: '1',
+            title: 'Verifica tu unidad al iniciar',
+            description:
+                'Confirma o edita tu número económico (ej. CRT-101) en Mi perfil antes de iniciar traslados.',
+          ),
+          const SizedBox(height: TriageSpacing.md),
+          const _GuideStepItem(
+            step: '2',
+            title: 'Registra incidente o paciente rápido',
+            description:
+                'Crea un incidente activo para múltiples lesionados o usa registro directo para atención individual, asignando color de triage.',
+          ),
+          const SizedBox(height: TriageSpacing.md),
+          const _GuideStepItem(
+            step: '3',
+            title: 'Asigna hospital y atiende alertas',
+            description:
+                'Inicia el traslado hacia el hospital disponible. Si el centro rechaza por saturación, recibirás aviso para reasignar destino.',
+          ),
+          const SizedBox(height: TriageSpacing.md),
+          const _GuideStepItem(
+            step: '4',
+            title: 'Comparte el folio de consulta',
+            description:
+                'Entrega el código generado a recepción hospitalaria o familiares para dar seguimiento al estado del paciente.',
+          ),
+          const SizedBox(height: TriageSpacing.lg),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: TriageColors.paramedicAccent,
+                foregroundColor: TriageColors.textInverse,
+                padding: const EdgeInsets.symmetric(
+                  vertical: TriageSpacing.md + 2,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(TriageRadii.md + 4),
+                ),
+                elevation: 0,
+              ),
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text(
+                'Entendido',
+                style: TriageTextStyles.titleSmall.copyWith(
+                  color: TriageColors.textInverse,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _InstitutionalTermsSheet extends StatelessWidget {
+  const _InstitutionalTermsSheet();
+
+  @override
+  Widget build(BuildContext context) {
+    return _ProfileFloatingSheet(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const _ProfileSheetHeader(
+            icon: Icons.verified_user_outlined,
+            title: 'Uso institucional',
+            subtitle: 'Términos y confidencialidad clínica',
+          ),
+          const SizedBox(height: TriageSpacing.md),
+          Container(
+            padding: const EdgeInsets.all(TriageSpacing.md),
+            decoration: BoxDecoration(
+              color: Theme.of(context).scaffoldBackgroundColor,
+              borderRadius: BorderRadius.circular(TriageRadii.md + 2),
+              border: Border.all(color: TriageColors.borderSubtle),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Plataforma exclusiva de atención prehospitalaria',
+                  style: TriageTextStyles.titleSmall.copyWith(
+                    color: TriageColors.textPrimary,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: TriageSpacing.xs),
+                Text(
+                  'El acceso y operación de este sistema están reservados únicamente para personal autorizado de Cruz Roja Mexicana y centros hospitalarios vinculados.',
+                  style: TriageTextStyles.bodySmall.copyWith(
+                    color: TriageColors.textSecondary,
+                    height: 1.4,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: TriageSpacing.md),
+          Text(
+            '• Confidencialidad: Los signos vitales, lesiones y datos de identidad capturados son información clínica protegida; queda prohibida su difusión externa.',
+            style: TriageTextStyles.bodySmall.copyWith(
+              color: TriageColors.textSecondary,
+              height: 1.4,
+            ),
+          ),
+          const SizedBox(height: TriageSpacing.xs + 2),
+          Text(
+            '• Trazabilidad: Toda captura, asignación de unidad y cambio de traslado queda registrado bajo tu sesión institucional activa.',
+            style: TriageTextStyles.bodySmall.copyWith(
+              color: TriageColors.textSecondary,
+              height: 1.4,
+            ),
+          ),
+          const SizedBox(height: TriageSpacing.lg),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: TriageColors.paramedicAccent,
+                foregroundColor: TriageColors.textInverse,
+                padding: const EdgeInsets.symmetric(
+                  vertical: TriageSpacing.md + 2,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(TriageRadii.md + 4),
+                ),
+                elevation: 0,
+              ),
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text(
+                'Cerrar',
+                style: TriageTextStyles.titleSmall.copyWith(
+                  color: TriageColors.textInverse,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _UnitCodeDialog extends StatefulWidget {
+  const _UnitCodeDialog({
+    required this.parentContext,
+    required this.repo,
+    this.initialCode,
+  });
+
+  final BuildContext parentContext;
+  final ParamedicoIncidentsRepository repo;
+  final String? initialCode;
+
+  @override
+  State<_UnitCodeDialog> createState() => _UnitCodeDialogState();
+}
+
+class _UnitCodeDialogState extends State<_UnitCodeDialog> {
+  late final TextEditingController _controller;
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.initialCode ?? '');
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    setState(() => _saving = true);
+    try {
+      final code = await widget.repo.setCurrentAmbulanceUnitCode(
+        _controller.text,
+      );
+      if (!mounted) return;
+      FocusManager.instance.primaryFocus?.unfocus();
+      Navigator.of(context).pop(code);
+      if (widget.parentContext.mounted) {
+        showAppSnackBar(widget.parentContext, 'Unidad registrada: $code');
+      }
+    } catch (e) {
+      if (widget.parentContext.mounted) {
+        showAppSnackBar(
+          widget.parentContext,
+          e.toString().replaceFirst('Exception: ', ''),
+          isError: true,
+        );
+      }
+      if (mounted) {
+        setState(() => _saving = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return PopScope(
+      canPop: !_saving,
+      child: AlertDialog(
+        backgroundColor: TriageColors.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(TriageRadii.md),
+        ),
+        title: Text(
+          'Código de unidad',
+          style: TriageTextStyles.titleMedium.copyWith(
+            color: TriageColors.textPrimary,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        content: TextField(
+          controller: _controller,
+          textCapitalization: TextCapitalization.characters,
+          decoration: const InputDecoration(
+            hintText: 'Ej. CRT-101',
+            labelText: 'Número económico',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: _saving
+                ? null
+                : () {
+                    FocusManager.instance.primaryFocus?.unfocus();
+                    Navigator.of(context).pop();
+                  },
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: TriageColors.paramedicAccent,
+              foregroundColor: TriageColors.textInverse,
+            ),
+            onPressed: _saving ? null : _submit,
+            child: Text(_saving ? 'Guardando...' : 'Guardar'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ProfileFloatingSheet extends StatelessWidget {
+  const _ProfileFloatingSheet({
+    required this.child,
+    this.padding = const EdgeInsets.fromLTRB(
+      TriageSpacing.lg,
+      TriageSpacing.md,
+      TriageSpacing.lg,
+      TriageSpacing.lg,
+    ),
+    this.showDragHandle = true,
+  });
+
+  final Widget child;
+  final EdgeInsetsGeometry padding;
+  final bool showDragHandle;
+
+  @override
+  Widget build(BuildContext context) {
+    final media = MediaQuery.of(context);
+    final bottomInset = media.padding.bottom;
+    final maxSheetHeight =
+        media.size.height - media.padding.top - (TriageSpacing.md * 2);
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        TriageSpacing.md,
+        TriageSpacing.md,
+        TriageSpacing.md,
+        bottomInset + TriageSpacing.md,
+      ),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxHeight: maxSheetHeight),
+        child: Container(
+          padding: padding,
+          decoration: BoxDecoration(
+            color: TriageColors.surface,
+            borderRadius: BorderRadius.circular(TriageRadii.xxl),
+            boxShadow: TriageShadows.floating,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (showDragHandle) ...[
+                Center(
+                  child: Container(
+                    width: 38,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: TriageColors.borderMedium,
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: TriageSpacing.md),
+              ],
+              Flexible(child: SingleChildScrollView(child: child)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ProfileSheetHeader extends StatelessWidget {
+  const _ProfileSheetHeader({
     required this.icon,
     required this.title,
     required this.subtitle,
-    required this.onTap,
-    this.destructive = false,
   });
 
   final IconData icon;
   final String title;
   final String subtitle;
-  final VoidCallback onTap;
-  final bool destructive;
 
   @override
   Widget build(BuildContext context) {
-    final color = destructive
-        ? const Color(0xFFB42318)
-        : AppColors.primaryParamedico;
-    return Material(
-      color: destructive ? const Color(0xFFFFF1F1) : const Color(0xFFF7F8FA),
-      borderRadius: BorderRadius.circular(12),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-          child: Row(
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Row(
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: TriageColors.paramedicAccent.withValues(alpha: 0.10),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Icon(icon, color: TriageColors.paramedicAccent, size: 22),
+            ),
+            const SizedBox(width: TriageSpacing.md),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TriageTextStyles.titleMedium.copyWith(
+                      color: TriageColors.textPrimary,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  Text(
+                    subtitle,
+                    style: TriageTextStyles.bodySmall.copyWith(
+                      color: TriageColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            TriageIconButton(
+              icon: TriageIcons.close,
+              tooltip: 'Cerrar',
+              onPressed: () => Navigator.of(context).pop(),
+              variant: TriageIconButtonVariant.plain,
+              iconSize: TriageSizes.iconLarge,
+            ),
+          ],
+        ),
+        const SizedBox(height: TriageSpacing.md),
+        const Divider(
+          height: TriageSizes.hairline,
+          thickness: TriageSizes.hairline,
+          color: TriageColors.borderSubtle,
+        ),
+      ],
+    );
+  }
+}
+
+class _GuideStepItem extends StatelessWidget {
+  const _GuideStepItem({
+    required this.step,
+    required this.title,
+    required this.description,
+  });
+
+  final String step;
+  final String title;
+  final String description;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 24,
+          height: 24,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: TriageColors.paramedicAccent.withValues(alpha: 0.12),
+            shape: BoxShape.circle,
+          ),
+          child: Text(
+            step,
+            style: TriageTextStyles.labelSmall.copyWith(
+              color: TriageColors.paramedicAccent,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+        const SizedBox(width: TriageSpacing.sm + 2),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                width: 34,
-                height: 34,
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(9),
-                ),
-                child: Icon(icon, color: color, size: 20),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: AppTextStyles.ESC_Bold_titleSmall.copyWith(
-                        fontSize: 13,
-                        color: Colors.black,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      subtitle,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: AppTextStyles.ESC_Regular_bodyMedium.copyWith(
-                        fontSize: 11,
-                        color: Colors.black.withValues(alpha: 0.55),
-                      ),
-                    ),
-                  ],
+              Text(
+                title,
+                style: TriageTextStyles.bodyMedium.copyWith(
+                  color: TriageColors.textPrimary,
+                  fontWeight: FontWeight.bold,
                 ),
               ),
-              Icon(
-                Icons.chevron_right_rounded,
-                size: 22,
-                color: Colors.black.withValues(alpha: 0.32),
+              const SizedBox(height: 2),
+              Text(
+                description,
+                style: TriageTextStyles.bodySmall.copyWith(
+                  color: TriageColors.textSecondary,
+                  height: 1.35,
+                ),
               ),
             ],
           ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ShiftMetricRow extends StatelessWidget {
+  const _ShiftMetricRow({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: Text(
+            label,
+            style: TriageTextStyles.bodyMedium.copyWith(
+              color: TriageColors.textSecondary,
+            ),
+          ),
+        ),
+        const SizedBox(width: TriageSpacing.md),
+        Text(
+          value,
+          style: TriageTextStyles.labelLarge.copyWith(
+            color: TriageColors.textPrimary,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ProfileMenuRow extends StatelessWidget {
+  const _ProfileMenuRow({
+    required this.icon,
+    required this.title,
+    required this.onTap,
+    this.badgeCount = 0,
+  });
+
+  final IconData icon;
+  final String title;
+  final VoidCallback onTap;
+  final int badgeCount;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(TriageRadii.md),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: TriageSpacing.xs),
+        child: Row(
+          children: [
+            Icon(icon, color: TriageColors.textSecondary, size: 20),
+            const SizedBox(width: TriageSpacing.md),
+            Expanded(
+              child: Text(
+                title,
+                style: TriageTextStyles.bodyMedium.copyWith(
+                  color: TriageColors.textPrimary,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+            if (badgeCount > 0) ...[
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: TriageSpacing.sm,
+                  vertical: 2,
+                ),
+                decoration: BoxDecoration(
+                  color: TriageColors.paramedicAccent,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  '$badgeCount',
+                  style: TriageTextStyles.labelSmall.copyWith(
+                    color: TriageColors.textInverse,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              const SizedBox(width: TriageSpacing.xs),
+            ],
+            const Icon(
+              Icons.chevron_right_rounded,
+              size: 20,
+              color: TriageColors.textSecondary,
+            ),
+          ],
         ),
       ),
     );

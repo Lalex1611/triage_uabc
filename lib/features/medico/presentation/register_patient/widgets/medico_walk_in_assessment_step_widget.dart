@@ -239,6 +239,10 @@ class _TriageLevelCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Amarillo es claro: texto oscuro, como en las demás tarjetas de triage
+    final fg = info.category == MedicoTriageCategory.amarillo
+        ? const Color(0xFF1A1A1A)
+        : Colors.white;
     return Semantics(
       button: true,
       selected: selected,
@@ -268,38 +272,34 @@ class _TriageLevelCard extends StatelessWidget {
                     Expanded(
                       child: Text(
                         'NIVEL ${info.level} · ${info.colorName}',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 10.5,
                           fontWeight: FontWeight.w600,
                           letterSpacing: 0.3,
-                          color: Colors.white,
+                          color: fg,
                         ),
                       ),
                     ),
                     if (selected)
-                      const Icon(
-                        Icons.check_circle_outline,
-                        size: 18,
-                        color: Colors.white,
-                      ),
+                      Icon(Icons.check_circle_outline, size: 18, color: fg),
                   ],
                 ),
                 const SizedBox(height: 2),
                 Text(
                   info.title,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 17,
                     fontWeight: FontWeight.w700,
-                    color: Colors.white,
+                    color: fg,
                   ),
                 ),
                 const SizedBox(height: 2),
                 Text(
                   info.subtitle,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
                     height: 1.25,
-                    color: Color(0xE6FFFFFF),
+                    color: fg.withValues(alpha: 0.9),
                   ),
                 ),
               ],

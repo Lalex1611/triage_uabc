@@ -63,11 +63,22 @@ abstract final class MedicoPatientFormValidators {
 
   /// Teléfono opcional: 10 dígitos (México / EE. UU.), u 11–12 con la lada
   /// del país (+1 / +52)
+  /// Un signo vital escrito debe ser un número ("36,5" vale; "36..5" no).
+  /// Los vacíos son opcionales.
+  static bool isValidVital(String raw) {
+    final t = raw.trim().replaceAll(',', '.');
+    return t.isEmpty || double.tryParse(t) != null;
+  }
+
   static String? phoneError(String phone) {
+    if (phone.trim().isEmpty) return null;
     final digits = phone.replaceAll(RegExp(r'[^0-9]'), '');
-    if (digits.isEmpty) return null;
-    if (digits.length < 10 || digits.length > 12) {
-      return 'El teléfono debe tener 10 dígitos (o 11–12 con la lada del país).';
+    final valid =
+        digits.length == 10 ||
+        (digits.length == 11 && digits.startsWith('1')) ||
+        (digits.length == 12 && digits.startsWith('52'));
+    if (!valid) {
+      return 'El teléfono debe tener 10 dígitos (o la lada +52 / +1 antes).';
     }
     return null;
   }
