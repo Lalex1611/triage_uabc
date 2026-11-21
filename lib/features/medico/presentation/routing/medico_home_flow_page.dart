@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:sistema_triage/features/medico/domain/constants/medico_patient_details_result.dart';
+import 'package:sistema_triage/features/medico/domain/constants/medico_patient_filter.dart';
 import 'package:sistema_triage/features/medico/domain/constants/medico_queue_filter.dart';
 import 'package:sistema_triage/features/medico/domain/constants/medico_queue_patient_status.dart';
 import 'package:sistema_triage/features/medico/domain/constants/medico_triage_level.dart';
@@ -160,11 +161,14 @@ class _MedicoHomeFlowPageState extends State<MedicoHomeFlowPage>
           ),
         ),
         if (incoming.isEmpty)
-          const SliverToBoxAdapter(
+          SliverToBoxAdapter(
             child: Padding(
-              padding: EdgeInsets.fromLTRB(16, 0, 16, 12),
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
               child: Text(
-                'Sin pacientes en camino.',
+                c.searchQuery.trim().isNotEmpty ||
+                        c.activeFilter != MedicoPatientFilter.todos
+                    ? 'Ningún paciente en camino coincide con la búsqueda o el filtro.'
+                    : 'Sin pacientes en camino.',
                 style: TextStyle(
                   fontSize: 12,
                   color: Colors.black54,

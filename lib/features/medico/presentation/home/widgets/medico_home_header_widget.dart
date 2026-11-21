@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
-import 'package:sistema_triage/core/constants/triage_icons.dart';
 import 'package:sistema_triage/core/theme/app_theme.dart';
-import 'package:sistema_triage/shared/widgets/triage_pressable_widget.dart';
+import 'package:sistema_triage/features/medico/presentation/home/widgets/medico_bell_button_widget.dart';
 
 /// Cabecera del Home médico (mockup 01): avatar + nombre + hospital + campana.
 class MedicoHomeHeader extends StatelessWidget {
@@ -67,49 +65,9 @@ class MedicoHomeHeader extends StatelessWidget {
           ),
           const SizedBox(width: 8),
           // Campana con punto rojo
-          TriagePressable(
+          MedicoBellButton(
+            hasUnread: hasNotifications,
             onTap: onNotificationTap,
-            builder: (context, pressed) => Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: const Color(0xFF3D7EB4),
-                shape: BoxShape.circle,
-                boxShadow: triagePressedShadow(pressed: pressed),
-              ),
-              child: SizedBox(
-                width: 28,
-                height: 28,
-                child: Stack(
-                  clipBehavior: Clip.none,
-                  alignment: Alignment.center,
-                  children: [
-                    SvgPicture.asset(
-                      TriageIcons.bell,
-                      width: 22,
-                      height: 22,
-                      colorFilter: const ColorFilter.mode(
-                        Colors.white,
-                        BlendMode.srcIn,
-                      ),
-                    ),
-                    if (hasNotifications)
-                      Positioned(
-                        right: 6,
-                        top: 6,
-                        child: Container(
-                          width: 10,
-                          height: 10,
-                          decoration: const BoxDecoration(
-                            color: Color(0xFFB6070C),
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-            ),
           ),
         ],
       ),
