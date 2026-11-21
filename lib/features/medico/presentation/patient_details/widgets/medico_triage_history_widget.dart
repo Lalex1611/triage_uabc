@@ -8,10 +8,7 @@ import 'package:sistema_triage/features/medico/domain/entities/patient_details/p
 // Este widget muestra la línea de tiempo del historial de cambios de triage y estado de un paciente
 
 class MedicoTriageHistoryWidget extends StatelessWidget {
-  const MedicoTriageHistoryWidget({
-    super.key,
-    required this.data,
-  });
+  const MedicoTriageHistoryWidget({super.key, required this.data});
 
   final MedicoTriageHistoryData data;
 
@@ -26,7 +23,11 @@ class MedicoTriageHistoryWidget extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Icon(Icons.history_rounded, size: 20, color: Colors.black87),
+              const Icon(
+                Icons.history_rounded,
+                size: 20,
+                color: Colors.black87,
+              ),
               const SizedBox(width: 8),
               Text(
                 'Historial de Triage y Estado',
@@ -123,15 +124,19 @@ class _TriageHistoryCard extends StatelessWidget {
                       // Fecha y hora del registro
                       Row(
                         children: [
-                          Icon(Icons.access_time_rounded,
-                              size: 14, color: Colors.grey.shade600),
+                          Icon(
+                            Icons.access_time_rounded,
+                            size: 14,
+                            color: Colors.grey.shade600,
+                          ),
                           const SizedBox(width: 4),
                           Text(
                             dtStr,
-                            style: AppTextStyles.ESC_SemiBold_bodyMedium.copyWith(
-                              color: Colors.black87,
-                              fontSize: 12,
-                            ),
+                            style:
+                                AppTextStyles.ESC_SemiBold_bodyMedium.copyWith(
+                                  color: Colors.black87,
+                                  fontSize: 12,
+                                ),
                           ),
                         ],
                       ),
@@ -142,7 +147,9 @@ class _TriageHistoryCard extends StatelessWidget {
                           vertical: 2,
                         ),
                         decoration: BoxDecoration(
-                          color: AppColors.primaryParamedico.withValues(alpha: 0.1),
+                          color: AppColors.primaryParamedico.withValues(
+                            alpha: 0.1,
+                          ),
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(
@@ -189,7 +196,11 @@ class _TriageHistoryCard extends StatelessWidget {
         ),
         if (oldCat != null && oldCat != newCat) ...[
           _TriagePill(category: oldCat),
-          Icon(Icons.arrow_forward_rounded, size: 14, color: Colors.grey.shade500),
+          Icon(
+            Icons.arrow_forward_rounded,
+            size: 14,
+            color: Colors.grey.shade500,
+          ),
         ],
         _TriagePill(category: newCat),
       ],
@@ -220,7 +231,11 @@ class _TriageHistoryCard extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 4),
-          Icon(Icons.arrow_forward_rounded, size: 12, color: Colors.grey.shade500),
+          Icon(
+            Icons.arrow_forward_rounded,
+            size: 12,
+            color: Colors.grey.shade500,
+          ),
           const SizedBox(width: 4),
         ],
         Text(
@@ -268,7 +283,8 @@ class _TriagePill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isWhiteText = category == MedicoTriageCategory.rojo ||
+    final isWhiteText =
+        category == MedicoTriageCategory.rojo ||
         category == MedicoTriageCategory.azul ||
         category == MedicoTriageCategory.naranja;
 

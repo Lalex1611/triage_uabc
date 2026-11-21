@@ -11,7 +11,7 @@ abstract final class MedicoWalkInColors {
   static const progressInactive = Color(0xFFC9D4DF);
   static const textPrimary = Color(0xFF1A1A1A);
   static const textSecondary = Color(0xFF5C6670);
-  static const placeholder = Color(0xFFA3ADB8);
+  static const placeholder = Color(0xFF6A7480);
   static const fieldBorder = Color(0xFFD3DBE3);
   static const fieldFill = Color(0xFFF8FAFC);
 }
@@ -142,7 +142,14 @@ class MedicoWalkInTextField extends StatelessWidget {
       textAlign: textAlign,
       textCapitalization: textCapitalization,
       inputFormatters: [
-        if (digitsOnly) FilteringTextInputFormatter.digitsOnly,
+        // Rechaza el cambio en vez de quitar el punto ("36.5" no se vuelve
+        // "365")
+        if (digitsOnly)
+          TextInputFormatter.withFunction(
+            (oldValue, newValue) => RegExp(r'^[0-9]*$').hasMatch(newValue.text)
+                ? newValue
+                : oldValue,
+          ),
         if (decimal) FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
         if (maxLength != null) LengthLimitingTextInputFormatter(maxLength),
         ...inputFormatters,
@@ -250,7 +257,8 @@ class MedicoWalkInPhoneFormatter extends TextInputFormatter {
   ) {
     final oldText = oldValue.text;
     final text = newValue.text;
-    if (text.length <= oldText.length) return newValue;
+    // Borrar no agrega caracteres ni dígitos, así que pasa; un reemplazo del
+    // mismo largo sí se revisa
     if (_invalid(text) > _invalid(oldText)) return oldValue;
     if (_digits(text) > maxDigits && _digits(text) > _digits(oldText)) {
       return oldValue;
