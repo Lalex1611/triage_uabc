@@ -121,7 +121,7 @@ class _StartGuidedPanelState extends State<StartGuidedPanel> {
         title: 'START guiado',
         // Sin preparar, el número de paciente aún no se conoce
         subtitle: widget.session.isPrepared
-            ? 'Paciente ${widget.session.nextNumber} · '
+            ? '${widget.session.patientLabel} · '
                   '${widget.session.incidentFolio}'
             : widget.session.incidentFolio,
         steps: level == null

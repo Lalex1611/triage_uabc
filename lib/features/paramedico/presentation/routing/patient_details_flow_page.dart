@@ -2,14 +2,10 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:sistema_triage/core/constants/triage_icons.dart';
-import 'package:sistema_triage/core/theme/triage_tokens.dart';
 import 'package:sistema_triage/features/paramedico/data/repositories/paramedico_incidents_repository.dart';
 import 'package:sistema_triage/features/paramedico/domain/constants/patient_status.dart';
 import 'package:sistema_triage/features/paramedico/domain/services/incident_for_cards_mapper.dart';
 import 'package:sistema_triage/features/paramedico/presentation/patient_registration/widgets/patient_map_widget.dart';
-import 'package:sistema_triage/shared/domain/patient_lifecycle_status.dart';
-import 'package:sistema_triage/shared/domain/triage_level.dart';
 import 'package:sistema_triage/shared/widgets/triage_ui.dart';
 import 'package:sistema_triage/features/paramedico/domain/entities/patient_details/details_header_data.dart';
 import 'package:sistema_triage/features/paramedico/domain/entities/patient_details/details_photo_data.dart';
@@ -90,8 +86,8 @@ class _PatientDetailsFlowPageState extends State<PatientDetailsFlowPage> {
     final blood = c.isEditing
         ? c.editBlood
         : PatientDemographicsMapper.bloodFromDemo(
-      demo['blood_type'] as String?,
-    );
+            demo['blood_type'] as String?,
+          );
     final photoPaths = c.photoPathsForUi(d);
     final mapCoords = c.patientMapCoords(d);
     final birthDay = c.isEditing
@@ -142,10 +138,10 @@ class _PatientDetailsFlowPageState extends State<PatientDetailsFlowPage> {
       ),
       stickyActionBar: c.isEditing
           ? PatientDetailsPage.readyBottomBar(
-        savingEdit: c.savingEdit,
-        onCancel: c.cancelEdit,
-        onConfirm: () => unawaited(c.saveEdit(context)),
-      )
+              savingEdit: c.savingEdit,
+              onCancel: c.cancelEdit,
+              onConfirm: () => unawaited(c.saveEdit(context)),
+            )
           : null,
       bottomPadding: c.isEditing ? 120 : (trailing == null ? 24 : 0),
       bodyChildren: PatientDetailsPage.readyBody(
@@ -310,18 +306,18 @@ class _PatientDetailsFlowPageState extends State<PatientDetailsFlowPage> {
                               : TriageStatusBadge.patient(lifecycle),
                           child: statusOptions.isEmpty
                               ? Text(
-                            c.wizardBusy
-                                ? 'Actualizando…'
-                                : 'Sin cambios disponibles en este estado.',
-                            style: TriageTextStyles.bodySmall.copyWith(
-                              color: TriageColors.textSecondary,
-                            ),
-                          )
+                                  c.wizardBusy
+                                      ? 'Actualizando…'
+                                      : 'Sin cambios disponibles en este estado.',
+                                  style: TriageTextStyles.bodySmall.copyWith(
+                                    color: TriageColors.textSecondary,
+                                  ),
+                                )
                               : _StatusPicker(
-                            onTap: () => unawaited(
-                              _openStatusPicker(c, statusOptions),
-                            ),
-                          ),
+                                  onTap: () => unawaited(
+                                    _openStatusPicker(c, statusOptions),
+                                  ),
+                                ),
                         ),
                         TriageSectionCard(
                           title: 'Fotografías',
@@ -338,7 +334,9 @@ class _PatientDetailsFlowPageState extends State<PatientDetailsFlowPage> {
                             children: [
                               for (final path in photos)
                                 TriagePhoto(image: FileImage(File(path))),
-                              if (photos.isEmpty)
+                              for (final url in c.storedPhotoUrls.values)
+                                TriagePhoto(image: NetworkImage(url)),
+                              if (photos.isEmpty && c.storedPhotoUrls.isEmpty)
                                 TriagePhoto(onTap: () => _addPhoto(c)),
                             ],
                           ),
@@ -433,9 +431,8 @@ class _PatientDetailsFlowPageState extends State<PatientDetailsFlowPage> {
       bottomNavigationBar: _ActionBar(
         primaryLabel: primaryLabel,
         busy: c.wizardBusy,
-        onPrimary: () => unawaited(
-          c.handleStatusPicked(context, PatientStatus.trasladando),
-        ),
+        onPrimary: () =>
+            unawaited(c.handleStatusPicked(context, PatientStatus.trasladando)),
         onQr: () => unawaited(c.onGenerateQrTap(context)),
       ),
     );
@@ -448,9 +445,9 @@ class _PatientDetailsFlowPageState extends State<PatientDetailsFlowPage> {
   }
 
   Future<void> _openMenu(
-      PatientDetailsController c,
-      ParamedicoPatientDetail d,
-      ) async {
+    PatientDetailsController c,
+    ParamedicoPatientDetail d,
+  ) async {
     final action = await showTriageSheet<_PatientMenuAction>(
       context,
       title: 'Opciones del paciente',
@@ -483,9 +480,9 @@ class _PatientDetailsFlowPageState extends State<PatientDetailsFlowPage> {
   }
 
   Future<void> _openStatusPicker(
-      PatientDetailsController c,
-      List<(String, PatientStatus)> options,
-      ) async {
+    PatientDetailsController c,
+    List<(String, PatientStatus)> options,
+  ) async {
     final chosen = await showTriageSheet<PatientStatus>(
       context,
       title: 'Cambiar estado',
@@ -506,8 +503,8 @@ class _PatientDetailsFlowPageState extends State<PatientDetailsFlowPage> {
 
   /// Opciones de estado a partir del menú que ya define el controlador
   static List<(String, PatientStatus)> _statusOptions(
-      List<PopupMenuEntry<PatientStatus>>? entries,
-      ) {
+    List<PopupMenuEntry<PatientStatus>>? entries,
+  ) {
     if (entries == null) return const [];
     return [
       for (final e in entries)
@@ -620,10 +617,10 @@ class _SheetTile extends StatelessWidget {
       leading: icon == null
           ? null
           : TriageIcon(
-        icon,
-        size: TriageSizes.icon,
-        color: TriageColors.textSecondary,
-      ),
+              icon,
+              size: TriageSizes.icon,
+              color: TriageColors.textSecondary,
+            ),
       title: Text(
         label,
         style: TriageTextStyles.bodyMedium.copyWith(
@@ -668,28 +665,28 @@ class _ActionBar extends StatelessWidget {
             padding: const EdgeInsets.all(TriageSpacing.lg),
             child: label == null
                 ? TriageButton(
-              label: 'Código de consulta',
-              variant: TriageButtonVariant.secondary,
-              onPressed: onQr,
-            )
+                    label: 'Código de consulta',
+                    variant: TriageButtonVariant.secondary,
+                    onPressed: onQr,
+                  )
                 : Row(
-              spacing: TriageSpacing.md,
-              children: [
-                TriageIconButton(
-                  icon: TriageIcons.qr,
-                  tooltip: 'Código de consulta',
-                  onPressed: onQr,
-                  size: TriageIconButtonSize.large,
-                ),
-                Expanded(
-                  child: TriageButton(
-                    label: label,
-                    isLoading: busy,
-                    onPressed: onPrimary,
+                    spacing: TriageSpacing.md,
+                    children: [
+                      TriageIconButton(
+                        icon: TriageIcons.qr,
+                        tooltip: 'Código de consulta',
+                        onPressed: onQr,
+                        size: TriageIconButtonSize.large,
+                      ),
+                      Expanded(
+                        child: TriageButton(
+                          label: label,
+                          isLoading: busy,
+                          onPressed: onPrimary,
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-              ],
-            ),
           ),
         ),
       ),

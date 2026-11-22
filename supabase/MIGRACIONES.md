@@ -41,6 +41,10 @@ corregir algo se crea una nueva.
 | 19 | `20261120120000_medico_append_patient_photo.sql` | Agregar foto sin pisar otros datos |
 | 20 | `20261120130000_medico_set_hospital_triage.sql` | Cambiar el triage hospitalario desde sala |
 | 21 | `20261120140000_medico_update_patient_info.sql` | Editar datos sin borrar fotos |
+| 22 | `20261120150000_paramedic_offline_captures.sql` | Sincronización de incidentes, pacientes y fotos capturados sin conexión por Paramédico |
+| 23 | `20261120160000_medico_offline_walk_ins.sql` | Sincronización de admisiones y fotos capturadas sin conexión por Médico |
+
+La migración de Paramédico pasó de `20261117120000` a `20261120150000` para que su versión sea única y se ejecute después de las migraciones de Médico ya incorporadas a `main`. Si el SQL de A08 ya se ejecutó manualmente en un entorno, verifica sus tablas y funciones antes de registrar esa nueva versión en el historial.
 
 ## Opción A: Supabase local (Docker)
 

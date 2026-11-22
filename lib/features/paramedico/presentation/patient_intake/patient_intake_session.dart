@@ -16,11 +16,13 @@ class RegisteredPatient {
     required this.id,
     required this.number,
     required this.level,
+    this.pending = false,
   });
 
   final String id;
   final int number;
   final TriageLevel level;
+  final bool pending;
 
   String get folio => IncidentPresentationFormatters.shortPatientId(id);
 }
@@ -51,6 +53,9 @@ class PatientIntakeSession {
 
   /// Número que tendrá el siguiente paciente del incidente
   int nextNumber = 1;
+  bool get localCapture => _repo.usesLocalCaptures;
+  String get patientLabel =>
+      localCapture ? 'Nueva captura' : 'Paciente $nextNumber';
   GeoPoint? _incidentPoint;
   String? _placeKey;
   bool _prepared = false;
@@ -68,12 +73,16 @@ class PatientIntakeSession {
     if (_prepared) return;
     final incident = await _repo.getIncident(incidentId);
     if (incident == null) throw Exception('Incidente no encontrado.');
-    nextNumber = await _repo.countPatientsForIncident(incidentId) + 1;
+    nextNumber = localCapture
+        ? 1
+        : await _repo.countPatientsForIncident(incidentId) + 1;
     final lat = incident.latitude;
     final lng = incident.longitude;
     if (lat != null && lng != null) {
       _incidentPoint = (lat: lat, lng: lng);
-      _placeKey = await _placeLabel(lat, lng) ?? _coords((lat: lat, lng: lng));
+      _placeKey = localCapture
+          ? _coords((lat: lat, lng: lng))
+          : await _placeLabel(lat, lng) ?? _coords((lat: lat, lng: lng));
     }
     _prepared = true;
   }
@@ -101,6 +110,8 @@ class PatientIntakeSession {
       triageColor: level.dbValue,
       displayName: custom != null && custom.isNotEmpty
           ? custom
+          : localCapture
+          ? ''
           : PatientDisplayNameFormatter.formatAuto(
               patientNumber: number,
               atLocal: DateTime.now(),
@@ -118,7 +129,12 @@ class PatientIntakeSession {
       locationLng: point.lng,
     );
     nextNumber++;
-    return RegisteredPatient(id: saved.patientId, number: number, level: level);
+    return RegisteredPatient(
+      id: saved.patientId,
+      number: number,
+      level: level,
+      pending: saved.code.isEmpty,
+    );
   }
 
   /// Sin permiso, sin GPS o si tarda demasiado se usa la ubicación del incidente

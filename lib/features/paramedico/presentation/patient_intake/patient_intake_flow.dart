@@ -78,7 +78,9 @@ Future<void> startPatientIntake(
     if (next == PatientRegisteredNext.record) {
       await pushParamedicoFullScreen(
         context,
-        '/paramedico/patient/${patient.id}',
+        patient.pending
+            ? '/paramedico/captura/${patient.id}'
+            : '/paramedico/patient/${patient.id}',
       );
       return;
     }

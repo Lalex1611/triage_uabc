@@ -322,6 +322,7 @@ class CreateIncidentController extends ChangeNotifier {
   /// Crea el incidente y devuelve su id (null si falló). Ya no navega: lo hace
   /// quien llamó (la hoja de nuevo incidente)
   Future<String?> submit(BuildContext context) async {
+    if (submitting) return null;
     if (!locationConfirmed) {
       showAppSnackBar(
         context,
@@ -338,6 +339,26 @@ class CreateIncidentController extends ChangeNotifier {
     notifyListeners();
     try {
       final type = mapEmergencyForRpc();
+      if (_repo.usesLocalCaptures) {
+        final id = await _repo.captureIncident(
+          title:
+              customTitle ??
+              IncidentTitleFormatter.formatAuto(
+                atLocal: capturedAt,
+                locationKey:
+                    '${lat.toStringAsFixed(4)}, ${lng.toStringAsFixed(4)}',
+              ),
+          emergencyType: type,
+          lat: lat,
+          lng: lng,
+          description: descriptionController.text.trim(),
+          photos: List<String>.of(photos),
+        );
+        if (context.mounted) {
+          showAppSnackBar(context, 'Guardado en este teléfono');
+        }
+        return id;
+      }
       final title = await IncidentTitleFormatter.resolveTitle(
         customTitle: customTitle,
         atLocal: capturedAt,
@@ -379,12 +400,12 @@ class CreateIncidentController extends ChangeNotifier {
       }
       if (context.mounted) {
         showAppSnackBar(
-        context,
-        photosUploaded
-            ? 'Incidente creado.'
-            : 'Incidente creado, pero no se pudieron subir las fotos. '
-                  'Añádelas desde el incidente.',
-        isError: !photosUploaded,
+          context,
+          photosUploaded
+              ? 'Incidente creado.'
+              : 'Incidente creado, pero no se pudieron subir las fotos. '
+                    'Añádelas desde el incidente.',
+          isError: !photosUploaded,
         );
       }
       return id;

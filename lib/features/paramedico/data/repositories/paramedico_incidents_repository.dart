@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
+import 'package:sistema_triage/features/paramedico/data/offline/paramedico_offline_runtime.dart';
 
 import 'package:latlong2/latlong.dart';
 import 'package:sistema_triage/core/config/supabase_env.dart';
@@ -269,8 +271,10 @@ class ParamedicoPatientRow {
       note: firstNote == null || firstNote.isEmpty || firstNote == display
           ? null
           : firstNote,
-      hospitalName: (j['hospitals'] as Map<String, dynamic>?)?['name'] as String?,
-      wasRejected: (j['medico_rejected_transfers'] as List?)?.isNotEmpty ?? false,
+      hospitalName:
+          (j['hospitals'] as Map<String, dynamic>?)?['name'] as String?,
+      wasRejected:
+          (j['medico_rejected_transfers'] as List?)?.isNotEmpty ?? false,
     );
   }
 }
@@ -375,6 +379,30 @@ class HospitalRow {
 /// Contrato de datos paramédico ↔ Supabase (columnas `patients`, Storage `patient_photos`, RPC incidentes)
 /// Ver migración `20260513120000_paramedico_patient_demographics.sql`
 class ParamedicoIncidentsRepository {
+  bool get usesLocalCaptures => ParamedicoOfflineRuntime.instance.supported;
+
+  Future<String> captureIncident({
+    required String title,
+    required String emergencyType,
+    required double lat,
+    required double lng,
+    String? description,
+    List<String> photos = const [],
+  }) async {
+    final row = await ParamedicoOfflineRuntime.instance.capture(
+      kind: 'incident',
+      payload: {
+        'title': title,
+        'emergency_type': emergencyType,
+        'lat': lat,
+        'lng': lng,
+        'description': description,
+      },
+      photos: photos,
+    );
+    return row['id'] as String;
+  }
+
   ParamedicoIncidentsRepository({SupabaseClient? client})
     : _client =
           client ??
@@ -384,7 +412,11 @@ class ParamedicoIncidentsRepository {
 
   SupabaseClient get _c {
     final x = _client;
-    if (x == null) throw Exception('El servicio no se encuentra configurado en este momento');
+    if (x == null) {
+      throw Exception(
+        'El servicio no se encuentra configurado en este momento',
+      );
+    }
     return x;
   }
 
@@ -408,26 +440,53 @@ class ParamedicoIncidentsRepository {
   }
 
   Future<ParamedicoIncidentSummary?> getIncident(String incidentId) async {
-    final row = await _c
-        .from('incidents')
-        .select(
-          'id, generated_title, emergency_type, description, photo_local_paths, '
-          'created_at, status, created_by, location',
-        )
-        .eq('id', incidentId)
-        .eq('is_deleted', false)
-        .maybeSingle();
-    if (row == null) return null;
-    return ParamedicoIncidentSummary.fromJson(Map<String, dynamic>.from(row));
+    final offline = ParamedicoOfflineRuntime.instance;
+    Map<String, dynamic>? local;
+    if (usesLocalCaptures) {
+      local = await offline.incident(incidentId);
+      final capture = await offline.local(incidentId);
+      if (local != null &&
+          (offline.offline ||
+              capture != null && capture['state'] != 'synced')) {
+        return ParamedicoIncidentSummary.fromJson(local);
+      }
+    }
+    try {
+      final row = await _c
+          .from('incidents')
+          .select(
+            'id, generated_title, emergency_type, description, photo_local_paths, '
+            'created_at, status, created_by, location',
+          )
+          .eq('id', incidentId)
+          .eq('is_deleted', false)
+          .maybeSingle()
+          .timeout(const Duration(seconds: 8));
+      if (row == null) return null;
+      if (usesLocalCaptures) {
+        await offline.cacheIncident(Map<String, dynamic>.from(row));
+      }
+      return ParamedicoIncidentSummary.fromJson(Map<String, dynamic>.from(row));
+    } on TimeoutException {
+      if (local != null && offline.canCapture) {
+        return ParamedicoIncidentSummary.fromJson(local);
+      }
+      rethrow;
+    } on SocketException {
+      if (local != null && offline.canCapture) {
+        return ParamedicoIncidentSummary.fromJson(local);
+      }
+      rethrow;
+    }
   }
 
   Future<String> _createConsultationCode(String patientId) async {
-  final code = await _c.rpc(
-    'create_consultation_code',
-    params: {'p_patient_id': patientId},
-  );
-  return code as String;
-}
+    final code = await _c.rpc(
+      'create_consultation_code',
+      params: {'p_patient_id': patientId},
+    );
+    return code as String;
+  }
 
   /// Pacientes activos del incidente (para numeración al registrar uno nuevo)
   Future<int> countPatientsForIncident(String incidentId) async {
@@ -484,7 +543,10 @@ class ParamedicoIncidentsRepository {
   /// Una sola consulta a `patients` para los conteos por color y los pines del
   /// mapa de los incidentes dados
   Future<
-    ({Map<String, IncidentPatientTriageCounts> counts, List<MapPatientPin> pins})
+    ({
+      Map<String, IncidentPatientTriageCounts> counts,
+      List<MapPatientPin> pins,
+    })
   >
   patientsOverviewForIncidents(
     Iterable<String> incidentIds, {
@@ -796,6 +858,15 @@ class ParamedicoIncidentsRepository {
     return {for (final s in signed) s.path: s.signedUrl};
   }
 
+  Future<Map<String, String>> signPatientPhotos(Iterable<String> paths) async {
+    final stored = paths.toList();
+    if (stored.isEmpty) return {};
+    final signed = await _c.storage
+        .from('patient_photos')
+        .createSignedUrls(stored, 3600);
+    return {for (final s in signed) s.path: s.signedUrl};
+  }
+
   Future<void> deleteIncidentPhoto(String path) async {
     if (!_isStoredPhoto(path)) return;
     await _c.storage.from(_incidentPhotosBucket).remove([path]);
@@ -853,7 +924,9 @@ class ParamedicoIncidentsRepository {
     final uid = const Uuid().v4();
 
     final uidAuth = _c.auth.currentUser?.id;
-    if (uidAuth == null) throw Exception('La sesión no es válida o ha expirado');
+    if (uidAuth == null) {
+      throw Exception('La sesión no es válida o ha expirado');
+    }
 
     final inserted = await _c
         .from('patients')
@@ -882,9 +955,30 @@ class ParamedicoIncidentsRepository {
     required double locationLat,
     required double locationLng,
   }) async {
+    if (usesLocalCaptures) {
+      final demo = Map<String, dynamic>.from(demographics);
+      final photos = (demo.remove('photo_local_paths') as List? ?? [])
+          .cast<String>();
+      final row = await ParamedicoOfflineRuntime.instance.capture(
+        kind: 'patient',
+        parentId: incidentId,
+        payload: {
+          'incident_id': incidentId,
+          'triage_color': triageColor,
+          'display_name': displayName,
+          'demographics': demo,
+          'lat': locationLat,
+          'lng': locationLng,
+        },
+        photos: photos,
+      );
+      return (patientId: row['id'] as String, code: '');
+    }
     final uid = const Uuid().v4();
     final uidAuth = _c.auth.currentUser?.id;
-    if (uidAuth == null) throw Exception('La sesión no es válida o ha expirado');
+    if (uidAuth == null) {
+      throw Exception('La sesión no es válida o ha expirado');
+    }
 
     final demo = Map<String, dynamic>.from(demographics)
       ..['registration_lat'] = locationLat
@@ -1035,19 +1129,19 @@ class ParamedicoIncidentsRepository {
   /// Código activo (no revocado) más reciente del paciente, si existe
   Future<String?> getActiveConsultationCode(String patientId) async {
     final rows = await _c
-      .from('consultation_codes')
-      .select('code, revoked_at, expires_at, created_at')
-      .eq('patient_id', patientId)
-      .order('created_at', ascending: false);
+        .from('consultation_codes')
+        .select('code, revoked_at, expires_at, created_at')
+        .eq('patient_id', patientId)
+        .order('created_at', ascending: false);
     final list = rows as List<dynamic>;
     final now = DateTime.now().toUtc();
     for (final raw in list) {
-        final m = raw as Map<String, dynamic>;
-        if (m['revoked_at'] != null) continue;
-        final exp = DateTime.tryParse(m['expires_at'] as String? ?? '');
-        if (exp != null && exp.isBefore(now)) continue;
-        final code = m['code'] as String?;
-        if (code != null && code.trim().isNotEmpty) return code.trim();
+      final m = raw as Map<String, dynamic>;
+      if (m['revoked_at'] != null) continue;
+      final exp = DateTime.tryParse(m['expires_at'] as String? ?? '');
+      if (exp != null && exp.isBefore(now)) continue;
+      final code = m['code'] as String?;
+      if (code != null && code.trim().isNotEmpty) return code.trim();
     }
     return null;
   }
@@ -1119,12 +1213,12 @@ class ParamedicoIncidentsRepository {
     return code == null || code.isEmpty ? null : code;
   }
 
-Future<String> setCurrentAmbulanceUnitCode(String rawCode) async {
-  final code = rawCode.trim().toUpperCase();
-  if (code.isEmpty) throw Exception('Escribe el código de tu unidad.');
-  await _c.rpc('paramedico_set_ambulance_unit', params: {'p_code': code});
-  return code;
-}
+  Future<String> setCurrentAmbulanceUnitCode(String rawCode) async {
+    final code = rawCode.trim().toUpperCase();
+    if (code.isEmpty) throw Exception('Escribe el código de tu unidad.');
+    await _c.rpc('paramedico_set_ambulance_unit', params: {'p_code': code});
+    return code;
+  }
 
   Future<List<ParamedicoPatientRow>> listRecentPatientsForCurrentUser({
     int limit = 40,

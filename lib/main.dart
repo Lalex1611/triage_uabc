@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
+import 'package:sistema_triage/features/paramedico/data/offline/paramedico_offline_runtime.dart';
 import 'package:flutter/services.dart';
 import 'package:sistema_triage/core/config/load_supabase_runtime.dart';
 import 'package:sistema_triage/core/config/supabase_env.dart';
@@ -8,6 +10,7 @@ import 'package:sistema_triage/core/session/auth_gate.dart';
 import 'package:sistema_triage/core/theme/app_theme.dart';
 import 'package:sistema_triage/core/theme/triage_role_theme.dart';
 import 'package:sistema_triage/features/auth/domain/user_role.dart';
+import 'package:sistema_triage/features/medico/data/offline/medico_offline_runtime.dart';
 import 'package:sistema_triage/shared/widgets/offline_connection_banner.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -29,6 +32,10 @@ Future<void> main() async {
   await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
 
   runApp(const MyApp());
+  if (SupabaseEnv.isConfigured) {
+    unawaited(ParamedicoOfflineRuntime.instance.start());
+    unawaited(MedicoOfflineRuntime.instance.start());
+  }
 }
 
 class MyApp extends StatelessWidget {

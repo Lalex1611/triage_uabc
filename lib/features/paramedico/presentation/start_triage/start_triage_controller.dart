@@ -25,6 +25,7 @@ class StartTriageController extends ChangeNotifier {
 
   final String? incidentId;
   bool get isStandalone => incidentId == null;
+  bool get localCapture => _repo.usesLocalCaptures;
   final ParamedicoIncidentsRepository _repo;
   final ImagePicker _picker;
 
@@ -49,6 +50,11 @@ class StartTriageController extends ChangeNotifier {
       incidentId != null ? '/paramedico/incident/$incidentId' : null;
 
   Future<void> loadPatientNumber() async {
+    if (localCapture) {
+      loadingPatientNumber = false;
+      notifyListeners();
+      return;
+    }
     if (isStandalone) {
       patientNumber = 1;
       loadingPatientNumber = false;
@@ -193,14 +199,20 @@ class StartTriageController extends ChangeNotifier {
         throw Exception('El incidente no tiene GPS capturado.');
       }
 
-      final count = await _repo.countPatientsForIncident(incidentId!);
-      final displayName = await PatientDisplayNameFormatter.resolveDisplayName(
-        customName: patientName.trim().isEmpty ? null : patientName.trim(),
-        patientNumber: count + 1,
-        atLocal: DateTime.now(),
-        lat: lat,
-        lng: lng,
-      );
+      final count = localCapture
+          ? 0
+          : await _repo.countPatientsForIncident(incidentId!);
+      final displayName = localCapture
+          ? patientName.trim()
+          : await PatientDisplayNameFormatter.resolveDisplayName(
+              customName: patientName.trim().isEmpty
+                  ? null
+                  : patientName.trim(),
+              patientNumber: count + 1,
+              atLocal: DateTime.now(),
+              lat: lat,
+              lng: lng,
+            );
       final demographics = <String, dynamic>{
         'photo_local_paths': List<String>.from(photos),
         'registered_from_start': true,
@@ -225,7 +237,7 @@ class StartTriageController extends ChangeNotifier {
       if (context.mounted) {
         showAppSnackBar(
           context,
-          'Paciente registrado.',
+          localCapture ? 'Guardado en este teléfono' : 'Paciente registrado.',
           duration: const Duration(seconds: 2),
         );
       }

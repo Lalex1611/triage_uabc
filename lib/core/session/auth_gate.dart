@@ -12,6 +12,33 @@ class AuthGate extends ChangeNotifier {
   static final AuthGate instance = AuthGate._();
 
   AppUserRole? role;
+  String? _verifiedAccount;
+  int sessionGeneration = 0;
+  bool lastVerificationSucceeded = false;
+  String? get _verifiedSessionAccount {
+    if (!SupabaseEnv.isConfigured) return null;
+    final session = Supabase.instance.client.auth.currentSession;
+    return session != null &&
+            !session.isExpired &&
+            session.user.id == _verifiedAccount
+        ? _verifiedAccount
+        : null;
+  }
+
+  String? get offlineAccount =>
+      role == AppUserRole.paramedico ? _verifiedSessionAccount : null;
+
+  ({String account, String hospitalId})? get medicoOfflineSession {
+    final account = _verifiedSessionAccount;
+    final hospital = _hospitalId;
+    return role == AppUserRole.medico &&
+            account != null &&
+            hospital != null &&
+            hospital.isNotEmpty
+        ? (account: account, hospitalId: hospital)
+        : null;
+  }
+
   String? _hospitalId;
   String? _fullName;
   String? get hospitalId => _hospitalId;
@@ -38,7 +65,12 @@ class AuthGate extends ChangeNotifier {
       return;
     }
 
-    _sub ??= Supabase.instance.client.auth.onAuthStateChange.listen((_) {
+    _sub ??= Supabase.instance.client.auth.onAuthStateChange.listen((event) {
+      if (event.event == AuthChangeEvent.signedIn ||
+          event.event == AuthChangeEvent.tokenRefreshed ||
+          event.event == AuthChangeEvent.signedOut) {
+        sessionGeneration++;
+      }
       syncFromSession();
     });
 
@@ -46,6 +78,7 @@ class AuthGate extends ChangeNotifier {
   }
 
   Future<void> syncFromSession() async {
+    lastVerificationSucceeded = false;
     if (!SupabaseEnv.isConfigured) {
       role = null;
       _hospitalId = null;
@@ -56,6 +89,8 @@ class AuthGate extends ChangeNotifier {
 
     final session = Supabase.instance.client.auth.currentSession;
     if (session == null) {
+      _verifiedAccount = null;
+      sessionGeneration++;
       role = null;
       _hospitalId = null;
       _fullName = null;
@@ -65,14 +100,24 @@ class AuthGate extends ChangeNotifier {
 
     _consultaExternaStaffBlockPending = false;
 
+    final requestGeneration = sessionGeneration;
     try {
       final row = await Supabase.instance.client
           .from('profiles')
-          .select('role, hospital_id, full_name')
+          .select('role, hospital_id, full_name, is_active')
           .eq('id', session.user.id)
-          .maybeSingle();
+          .maybeSingle()
+          .timeout(const Duration(seconds: 8));
 
-      final parsed = AppUserRole.fromDb(row?['role'] as String?);
+      if (Supabase.instance.client.auth.currentSession?.user.id !=
+              session.user.id ||
+          sessionGeneration != requestGeneration) {
+        return;
+      }
+
+      final parsed = row?['is_active'] == true
+          ? AppUserRole.fromDb(row?['role'] as String?)
+          : null;
       if (parsed == AppUserRole.consultaExterna) {
         _consultaExternaStaffBlockPending = true;
         await Supabase.instance.client.auth.signOut();
@@ -83,14 +128,38 @@ class AuthGate extends ChangeNotifier {
         return;
       }
 
+      final hospital = row?['hospital_id']?.toString();
+      final verified =
+          parsed == AppUserRole.paramedico || parsed == AppUserRole.medico
+          ? session.user.id
+          : null;
+      if (_verifiedAccount != verified ||
+          role != parsed ||
+          _hospitalId != hospital) {
+        sessionGeneration++;
+      }
       role = parsed;
-      final hid = row?['hospital_id'];
-      _hospitalId = hid?.toString();
+      _verifiedAccount = verified;
+      lastVerificationSucceeded = true;
+      _hospitalId = hospital;
       final fn = row?['full_name'] as String?;
       _fullName = (fn != null && fn.trim().isNotEmpty)
           ? fn.trim()
           : session.user.email;
     } catch (_) {
+      if (Supabase.instance.client.auth.currentSession?.user.id !=
+              session.user.id ||
+          sessionGeneration != requestGeneration) {
+        return;
+      }
+      // Never restore offline authorization from disk. A verified, unexpired
+      // session in this process can keep capturing during a network outage.
+      if (offlineAccount == session.user.id ||
+          medicoOfflineSession?.account == session.user.id) {
+        notifyListeners();
+        return;
+      }
+      _verifiedAccount = null;
       role = null;
       _hospitalId = null;
       _fullName = null;
@@ -101,11 +170,13 @@ class AuthGate extends ChangeNotifier {
   Future<void> signOut() async {
     if (!SupabaseEnv.isConfigured) return;
     _consultaExternaStaffBlockPending = false;
-    await Supabase.instance.client.auth.signOut();
+    _verifiedAccount = null;
+    sessionGeneration++;
     role = null;
     _hospitalId = null;
     _fullName = null;
     notifyListeners();
+    await Supabase.instance.client.auth.signOut(scope: SignOutScope.local);
   }
 
   @override

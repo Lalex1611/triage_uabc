@@ -710,6 +710,19 @@ class _ParamedicoProfileSheetState extends State<_ParamedicoProfileSheet> {
                       ),
                       const SizedBox(height: TriageSpacing.lg),
                       _ProfileMenuRow(
+                        icon: Icons.cloud_sync_outlined,
+                        title: 'Capturas en este teléfono',
+                        subtitle: 'Pendientes, confirmadas y conexión',
+                        onTap: () {
+                          final parentContext = widget.parentContext;
+                          Navigator.of(context).pop();
+                          if (parentContext.mounted) {
+                            parentContext.push<void>('/sin-conexion');
+                          }
+                        },
+                      ),
+                      const SizedBox(height: TriageSpacing.lg),
+                      _ProfileMenuRow(
                         icon: Icons.verified_user_outlined,
                         title: 'Privacidad y permisos',
                         onTap: () =>
@@ -1289,11 +1302,13 @@ class _ProfileMenuRow extends StatelessWidget {
     required this.icon,
     required this.title,
     required this.onTap,
+    this.subtitle,
     this.badgeCount = 0,
   });
 
   final IconData icon;
   final String title;
+  final String? subtitle;
   final VoidCallback onTap;
   final int badgeCount;
 
@@ -1309,12 +1324,25 @@ class _ProfileMenuRow extends StatelessWidget {
             Icon(icon, color: TriageColors.textSecondary, size: 20),
             const SizedBox(width: TriageSpacing.md),
             Expanded(
-              child: Text(
-                title,
-                style: TriageTextStyles.bodyMedium.copyWith(
-                  color: TriageColors.textPrimary,
-                  fontWeight: FontWeight.w500,
-                ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TriageTextStyles.bodyMedium.copyWith(
+                      color: TriageColors.textPrimary,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  if (subtitle case final text?)
+                    Text(
+                      text,
+                      style: TriageTextStyles.bodySmall.copyWith(
+                        color: TriageColors.textSecondary,
+                      ),
+                    ),
+                ],
               ),
             ),
             if (badgeCount > 0) ...[

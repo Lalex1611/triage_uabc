@@ -1,20 +1,14 @@
 import 'dart:async';
 import 'dart:io';
+import 'package:sistema_triage/features/paramedico/data/offline/paramedico_offline_runtime.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:go_router/go_router.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:sistema_triage/core/constants/triage_icons.dart';
 import 'package:sistema_triage/core/layout/app_responsive.dart';
-import 'package:sistema_triage/core/theme/triage_role_theme.dart';
-import 'package:sistema_triage/core/theme/triage_tokens.dart';
 import 'package:sistema_triage/features/paramedico/domain/constants/emergency_catalog.dart';
 import 'package:sistema_triage/features/paramedico/presentation/create_incident/create_incident_controller.dart';
-import 'package:sistema_triage/shared/widgets/triage_icon_widget.dart';
-import 'package:sistema_triage/shared/widgets/triage_map_markers_widget.dart';
-import 'package:sistema_triage/shared/widgets/triage_map_tiles_widget.dart';
-import 'package:sistema_triage/shared/widgets/triage_tap_card_widget.dart';
 import 'package:sistema_triage/shared/widgets/triage_ui.dart';
 
 /// Abre la hoja "Nuevo incidente" sobre la pantalla actual
@@ -30,7 +24,11 @@ Future<void> showCreateIncidentSheet(BuildContext context) async {
     builder: (_) => const _CreateIncidentBody(),
   );
   if (createdId != null && context.mounted) {
-    context.go('/paramedico/mapa?focus=$createdId');
+    if (ParamedicoOfflineRuntime.instance.supported) {
+      context.push('/paramedico/captura/$createdId');
+    } else {
+      context.go('/paramedico/mapa?focus=$createdId');
+    }
   }
 }
 
@@ -66,7 +64,9 @@ class _CreateIncidentBodyState extends State<_CreateIncidentBody> {
     _controller.addListener(_onController);
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await _controller.refreshGpsFromDevice(context, silent: true);
-      if (mounted && _controller.locationConfirmed) await _controller.refreshPreviewTitle();
+      if (mounted && _controller.locationConfirmed) {
+        await _controller.refreshPreviewTitle();
+      }
     });
   }
 
@@ -214,7 +214,8 @@ class _CreateIncidentBodyState extends State<_CreateIncidentBody> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       spacing: TriageSpacing.md,
       children: [
-        _NumberedHeading( // sin const
+        _NumberedHeading(
+          // sin const
           number: 2,
           title: '¿Dónde ocurrió?',
           subtitle: confirmed
@@ -360,12 +361,16 @@ class _CreateIncidentBodyState extends State<_CreateIncidentBody> {
                 crossAxisSpacing: TriageSpacing.sm,
                 children: [
                   TriagePhoto(
-                    onTap: c.submitting ? null : () => c.showImageSourceDialog(context),
+                    onTap: c.submitting
+                        ? null
+                        : () => c.showImageSourceDialog(context),
                   ),
                   for (var i = 0; i < c.photos.length; i++)
                     TriagePhoto(
                       image: FileImage(File(c.photos[i])),
-                      onTap: c.submitting ? null : () => unawaited(_openPhotoMenu(i)),
+                      onTap: c.submitting
+                          ? null
+                          : () => unawaited(_openPhotoMenu(i)),
                     ),
                 ],
               ),
