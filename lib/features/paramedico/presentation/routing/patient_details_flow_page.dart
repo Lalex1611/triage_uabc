@@ -2,27 +2,20 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:sistema_triage/core/constants/triage_icons.dart';
-import 'package:sistema_triage/core/theme/triage_tokens.dart';
+import 'package:flutter/services.dart';
 import 'package:sistema_triage/features/paramedico/data/repositories/paramedico_incidents_repository.dart';
+import 'package:sistema_triage/features/paramedico/domain/constants/patient_blood_type.dart';
+import 'package:sistema_triage/features/paramedico/domain/constants/patient_gender.dart';
+import 'package:sistema_triage/features/paramedico/domain/constants/patient_injury_type.dart';
 import 'package:sistema_triage/features/paramedico/domain/constants/patient_status.dart';
-import 'package:sistema_triage/features/paramedico/domain/services/incident_for_cards_mapper.dart';
-import 'package:sistema_triage/features/paramedico/presentation/patient_registration/widgets/patient_map_widget.dart';
-import 'package:sistema_triage/shared/domain/patient_lifecycle_status.dart';
-import 'package:sistema_triage/shared/domain/triage_level.dart';
-import 'package:sistema_triage/shared/widgets/triage_ui.dart';
-import 'package:sistema_triage/features/paramedico/domain/entities/patient_details/details_header_data.dart';
-import 'package:sistema_triage/features/paramedico/domain/entities/patient_details/details_photo_data.dart';
-import 'package:sistema_triage/features/paramedico/domain/entities/patient_details/details_status_data.dart';
-import 'package:sistema_triage/features/paramedico/domain/entities/patient_registration/patient_description_data.dart';
+import 'package:sistema_triage/features/paramedico/domain/constants/triage_catalog.dart';
 import 'package:sistema_triage/features/paramedico/domain/entities/patient_registration/patient_map_data.dart';
-import 'package:sistema_triage/features/paramedico/domain/entities/patient_registration/patient_personal_data.dart';
-import 'package:sistema_triage/features/paramedico/domain/entities/patient_registration/patient_triage_classification_data.dart';
-import 'package:sistema_triage/features/paramedico/domain/services/incident_presentation_formatters.dart';
-import 'package:sistema_triage/features/paramedico/domain/services/paramedico_catalog_mappers.dart';
+import 'package:sistema_triage/features/paramedico/domain/services/incident_for_cards_mapper.dart';
 import 'package:sistema_triage/features/paramedico/domain/services/patient_demographics_mapper.dart';
 import 'package:sistema_triage/features/paramedico/presentation/patient_details/patient_details_controller.dart';
 import 'package:sistema_triage/features/paramedico/presentation/patient_details/patient_details_page.dart';
+import 'package:sistema_triage/features/paramedico/presentation/patient_registration/widgets/patient_map_widget.dart';
+import 'package:sistema_triage/shared/widgets/triage_ui.dart';
 
 /// Contenedor del flujo de detalles del paciente para paramédicos
 class PatientDetailsFlowPage extends StatefulWidget {
@@ -37,10 +30,23 @@ class PatientDetailsFlowPage extends StatefulWidget {
 class _PatientDetailsFlowPageState extends State<PatientDetailsFlowPage> {
   late final PatientDetailsController _controller;
 
+  late final TextEditingController _nameCtrl;
+  late final TextEditingController _dayCtrl;
+  late final TextEditingController _monthCtrl;
+  late final TextEditingController _yearCtrl;
+  late final TextEditingController _contactCtrl;
+  late final TextEditingController _descCtrl;
+
   @override
   void initState() {
     super.initState();
     _controller = PatientDetailsController(patientId: widget.patientId);
+    _nameCtrl = TextEditingController();
+    _dayCtrl = TextEditingController();
+    _monthCtrl = TextEditingController();
+    _yearCtrl = TextEditingController();
+    _contactCtrl = TextEditingController();
+    _descCtrl = TextEditingController();
     _controller.addListener(_onController);
     unawaited(_controller.load());
   }
@@ -48,12 +54,41 @@ class _PatientDetailsFlowPageState extends State<PatientDetailsFlowPage> {
   @override
   void dispose() {
     _controller.removeListener(_onController);
+    _nameCtrl.dispose();
+    _dayCtrl.dispose();
+    _monthCtrl.dispose();
+    _yearCtrl.dispose();
+    _contactCtrl.dispose();
+    _descCtrl.dispose();
     _controller.dispose();
     super.dispose();
   }
 
   void _onController() {
-    if (mounted) setState(() {});
+    if (!mounted) return;
+    _syncEditControllers();
+    setState(() {});
+  }
+
+  void _syncEditControllers() {
+    final c = _controller;
+    if (!c.isEditing) return;
+
+    void sync(TextEditingController ctrl, String value) {
+      if (ctrl.text != value) {
+        ctrl.value = TextEditingValue(
+          text: value,
+          selection: TextSelection.collapsed(offset: value.length),
+        );
+      }
+    }
+
+    sync(_nameCtrl, c.editName);
+    sync(_dayCtrl, c.editBirthDay?.toString() ?? '');
+    sync(_monthCtrl, c.editBirthMonth?.toString() ?? '');
+    sync(_yearCtrl, c.editBirthYear?.toString() ?? '');
+    sync(_contactCtrl, c.editContact ?? '');
+    sync(_descCtrl, c.editDescription);
   }
 
   @override
@@ -69,170 +104,11 @@ class _PatientDetailsFlowPageState extends State<PatientDetailsFlowPage> {
       );
     }
 
-    // Lectura: diseño nuevo (B13). Edición: pantalla anterior, sin cambios
-    if (!c.isEditing) return _buildView(context, c);
-
-    final d = c.detail!;
-    final demo = d.demographics;
-    final tri = c.isEditing
-        ? c.editTriage
-        : ParamedicoCatalogMappers.triageFromDb(d.triageColor);
-    final st = ParamedicoCatalogMappers.statusFromDb(d.status);
-    final injurySet = c.isEditing
-        ? c.editInjuries
-        : PatientDemographicsMapper.injuriesFromDemo(demo);
-    final desc = c.isEditing
-        ? c.editDescription
-        : (demo['description'] as String? ?? '');
-    final gender = c.isEditing
-        ? c.editGender
-        : PatientDemographicsMapper.genderFromDemo(demo['gender'] as String?);
-    final blood = c.isEditing
-        ? c.editBlood
-        : PatientDemographicsMapper.bloodFromDemo(
-      demo['blood_type'] as String?,
-    );
-    final photoPaths = c.photoPathsForUi(d);
-    final mapCoords = c.patientMapCoords(d);
-    final birthDay = c.isEditing
-        ? c.editBirthDay
-        : (demo['birth_day'] as num?)?.toInt();
-    final birthMonth = c.isEditing
-        ? c.editBirthMonth
-        : (demo['birth_month'] as num?)?.toInt();
-    final birthYear = c.isEditing
-        ? c.editBirthYear
-        : (demo['birth_year'] as num?)?.toInt();
-    final contact = c.isEditing
-        ? c.editContact
-        : (demo['emergency_contact'] as String?);
-    final displayName = c.isEditing ? c.editName : d.displayName;
-    final statusMenu = c.statusMenuEntries(d.status);
-    final canOpenStatusMenu =
-        !c.isEditing && statusMenu != null && !c.wizardBusy;
-    final formReadOnly = !c.isEditing;
-
-    final extra = <Widget>[
-      if (d.regulationFolio != null && d.regulationFolio!.trim().isNotEmpty)
-        PatientDetailsPage.infoSection(
-          'Folio de regulación',
-          d.regulationFolio!.trim(),
-        ),
-      if (c.assignedHospital?.name != null &&
-          c.assignedHospital!.name.isNotEmpty)
-        PatientDetailsPage.infoSection(
-          'Hospital de traslado',
-          c.assignedHospital!.name,
-        ),
-    ];
-
-    Widget? trailing;
-    if (c.showExportRoute(d)) {
-      trailing = PatientDetailsPage.exportRouteButton(
-        onPressed: () => unawaited(c.exportRoute(context)),
-      );
-    }
-
-    return PatientDetailsPage(
-      shellMode: mode,
-      appBar: PatientDetailsPage.readyAppBar(
-        triageCategory: tri,
-        onBackTap: () => c.onBack(context),
-        onClosePatientTap: () => unawaited(c.confirmClosePatient(context)),
-      ),
-      stickyActionBar: c.isEditing
-          ? PatientDetailsPage.readyBottomBar(
-        savingEdit: c.savingEdit,
-        onCancel: c.cancelEdit,
-        onConfirm: () => unawaited(c.saveEdit(context)),
-      )
-          : null,
-      bottomPadding: c.isEditing ? 120 : (trailing == null ? 24 : 0),
-      bodyChildren: PatientDetailsPage.readyBody(
-        headerData: DetailsHeaderData(
-          patientId: c.patientIdLabel(d),
-          patientName: displayName,
-          gpsCoordinates: c.gpsLabel(d),
-          triageCategory: tri,
-          isEditing: c.isEditing,
-          showEditButton: !c.isEditing,
-          onStartEditTap: c.startEdit,
-          onNameChanged: c.setEditName,
-          onGenerateQrTap: () => unawaited(c.onGenerateQrTap(context)),
-          onShowMapTap: () {
-            if (c.isEditing) {
-              unawaited(c.openMapPreview(context));
-            } else {
-              c.openInteractiveMap(context);
-            }
-          },
-          onEditMapTap: () => unawaited(c.openEditLocation(context)),
-        ),
-        statusData: DetailsStatusData(
-          creatorName: c.creatorName ?? '—',
-          timeElapsed: IncidentPresentationFormatters.relativeCreated(
-            d.createdAt,
-          ),
-          currentStatus: st,
-          canEdit: canOpenStatusMenu,
-          statusMenuEntries: statusMenu,
-          onStatusChanged: (s) => c.onStatusMenuSelection(context, s),
-        ),
-        photoData: DetailsPhotoData(
-          photos: photoPaths,
-          isReadOnly: formReadOnly,
-          onAddPhotoTap: () => c.showEditImageSourceDialog(context),
-          onRemovePhotoTap: c.removeEditPhotoAt,
-        ),
-        triageData: PatientTriageClassificationData(
-          selectedCategory: tri,
-          onCategorySelected: formReadOnly ? (_) {} : c.setEditTriage,
-          onStartTriageTap: null,
-          sectionTitle: 'Seleccione la clasificación START',
-          dimUnselectedColors: formReadOnly,
-        ),
-        mapData: PatientMapData(
-          latitude: mapCoords.$1,
-          longitude: mapCoords.$2,
-          sectionTitle: 'Ajuste la ubicación',
-          onOpenAppMapTap: () => unawaited(c.openMapFromSection(context)),
-          onOpenGoogleMapsTap: () =>
-              unawaited(c.openGoogleMapsForPatient(context)),
-          onTriangulateTap: formReadOnly
-              ? null
-              : () => unawaited(c.triangulatePatientLocation(context)),
-          showTriangulationButton: !formReadOnly,
-        ),
-        personalData: PatientPersonalData(
-          birthDay: birthDay,
-          birthMonth: birthMonth,
-          birthYear: birthYear,
-          gender: gender,
-          bloodType: blood,
-          contactNumber: contact,
-          isReadOnly: formReadOnly,
-          onDayChanged: (v) => c.setEditBirthDay(int.tryParse(v)),
-          onMonthChanged: (v) => c.setEditBirthMonth(int.tryParse(v)),
-          onYearChanged: (v) => c.setEditBirthYear(int.tryParse(v)),
-          onGenderChanged: c.setEditGender,
-          onBloodTypeChanged: c.setEditBlood,
-          onContactNumberChanged: c.setEditContact,
-        ),
-        descriptionData: PatientDescriptionData(
-          selectedInjuries: injurySet,
-          descriptionText: desc,
-          isReadOnly: formReadOnly,
-          onInjuryToggled: formReadOnly ? (_) {} : c.toggleEditInjury,
-          onDescriptionChanged: c.setEditDescription,
-        ),
-        extraSections: extra,
-        trailing: trailing,
-      ),
-    );
+    return _buildView(context, c);
   }
 
   // ---------------------------------------------------------------------------
-  // Vista de lectura (B13)
+  // Vista unificada (lectura y edición en línea con diseño B13)
   // ---------------------------------------------------------------------------
 
   static const int _photoColumns = 3;
@@ -240,7 +116,12 @@ class _PatientDetailsFlowPageState extends State<PatientDetailsFlowPage> {
   Widget _buildView(BuildContext context, PatientDetailsController c) {
     final d = c.detail!;
     final demo = d.demographics;
-    final level = TriageLevel.fromDb(d.triageColor) ?? TriageLevel.yellow;
+    final editing = c.isEditing;
+
+    final baseLevel = TriageLevel.fromDb(d.triageColor) ?? TriageLevel.yellow;
+    final level = editing
+        ? (TriageLevel.fromDb(c.editTriage.sqlValue) ?? baseLevel)
+        : baseLevel;
     final lifecycle = PatientLifecycleStatus.fromDb(d.status);
     final statusOptions = c.wizardBusy
         ? const <(String, PatientStatus)>[]
@@ -265,192 +146,550 @@ class _PatientDetailsFlowPageState extends State<PatientDetailsFlowPage> {
     final hospitalName = c.assignedHospital?.name ?? '';
     final incidentFolio = _incidentFolio(c);
 
+    final shownName = editing
+        ? (c.editName.trim().isEmpty ? d.displayName : c.editName.trim())
+        : d.displayName;
+
     final primaryLabel = switch (d.status) {
       'en_espera' => 'Enviar a hospital',
       'trasladando' => 'Reasignar hospital',
       _ => null,
     };
 
-    return Scaffold(
-      // Figma usa un fondo gris claro; cámbialo por el token de fondo cuando lo confirmes
-      backgroundColor: TriageColors.surface,
-      resizeToAvoidBottomInset: false,
-      body: Column(
-        children: [
-          TriageDetailHeader(
-            title: c.patientIdLabel(d),
-            subtitle: incidentFolio == null
-                ? d.displayName
-                : '${d.displayName} · $incidentFolio',
-            onBack: () => c.onBack(context),
-            onMore: () => unawaited(_openMenu(c, d)),
-          ),
-          Expanded(
-            child: SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.all(TriageSpacing.lg),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      spacing: TriageSpacing.md,
-                      children: [
-                        TriagePatientBanner(
-                          level: level,
-                          tag: '${level.label} · ${level.startName}'
-                              .toUpperCase(),
-                          title: d.displayName,
-                          onEdit: c.startEdit,
-                        ),
-                        TriageSectionCard(
-                          title: 'Estado actual',
-                          trailing: lifecycle == null
-                              ? null
-                              : TriageStatusBadge.patient(lifecycle),
-                          child: statusOptions.isEmpty
-                              ? Text(
-                            c.wizardBusy
-                                ? 'Actualizando…'
-                                : 'Sin cambios disponibles en este estado.',
-                            style: TriageTextStyles.bodySmall.copyWith(
-                              color: TriageColors.textSecondary,
-                            ),
-                          )
-                              : _StatusPicker(
-                            onTap: () => unawaited(
-                              _openStatusPicker(c, statusOptions),
-                            ),
+    return PopScope(
+      canPop: !editing,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop && editing && !c.savingEdit) {
+          c.cancelEdit();
+        }
+      },
+      child: Scaffold(
+        backgroundColor: TriageColors.surface,
+        resizeToAvoidBottomInset: editing,
+        body: Column(
+          children: [
+            TriageDetailHeader(
+              title: c.patientIdLabel(d),
+              subtitle: incidentFolio == null
+                  ? shownName
+                  : '$shownName · $incidentFolio',
+              onBack: () => c.onBack(context),
+              onMore: () {
+                if (!editing) {
+                  unawaited(_openMenu(c, d));
+                }
+              },
+            ),
+            Expanded(
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.all(TriageSpacing.lg),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        spacing: TriageSpacing.md,
+                        children: [
+                          TriagePatientBanner(
+                            level: level,
+                            tag: '${level.label} · ${level.startName}'
+                                .toUpperCase(),
+                            title: shownName,
+                            onEdit: editing ? null : c.startEdit,
                           ),
-                        ),
-                        TriageSectionCard(
-                          title: 'Fotografías',
-                          trailing: TriageSectionAction(
-                            label: 'Añadir',
-                            onTap: () => _addPhoto(c),
-                          ),
-                          child: GridView.count(
-                            crossAxisCount: _photoColumns,
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
-                            mainAxisSpacing: TriageSpacing.sm,
-                            crossAxisSpacing: TriageSpacing.sm,
-                            children: [
-                              for (final path in photos)
-                                TriagePhoto(image: FileImage(File(path))),
-                              if (photos.isEmpty)
-                                TriagePhoto(onTap: () => _addPhoto(c)),
-                            ],
-                          ),
-                        ),
-                        TriageSectionCard(
-                          title: 'Datos del paciente',
-                          trailing: TriageSectionAction(
-                            label: 'Editar',
-                            icon: TriageIcons.pencil,
-                            onTap: c.startEdit,
-                          ),
-                          child: Column(
-                            children: _divided([
-                              TriageDataRow(label: 'Edad', value: age ?? '—'),
-                              TriageDataRow(
-                                label: 'Sexo',
-                                value: gender?.label ?? '—',
-                              ),
-                              TriageDataRow(
-                                label: 'Tipo de sangre',
-                                value: blood?.label ?? '—',
-                              ),
-                              if (contact.isNotEmpty)
-                                TriageDataRow(
-                                  label: 'Contacto de emergencia',
-                                  value: contact,
-                                ),
-                            ]),
-                          ),
-                        ),
-                        TriageSectionCard(
-                          title: 'Estado y lesiones',
-                          trailing: TriageSectionAction(
-                            label: 'Editar',
-                            icon: TriageIcons.pencil,
-                            onTap: c.startEdit,
-                          ),
-                          child: Text(
-                            description.isEmpty
-                                ? 'Sin descripción.'
-                                : description,
-                            style: TriageTextStyles.bodyMedium.copyWith(
-                              color: description.isEmpty
-                                  ? TriageColors.textSecondary
-                                  : TriageColors.textPrimary,
-                            ),
-                          ),
-                        ),
-                        if (folio.isNotEmpty || hospitalName.isNotEmpty)
+                          if (editing) _buildIdentityAndTriageEditCard(c),
                           TriageSectionCard(
-                            title: 'Traslado',
-                            child: Column(
-                              children: _divided([
-                                if (hospitalName.isNotEmpty)
-                                  TriageDataRow(
-                                    label: 'Hospital',
-                                    value: hospitalName,
+                            title: 'Estado actual',
+                            trailing: lifecycle == null
+                                ? null
+                                : TriageStatusBadge.patient(lifecycle),
+                            child: editing
+                                ? Text(
+                                    'Guarda o cancela la edición para cambiar el estado de traslado.',
+                                    style: TriageTextStyles.bodySmall.copyWith(
+                                      color: TriageColors.textSecondary,
+                                    ),
+                                  )
+                                : statusOptions.isEmpty
+                                ? Text(
+                                    c.wizardBusy
+                                        ? 'Actualizando…'
+                                        : 'Sin cambios disponibles en este estado.',
+                                    style: TriageTextStyles.bodySmall.copyWith(
+                                      color: TriageColors.textSecondary,
+                                    ),
+                                  )
+                                : _StatusPicker(
+                                    onTap: () => unawaited(
+                                      _openStatusPicker(c, statusOptions),
+                                    ),
                                   ),
-                                if (folio.isNotEmpty)
-                                  TriageDataRow(
-                                    label: 'Folio de regulación',
-                                    value: folio,
+                          ),
+                          TriageSectionCard(
+                            title: 'Fotografías',
+                            trailing: TriageSectionAction(
+                              label: 'Añadir',
+                              onTap: () => editing
+                                  ? c.showEditImageSourceDialog(context)
+                                  : _addPhoto(c),
+                            ),
+                            child: GridView.count(
+                              crossAxisCount: _photoColumns,
+                              shrinkWrap: true,
+                              physics: const NeverScrollableScrollPhysics(),
+                              mainAxisSpacing: TriageSpacing.sm,
+                              crossAxisSpacing: TriageSpacing.sm,
+                              children: [
+                                for (var i = 0; i < photos.length; i++)
+                                  editing
+                                      ? _EditablePhotoTile(
+                                          path: photos[i],
+                                          onRemove: () =>
+                                              c.removeEditPhotoAt(i),
+                                        )
+                                      : TriagePhoto(
+                                          image: FileImage(File(photos[i])),
+                                        ),
+                                if (editing || photos.isEmpty)
+                                  TriagePhoto(
+                                    onTap: () => editing
+                                        ? c.showEditImageSourceDialog(context)
+                                        : _addPhoto(c),
                                   ),
-                              ]),
+                              ],
                             ),
                           ),
-                      ],
+                          TriageSectionCard(
+                            title: 'Datos del paciente',
+                            trailing: editing
+                                ? null
+                                : TriageSectionAction(
+                                    label: 'Editar',
+                                    icon: TriageIcons.pencil,
+                                    onTap: c.startEdit,
+                                  ),
+                            child: editing
+                                ? _buildPersonalDataEditForm(c)
+                                : Column(
+                                    children: _divided([
+                                      TriageDataRow(
+                                        label: 'Edad',
+                                        value: age ?? '—',
+                                      ),
+                                      TriageDataRow(
+                                        label: 'Sexo',
+                                        value: gender?.label ?? '—',
+                                      ),
+                                      TriageDataRow(
+                                        label: 'Tipo de sangre',
+                                        value: blood?.label ?? '—',
+                                      ),
+                                      if (contact.isNotEmpty)
+                                        TriageDataRow(
+                                          label: 'Contacto de emergencia',
+                                          value: contact,
+                                        ),
+                                    ]),
+                                  ),
+                          ),
+                          TriageSectionCard(
+                            title: 'Estado y lesiones',
+                            trailing: editing
+                                ? null
+                                : TriageSectionAction(
+                                    label: 'Editar',
+                                    icon: TriageIcons.pencil,
+                                    onTap: c.startEdit,
+                                  ),
+                            child: editing
+                                ? _buildDescriptionEditForm(c)
+                                : Text(
+                                    description.isEmpty
+                                        ? 'Sin descripción.'
+                                        : description,
+                                    style: TriageTextStyles.bodyMedium.copyWith(
+                                      color: description.isEmpty
+                                          ? TriageColors.textSecondary
+                                          : TriageColors.textPrimary,
+                                    ),
+                                  ),
+                          ),
+                          if (folio.isNotEmpty || hospitalName.isNotEmpty)
+                            TriageSectionCard(
+                              title: 'Traslado',
+                              child: Column(
+                                children: _divided([
+                                  if (hospitalName.isNotEmpty)
+                                    TriageDataRow(
+                                      label: 'Hospital',
+                                      value: hospitalName,
+                                    ),
+                                  if (folio.isNotEmpty)
+                                    TriageDataRow(
+                                      label: 'Folio de regulación',
+                                      value: folio,
+                                    ),
+                                ]),
+                              ),
+                            ),
+                        ],
+                      ),
                     ),
-                  ),
-                  // Mapa: se conserva el widget anterior hasta migrarlo con
-                  // TriageMapTiles y TriagePatientMarker
-                  PatientMapWidget(
-                    data: PatientMapData(
-                      latitude: coords.$1,
-                      longitude: coords.$2,
-                      sectionTitle: 'Ubicación',
-                      onOpenAppMapTap: () =>
-                          unawaited(c.openMapFromSection(context)),
-                      onOpenGoogleMapsTap: () =>
-                          unawaited(c.openGoogleMapsForPatient(context)),
-                      onTriangulateTap: null,
-                      showTriangulationButton: false,
+                    PatientMapWidget(
+                      data: PatientMapData(
+                        latitude: coords.$1,
+                        longitude: coords.$2,
+                        sectionTitle: editing
+                            ? 'Ajuste la ubicación'
+                            : 'Ubicación',
+                        onOpenAppMapTap: () =>
+                            unawaited(c.openMapFromSection(context)),
+                        onOpenGoogleMapsTap: () =>
+                            unawaited(c.openGoogleMapsForPatient(context)),
+                        onTriangulateTap: editing
+                            ? () => unawaited(
+                                c.triangulatePatientLocation(context),
+                              )
+                            : null,
+                        showTriangulationButton: editing,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: TriageSpacing.xxl),
-                ],
+                    const SizedBox(height: TriageSpacing.xxl),
+                  ],
+                ),
               ),
             ),
-          ),
-        ],
-      ),
-      bottomNavigationBar: _ActionBar(
-        primaryLabel: primaryLabel,
-        busy: c.wizardBusy,
-        onPrimary: () => unawaited(
-          c.handleStatusPicked(context, PatientStatus.trasladando),
+          ],
         ),
-        onQr: () => unawaited(c.onGenerateQrTap(context)),
+        bottomNavigationBar: editing
+            ? _EditActionBar(
+                saving: c.savingEdit,
+                onCancel: c.cancelEdit,
+                onSave: () => unawaited(c.saveEdit(context)),
+              )
+            : _ActionBar(
+                primaryLabel: primaryLabel,
+                busy: c.wizardBusy,
+                onPrimary: () => unawaited(
+                  c.handleStatusPicked(context, PatientStatus.trasladando),
+                ),
+                onQr: () => unawaited(c.onGenerateQrTap(context)),
+              ),
       ),
     );
   }
 
-  // "Añadir" foto y "Editar" entran al modo de edición anterior
+  // ---------------------------------------------------------------------------
+  // Formularios en línea dentro de las tarjetas B13
+  // ---------------------------------------------------------------------------
+
+  Widget _buildIdentityAndTriageEditCard(PatientDetailsController c) {
+    const categories = [
+      (TriageCategory.rojo, 'Rojo'),
+      (TriageCategory.amarillo, 'Amarillo'),
+      (TriageCategory.verde, 'Verde'),
+      (TriageCategory.negro, 'Negro'),
+    ];
+
+    return TriageSectionCard(
+      title: 'Identificación y clasificación START',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        spacing: TriageSpacing.md,
+        children: [
+          TextField(
+            controller: _nameCtrl,
+            onChanged: c.setEditName,
+            textCapitalization: TextCapitalization.words,
+            decoration: _inputDecoration(
+              label: 'Nombre del paciente',
+              hint: 'Ej. Juan Pérez o Desconocido #1',
+            ),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            spacing: TriageSpacing.xs,
+            children: [
+              Text(
+                'Prioridad START',
+                style: TriageTextStyles.labelSmall.copyWith(
+                  color: TriageColors.textSecondary,
+                ),
+              ),
+              Row(
+                spacing: TriageSpacing.sm,
+                children: [
+                  for (final (category, label) in categories)
+                    Expanded(
+                      child: _TriageCategoryOption(
+                        label: label,
+                        color: category.color,
+                        selected: c.editTriage == category,
+                        onTap: () => c.setEditTriage(category),
+                      ),
+                    ),
+                ],
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPersonalDataEditForm(PatientDetailsController c) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      spacing: TriageSpacing.md,
+      children: [
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          spacing: TriageSpacing.xs,
+          children: [
+            Text(
+              'Fecha de nacimiento',
+              style: TriageTextStyles.labelSmall.copyWith(
+                color: TriageColors.textSecondary,
+              ),
+            ),
+            Row(
+              spacing: TriageSpacing.sm,
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _dayCtrl,
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [
+                      FilteringTextInputFormatter.digitsOnly,
+                      LengthLimitingTextInputFormatter(2),
+                    ],
+                    onChanged: (v) => c.setEditBirthDay(int.tryParse(v)),
+                    decoration: _inputDecoration(label: 'Día', hint: 'DD'),
+                  ),
+                ),
+                Expanded(
+                  child: TextField(
+                    controller: _monthCtrl,
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [
+                      FilteringTextInputFormatter.digitsOnly,
+                      LengthLimitingTextInputFormatter(2),
+                    ],
+                    onChanged: (v) => c.setEditBirthMonth(int.tryParse(v)),
+                    decoration: _inputDecoration(label: 'Mes', hint: 'MM'),
+                  ),
+                ),
+                Expanded(
+                  flex: 2,
+                  child: TextField(
+                    controller: _yearCtrl,
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [
+                      FilteringTextInputFormatter.digitsOnly,
+                      LengthLimitingTextInputFormatter(4),
+                    ],
+                    onChanged: (v) => c.setEditBirthYear(int.tryParse(v)),
+                    decoration: _inputDecoration(label: 'Año', hint: 'AAAA'),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          spacing: TriageSpacing.xs,
+          children: [
+            Text(
+              'Sexo',
+              style: TriageTextStyles.labelSmall.copyWith(
+                color: TriageColors.textSecondary,
+              ),
+            ),
+            Wrap(
+              spacing: TriageSpacing.sm,
+              runSpacing: TriageSpacing.xs,
+              children: [
+                for (final g in PatientGender.values)
+                  ChoiceChip(
+                    label: Text(g.label),
+                    selected: c.editGender == g,
+                    selectedColor: TriageColors.paramedicAccent.withValues(
+                      alpha: 0.14,
+                    ),
+                    labelStyle: TriageTextStyles.labelLarge.copyWith(
+                      color: c.editGender == g
+                          ? TriageColors.paramedicAccent
+                          : TriageColors.textPrimary,
+                    ),
+                    side: BorderSide(
+                      color: c.editGender == g
+                          ? TriageColors.paramedicAccent
+                          : TriageColors.borderMedium,
+                    ),
+                    onSelected: (selected) =>
+                        c.setEditGender(selected ? g : null),
+                  ),
+              ],
+            ),
+          ],
+        ),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          spacing: TriageSpacing.xs,
+          children: [
+            Text(
+              'Tipo de sangre',
+              style: TriageTextStyles.labelSmall.copyWith(
+                color: TriageColors.textSecondary,
+              ),
+            ),
+            Wrap(
+              spacing: TriageSpacing.sm,
+              runSpacing: TriageSpacing.xs,
+              children: [
+                for (final b in PatientBloodType.values)
+                  ChoiceChip(
+                    label: Text(b.label),
+                    selected: c.editBlood == b,
+                    selectedColor: TriageColors.paramedicAccent.withValues(
+                      alpha: 0.14,
+                    ),
+                    labelStyle: TriageTextStyles.labelLarge.copyWith(
+                      color: c.editBlood == b
+                          ? TriageColors.paramedicAccent
+                          : TriageColors.textPrimary,
+                    ),
+                    side: BorderSide(
+                      color: c.editBlood == b
+                          ? TriageColors.paramedicAccent
+                          : TriageColors.borderMedium,
+                    ),
+                    onSelected: (selected) =>
+                        c.setEditBlood(selected ? b : null),
+                  ),
+              ],
+            ),
+          ],
+        ),
+        TextField(
+          controller: _contactCtrl,
+          keyboardType: TextInputType.phone,
+          onChanged: (v) =>
+              c.setEditContact(v.trim().isEmpty ? null : v.trim()),
+          decoration: _inputDecoration(
+            label: 'Contacto de emergencia',
+            hint: 'Teléfono de familiar o responsable',
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDescriptionEditForm(PatientDetailsController c) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      spacing: TriageSpacing.md,
+      children: [
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          spacing: TriageSpacing.xs,
+          children: [
+            Text(
+              'Lesiones observadas',
+              style: TriageTextStyles.labelSmall.copyWith(
+                color: TriageColors.textSecondary,
+              ),
+            ),
+            Wrap(
+              spacing: TriageSpacing.sm,
+              runSpacing: TriageSpacing.xs,
+              children: [
+                for (final injury in PatientInjuryType.values)
+                  FilterChip(
+                    label: Text(injury.label),
+                    selected: c.editInjuries.contains(injury),
+                    selectedColor: TriageColors.paramedicAccent.withValues(
+                      alpha: 0.14,
+                    ),
+                    checkmarkColor: TriageColors.paramedicAccent,
+                    labelStyle: TriageTextStyles.bodySmall.copyWith(
+                      color: c.editInjuries.contains(injury)
+                          ? TriageColors.paramedicAccent
+                          : TriageColors.textPrimary,
+                      fontWeight: c.editInjuries.contains(injury)
+                          ? FontWeight.w600
+                          : FontWeight.normal,
+                    ),
+                    side: BorderSide(
+                      color: c.editInjuries.contains(injury)
+                          ? TriageColors.paramedicAccent
+                          : TriageColors.borderMedium,
+                    ),
+                    onSelected: (_) => c.toggleEditInjury(injury),
+                  ),
+              ],
+            ),
+          ],
+        ),
+        TextField(
+          controller: _descCtrl,
+          minLines: 3,
+          maxLines: 5,
+          onChanged: c.setEditDescription,
+          textCapitalization: TextCapitalization.sentences,
+          decoration: _inputDecoration(
+            label: 'Observaciones clínicas',
+            hint: 'Describe signos vitales, lesiones o evolución del paciente',
+          ),
+        ),
+      ],
+    );
+  }
+
+  InputDecoration _inputDecoration({
+    required String label,
+    required String hint,
+  }) {
+    final radius = BorderRadius.circular(TriageRadii.md);
+    return InputDecoration(
+      labelText: label,
+      hintText: hint,
+      filled: true,
+      fillColor: TriageColors.sunken,
+      isDense: true,
+      contentPadding: const EdgeInsets.symmetric(
+        horizontal: TriageSpacing.md,
+        vertical: TriageSpacing.md,
+      ),
+      border: OutlineInputBorder(
+        borderRadius: radius,
+        borderSide: const BorderSide(color: TriageColors.borderSubtle),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: radius,
+        borderSide: const BorderSide(color: TriageColors.borderSubtle),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: radius,
+        borderSide: const BorderSide(
+          color: TriageColors.paramedicAccent,
+          width: 1.5,
+        ),
+      ),
+    );
+  }
+
   void _addPhoto(PatientDetailsController c) {
     c.startEdit();
     c.showEditImageSourceDialog(context);
   }
 
   Future<void> _openMenu(
-      PatientDetailsController c,
-      ParamedicoPatientDetail d,
-      ) async {
+    PatientDetailsController c,
+    ParamedicoPatientDetail d,
+  ) async {
     final action = await showTriageSheet<_PatientMenuAction>(
       context,
       title: 'Opciones del paciente',
@@ -483,9 +722,9 @@ class _PatientDetailsFlowPageState extends State<PatientDetailsFlowPage> {
   }
 
   Future<void> _openStatusPicker(
-      PatientDetailsController c,
-      List<(String, PatientStatus)> options,
-      ) async {
+    PatientDetailsController c,
+    List<(String, PatientStatus)> options,
+  ) async {
     final chosen = await showTriageSheet<PatientStatus>(
       context,
       title: 'Cambiar estado',
@@ -506,8 +745,8 @@ class _PatientDetailsFlowPageState extends State<PatientDetailsFlowPage> {
 
   /// Opciones de estado a partir del menú que ya define el controlador
   static List<(String, PatientStatus)> _statusOptions(
-      List<PopupMenuEntry<PatientStatus>>? entries,
-      ) {
+    List<PopupMenuEntry<PatientStatus>>? entries,
+  ) {
     if (entries == null) return const [];
     return [
       for (final e in entries)
@@ -555,6 +794,103 @@ class _PatientDetailsFlowPageState extends State<PatientDetailsFlowPage> {
 }
 
 enum _PatientMenuAction { exportRoute, closePatient }
+
+class _TriageCategoryOption extends StatelessWidget {
+  const _TriageCategoryOption({
+    required this.label,
+    required this.color,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final Color color;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final radius = BorderRadius.circular(TriageRadii.md);
+    return Material(
+      color: selected ? color.withValues(alpha: 0.16) : TriageColors.sunken,
+      borderRadius: radius,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: radius,
+        child: Container(
+          padding: const EdgeInsets.symmetric(
+            vertical: TriageSpacing.sm,
+            horizontal: TriageSpacing.xs,
+          ),
+          decoration: BoxDecoration(
+            borderRadius: radius,
+            border: Border.all(
+              color: selected ? color : TriageColors.borderSubtle,
+              width: selected ? 1.5 : 1,
+            ),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            spacing: 4,
+            children: [
+              Container(
+                width: 16,
+                height: 16,
+                decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+              ),
+              Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TriageTextStyles.labelSmall.copyWith(
+                  color: TriageColors.textPrimary,
+                  fontWeight: selected ? FontWeight.bold : FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _EditablePhotoTile extends StatelessWidget {
+  const _EditablePhotoTile({required this.path, required this.onRemove});
+
+  final String path;
+  final VoidCallback onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        TriagePhoto(image: FileImage(File(path))),
+        Positioned(
+          top: 4,
+          right: 4,
+          child: GestureDetector(
+            onTap: onRemove,
+            child: Container(
+              width: 24,
+              height: 24,
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.7),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.close_rounded,
+                color: Colors.white,
+                size: 16,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
 
 /// Selector "Cambiar estado" de B13: barra gris con chevron
 class _StatusPicker extends StatelessWidget {
@@ -620,10 +956,10 @@ class _SheetTile extends StatelessWidget {
       leading: icon == null
           ? null
           : TriageIcon(
-        icon,
-        size: TriageSizes.icon,
-        color: TriageColors.textSecondary,
-      ),
+              icon,
+              size: TriageSizes.icon,
+              color: TriageColors.textSecondary,
+            ),
       title: Text(
         label,
         style: TriageTextStyles.bodyMedium.copyWith(
@@ -668,24 +1004,79 @@ class _ActionBar extends StatelessWidget {
             padding: const EdgeInsets.all(TriageSpacing.lg),
             child: label == null
                 ? TriageButton(
-              label: 'Código de consulta',
-              variant: TriageButtonVariant.secondary,
-              onPressed: onQr,
-            )
+                    label: 'Código de consulta',
+                    variant: TriageButtonVariant.secondary,
+                    onPressed: onQr,
+                  )
                 : Row(
+                    spacing: TriageSpacing.md,
+                    children: [
+                      TriageIconButton(
+                        icon: TriageIcons.qr,
+                        tooltip: 'Código de consulta',
+                        onPressed: onQr,
+                        size: TriageIconButtonSize.large,
+                      ),
+                      Expanded(
+                        child: TriageButton(
+                          label: label,
+                          isLoading: busy,
+                          onPressed: onPrimary,
+                        ),
+                      ),
+                    ],
+                  ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Barra inferior en modo edición: Cancelar / Guardar dentro del mismo diseño
+class _EditActionBar extends StatelessWidget {
+  const _EditActionBar({
+    required this.saving,
+    required this.onCancel,
+    required this.onSave,
+  });
+
+  final bool saving;
+  final VoidCallback onCancel;
+  final VoidCallback onSave;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: TriageColors.surface,
+      child: DecoratedBox(
+        decoration: const BoxDecoration(
+          border: Border(
+            top: BorderSide(
+              color: TriageColors.borderSubtle,
+              width: TriageSizes.hairline,
+            ),
+          ),
+        ),
+        child: SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.all(TriageSpacing.lg),
+            child: Row(
               spacing: TriageSpacing.md,
               children: [
-                TriageIconButton(
-                  icon: TriageIcons.qr,
-                  tooltip: 'Código de consulta',
-                  onPressed: onQr,
-                  size: TriageIconButtonSize.large,
+                Expanded(
+                  child: TriageButton(
+                    label: 'Cancelar',
+                    variant: TriageButtonVariant.secondary,
+                    onPressed: saving ? null : onCancel,
+                  ),
                 ),
                 Expanded(
                   child: TriageButton(
-                    label: label,
-                    isLoading: busy,
-                    onPressed: onPrimary,
+                    label: 'Guardar',
+                    isLoading: saving,
+                    onPressed: saving ? null : onSave,
                   ),
                 ),
               ],
