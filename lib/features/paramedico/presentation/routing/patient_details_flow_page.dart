@@ -36,6 +36,7 @@ class _PatientDetailsFlowPageState extends State<PatientDetailsFlowPage> {
   late final TextEditingController _yearCtrl;
   late final TextEditingController _contactCtrl;
   late final TextEditingController _descCtrl;
+  bool _wasEditing = false;
 
   @override
   void initState() {
@@ -72,9 +73,12 @@ class _PatientDetailsFlowPageState extends State<PatientDetailsFlowPage> {
 
   void _syncEditControllers() {
     final c = _controller;
-    if (!c.isEditing) return;
+    if (!c.isEditing) {
+      _wasEditing = false;
+      return;
+    }
 
-    void sync(TextEditingController ctrl, String value) {
+    void setControllerText(TextEditingController ctrl, String value) {
       if (ctrl.text != value) {
         ctrl.value = TextEditingValue(
           text: value,
@@ -83,12 +87,38 @@ class _PatientDetailsFlowPageState extends State<PatientDetailsFlowPage> {
       }
     }
 
-    sync(_nameCtrl, c.editName);
-    sync(_dayCtrl, c.editBirthDay?.toString() ?? '');
-    sync(_monthCtrl, c.editBirthMonth?.toString() ?? '');
-    sync(_yearCtrl, c.editBirthYear?.toString() ?? '');
-    sync(_contactCtrl, c.editContact ?? '');
-    sync(_descCtrl, c.editDescription);
+    if (!_wasEditing) {
+      _wasEditing = true;
+      setControllerText(_nameCtrl, c.editName);
+      setControllerText(_dayCtrl, c.editBirthDay?.toString() ?? '');
+      setControllerText(_monthCtrl, c.editBirthMonth?.toString() ?? '');
+      setControllerText(_yearCtrl, c.editBirthYear?.toString() ?? '');
+      setControllerText(_contactCtrl, c.editContact ?? '');
+      setControllerText(_descCtrl, c.editDescription);
+      return;
+    }
+
+    if (_nameCtrl.text != c.editName) {
+      setControllerText(_nameCtrl, c.editName);
+    }
+    if (_descCtrl.text != c.editDescription) {
+      setControllerText(_descCtrl, c.editDescription);
+    }
+    if (int.tryParse(_dayCtrl.text.trim()) != c.editBirthDay) {
+      setControllerText(_dayCtrl, c.editBirthDay?.toString() ?? '');
+    }
+    if (int.tryParse(_monthCtrl.text.trim()) != c.editBirthMonth) {
+      setControllerText(_monthCtrl, c.editBirthMonth?.toString() ?? '');
+    }
+    if (int.tryParse(_yearCtrl.text.trim()) != c.editBirthYear) {
+      setControllerText(_yearCtrl, c.editBirthYear?.toString() ?? '');
+    }
+    final normalizedContact = _contactCtrl.text.trim().isEmpty
+        ? null
+        : _contactCtrl.text.trim();
+    if (normalizedContact != c.editContact) {
+      setControllerText(_contactCtrl, c.editContact ?? '');
+    }
   }
 
   @override
@@ -174,11 +204,7 @@ class _PatientDetailsFlowPageState extends State<PatientDetailsFlowPage> {
                   ? shownName
                   : '$shownName · $incidentFolio',
               onBack: () => c.onBack(context),
-              onMore: () {
-                if (!editing) {
-                  unawaited(_openMenu(c, d));
-                }
-              },
+              onMore: editing ? null : () => unawaited(_openMenu(c, d)),
             ),
             Expanded(
               child: SingleChildScrollView(
@@ -863,14 +889,19 @@ class _EditablePhotoTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final imageProvider = FileImage(File(path));
     return Stack(
       fit: StackFit.expand,
       children: [
-        TriagePhoto(image: FileImage(File(path))),
+        TriagePhoto(
+          image: imageProvider,
+          onTap: () => showTriagePhotoViewer(context, photos: [imageProvider]),
+        ),
         Positioned(
           top: 4,
           right: 4,
           child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
             onTap: onRemove,
             child: Container(
               width: 24,

@@ -47,6 +47,7 @@ class PatientDetailsController extends ChangeNotifier {
   bool wizardBusy = false;
   bool isEditing = false;
   bool savingEdit = false;
+  int _editSession = 0;
   String editName = '';
   TriageCategory editTriage = TriageCategory.amarillo;
   Set<PatientInjuryType> editInjuries = {};
@@ -140,12 +141,14 @@ class PatientDetailsController extends ChangeNotifier {
   void startEdit() {
     final d = detail;
     if (d == null) return;
+    _editSession++;
     _hydrateEditFromDetail(d);
     isEditing = true;
     notifyListeners();
   }
 
   void cancelEdit() {
+    _editSession++;
     isEditing = false;
     notifyListeners();
   }
@@ -284,6 +287,7 @@ class PatientDetailsController extends ChangeNotifier {
         locationLng: editLng,
       );
       if (!context.mounted) return;
+      _editSession++;
       isEditing = false;
       showAppSnackBar(context, 'Datos actualizados.');
       await load();
@@ -423,6 +427,7 @@ class PatientDetailsController extends ChangeNotifier {
   Future<void> openAppMapPicker(BuildContext context) async {
     final d = detail;
     if (d == null) return;
+    final editSession = isEditing ? _editSession : null;
     final coords = isEditing ? (editLat, editLng) : patientMapCoords(d);
     final r = await PatientLocationActions.pickInAppMap(
       context,
@@ -430,7 +435,12 @@ class PatientDetailsController extends ChangeNotifier {
       lng: coords.$2,
     );
     if (r == null || !context.mounted) return;
-    await _applyPickedCoords(context, r.latitude, r.longitude);
+    await _applyPickedCoords(
+      context,
+      r.latitude,
+      r.longitude,
+      editSession: editSession,
+    );
   }
 
   Future<void> openGoogleMapsForPatient(BuildContext context) async {
@@ -445,22 +455,31 @@ class PatientDetailsController extends ChangeNotifier {
   }
 
   Future<void> triangulatePatientLocation(BuildContext context) async {
+    final editSession = isEditing ? _editSession : null;
     final pos = await PatientLocationActions.captureCurrentPosition(context);
     if (pos == null || !context.mounted) return;
-    await _applyPickedCoords(context, pos.latitude, pos.longitude);
+    await _applyPickedCoords(
+      context,
+      pos.latitude,
+      pos.longitude,
+      editSession: editSession,
+    );
   }
 
   Future<void> _applyPickedCoords(
     BuildContext context,
     double lat,
-    double lng,
-  ) async {
+    double lng, {
+    int? editSession,
+  }) async {
     final d = detail;
     if (d == null) return;
-    if (isEditing) {
+    if (editSession != null) {
+      if (!isEditing || _editSession != editSession) return;
       setEditCoords(lat, lng);
       return;
     }
+    if (isEditing) return;
     try {
       final demo = Map<String, dynamic>.from(d.demographics)
         ..['registration_lat'] = lat
@@ -482,6 +501,7 @@ class PatientDetailsController extends ChangeNotifier {
   Future<void> openEditLocation(BuildContext context) async {
     final d = detail;
     if (d == null) return;
+    final editSession = isEditing ? _editSession : null;
     final coords = patientMapCoords(d);
     final r = await PatientLocationActions.pickInAppMap(
       context,
@@ -489,7 +509,12 @@ class PatientDetailsController extends ChangeNotifier {
       lng: coords.$2,
     );
     if (r == null || !context.mounted) return;
-    await _applyPickedCoords(context, r.latitude, r.longitude);
+    await _applyPickedCoords(
+      context,
+      r.latitude,
+      r.longitude,
+      editSession: editSession,
+    );
   }
 
   Future<void> exportRoute(BuildContext context) async {
@@ -698,6 +723,7 @@ class PatientDetailsController extends ChangeNotifier {
   }
 
   void onBack(BuildContext context) {
+    if (savingEdit) return;
     if (isEditing) {
       cancelEdit();
       return;
