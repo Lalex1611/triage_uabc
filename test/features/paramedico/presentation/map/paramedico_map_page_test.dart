@@ -23,11 +23,13 @@ final _card = IncidentForCards(
   isMine: true,
 );
 
-/// El mapa se queda cargando (sin teselas de red): se prueba el panel B03
+/// Pantalla con "a" elegido; [isLoading] mientras aún llegan los incidentes
 Widget _page({
   double textScale = 1,
   List<String>? taps,
   bool fromPatient = false,
+  bool isLoading = false,
+  bool isLocating = false,
 }) {
   void tap(String name) => taps?.add(name);
   return MaterialApp(
@@ -44,13 +46,13 @@ Widget _page({
         onSearchSubmitted: (_) {},
         mapController: MapController(),
         errorMessage: null,
-        isLoading: true,
+        isLoading: isLoading,
+        isLocating: isLocating,
         mappableIncidents: const [],
         selectedIncidentId: 'a',
         userPosition: null,
         selectedCard: _card,
         onMapBackgroundTap: () {},
-        onMapPositionChanged: (_, _) {},
         onPinTap: (_) {},
         onClearSelection: () => tap('cerrar'),
         onDirections: () => tap('google maps'),
@@ -79,6 +81,40 @@ void main() {
     }
     await loader.load();
   });
+
+  testWidgets('mientras cargan los incidentes el mapa y sus controles se ven', (
+    tester,
+  ) async {
+    final semantics = tester.ensureSemantics();
+    await tester.pumpWidget(_page(isLoading: true));
+
+    expect(find.byType(FlutterMap), findsOneWidget);
+    expect(find.byTooltip('Centrar en mi ubicación'), findsOneWidget);
+    expect(find.byTooltip('Capas del mapa'), findsOneWidget);
+    expect(find.bySemanticsLabel('Cargando incidentes'), findsOneWidget);
+
+    await tester.pumpWidget(_page());
+    expect(find.bySemanticsLabel('Cargando incidentes'), findsNothing);
+    semantics.dispose();
+  });
+
+  testWidgets(
+    'mientras busca la ubicación, «Objetivo» lo anuncia y no repite',
+    (tester) async {
+      await tester.pumpWidget(_page(isLocating: true));
+
+      final button = find.byTooltip('Buscando tu ubicación');
+      expect(button, findsOneWidget);
+      expect(
+        tester
+            .widget<IconButton>(
+              find.ancestor(of: button, matching: find.byType(IconButton)),
+            )
+            .onPressed,
+        isNull,
+      );
+    },
+  );
 
   testWidgets('B03: el incidente elegido con "Cómo llegar" y "Abrir"', (
     tester,
@@ -112,7 +148,6 @@ void main() {
     await tester.pumpWidget(_page(taps: taps));
 
     await tester.drag(find.text('Accidente vehicular'), const Offset(0, 400));
-    // El cargador del mapa no para: se avanza el reloj en vez de esperar
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
     expect(taps, ['cerrar']);

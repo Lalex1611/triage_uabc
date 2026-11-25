@@ -24,7 +24,6 @@ class ParamedicoMapPage extends StatelessWidget {
     required this.userPosition,
     required this.selectedCard,
     required this.onMapBackgroundTap,
-    required this.onMapPositionChanged,
     required this.onPinTap,
     required this.onClearSelection,
     required this.onDirections,
@@ -39,13 +38,14 @@ class ParamedicoMapPage extends StatelessWidget {
     this.showHospitals = true,
     this.unreadNotifications = 0,
     this.onOpenNotifications,
-    this.coverageRings = const [],
-    this.patientPins = const [],
+    this.coverageRingsFor,
+    this.patientPinsFor,
     this.highlightedPatientId,
     this.onPatientPinTap,
     this.onMapReady,
     this.onReturnToPatient,
     this.panelKey,
+    this.isLocating = false,
   });
 
   /// Buscador de direcciones: [onSearchSubmitted] mueve el mapa al resultado
@@ -61,7 +61,6 @@ class ParamedicoMapPage extends StatelessWidget {
   /// Incidente elegido: su panel va abajo (B03)
   final IncidentForCards? selectedCard;
   final VoidCallback onMapBackgroundTap;
-  final void Function(MapCamera camera, bool hasGesture) onMapPositionChanged;
   final void Function(ParamedicoIncidentSummary inc) onPinTap;
 
   /// Arrastrar el panel hacia abajo suelta el incidente
@@ -86,8 +85,12 @@ class ParamedicoMapPage extends StatelessWidget {
   /// Sin [onOpenNotifications] no se muestra la campana
   final int unreadNotifications;
   final VoidCallback? onOpenNotifications;
-  final List<({LatLng center, double radiusMeters})> coverageRings;
-  final List<MapPatientPin> patientPins;
+
+  /// Radios y pacientes a la vista con la cámara del momento. Se piden desde
+  /// dentro del mapa: moverlo no reconstruye el resto de la pantalla
+  final List<({LatLng center, double radiusMeters})> Function(MapCamera)?
+  coverageRingsFor;
+  final List<MapPatientPin> Function(MapCamera)? patientPinsFor;
   final String? highlightedPatientId;
   final void Function(MapPatientPin pin)? onPatientPinTap;
   final VoidCallback? onMapReady;
@@ -97,6 +100,10 @@ class ParamedicoMapPage extends StatelessWidget {
 
   /// Para medir cuánto mapa tapa el panel al encuadrar
   final GlobalKey? panelKey;
+
+  /// Esperando al GPS sin ninguna posición conocida: «Objetivo» no responde
+  /// a más toques y lo anuncia
+  final bool isLocating;
 
   // Marcador de incidente: ancho para "88" con aire; alto = zona táctil
   static const double _incidentMarkerWidth = 88;
@@ -116,15 +123,8 @@ class ParamedicoMapPage extends StatelessWidget {
       color: TriageColors.surface,
       child: Stack(
         children: [
-          Positioned.fill(
-            child: isLoading
-                ? const Center(
-                    child: CircularProgressIndicator(
-                      color: TriageColors.paramedicAccent,
-                    ),
-                  )
-                : _buildMap(),
-          ),
+          // El mapa se ve desde el principio; la carga es solo un indicador
+          Positioned.fill(child: _buildMap()),
           // Buscador y filtros flotan sobre el mapa
           Positioned(
             top: 0,
@@ -180,6 +180,19 @@ class ParamedicoMapPage extends StatelessWidget {
                           ),
                       ],
                     ),
+                    if (isLoading) ...[
+                      const SizedBox(height: TriageSpacing.sm),
+                      ClipRRect(
+                        borderRadius: const BorderRadius.all(
+                          Radius.circular(TriageRadii.full),
+                        ),
+                        child: LinearProgressIndicator(
+                          semanticsLabel: 'Cargando incidentes',
+                          color: context.triageRole.accent,
+                          backgroundColor: TriageColors.sunken,
+                        ),
+                      ),
+                    ],
                     if (errorMessage != null) ...[
                       const SizedBox(height: TriageSpacing.sm),
                       TriageAlert(
@@ -193,37 +206,38 @@ class ParamedicoMapPage extends StatelessWidget {
               ),
             ),
           ),
-          if (!isLoading)
-            Positioned.fill(
-              child: Align(
-                alignment: AlignmentDirectional.centerEnd,
-                child: Padding(
-                  padding: const EdgeInsetsDirectional.only(
-                    end: TriageSpacing.lg,
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      TriageIconButton(
-                        icon: TriageIcons.target,
-                        tooltip: 'Centrar en mi ubicación',
-                        onPressed: onLocateMe,
-                        variant: TriageIconButtonVariant.surface,
-                        diameter: TriageSizes.touchTarget,
-                      ),
-                      const SizedBox(height: TriageSpacing.sm),
-                      TriageIconButton(
-                        icon: TriageIcons.layers,
-                        tooltip: 'Capas del mapa',
-                        onPressed: onOpenLayers,
-                        variant: TriageIconButtonVariant.surface,
-                        diameter: TriageSizes.touchTarget,
-                      ),
-                    ],
-                  ),
+          Positioned.fill(
+            child: Align(
+              alignment: AlignmentDirectional.centerEnd,
+              child: Padding(
+                padding: const EdgeInsetsDirectional.only(
+                  end: TriageSpacing.lg,
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TriageIconButton(
+                      icon: TriageIcons.target,
+                      tooltip: isLocating
+                          ? 'Buscando tu ubicación'
+                          : 'Centrar en mi ubicación',
+                      onPressed: isLocating ? null : onLocateMe,
+                      variant: TriageIconButtonVariant.surface,
+                      diameter: TriageSizes.touchTarget,
+                    ),
+                    const SizedBox(height: TriageSpacing.sm),
+                    TriageIconButton(
+                      icon: TriageIcons.layers,
+                      tooltip: 'Capas del mapa',
+                      onPressed: onOpenLayers,
+                      variant: TriageIconButtonVariant.surface,
+                      diameter: TriageSizes.touchTarget,
+                    ),
+                  ],
                 ),
               ),
             ),
+          ),
           if (selected != null)
             Positioned.fill(
               child: Align(
@@ -254,26 +268,28 @@ class ParamedicoMapPage extends StatelessWidget {
         initialZoom: MapOperationalRegion.overviewZoom,
         onMapReady: onMapReady,
         onTap: (_, _) => onMapBackgroundTap(),
-        onPositionChanged: onMapPositionChanged,
       ),
       children: [
         const TriageMapTiles(),
-        if (showIncidents && coverageRings.isNotEmpty)
-          CircleLayer(
-            optimizeRadiusInMeters: true,
-            circles: [
-              for (final ring in coverageRings)
-                CircleMarker(
-                  point: ring.center,
-                  radius: ring.radiusMeters,
-                  useRadiusInMeter: true,
-                  color: TriageColors.paramedicAccent.withValues(
-                    alpha: TriageOpacity.hover,
+        if (showIncidents && coverageRingsFor != null)
+          // Solo esta capa se rehace al mover la cámara
+          Builder(
+            builder: (context) => CircleLayer(
+              optimizeRadiusInMeters: true,
+              circles: [
+                for (final ring in coverageRingsFor!(MapCamera.of(context)))
+                  CircleMarker(
+                    point: ring.center,
+                    radius: ring.radiusMeters,
+                    useRadiusInMeter: true,
+                    color: TriageColors.paramedicAccent.withValues(
+                      alpha: TriageOpacity.hover,
+                    ),
+                    borderColor: TriageColors.paramedicAccent,
+                    borderStrokeWidth: TriageSizes.strokeStrong,
                   ),
-                  borderColor: TriageColors.paramedicAccent,
-                  borderStrokeWidth: TriageSizes.strokeStrong,
-                ),
-            ],
+              ],
+            ),
           ),
         if (showHospitals && hospitals.isNotEmpty)
           MarkerLayer(
@@ -298,23 +314,25 @@ class ParamedicoMapPage extends StatelessWidget {
               ),
             ],
           ),
-        if (showIncidents && patientPins.isNotEmpty)
-          MarkerLayer(
-            markers: [
-              for (final p in patientPins)
-                Marker(
-                  point: LatLng(p.latitude, p.longitude),
-                  width: TriageSizes.touchTarget,
-                  height: TriageSizes.touchTarget,
-                  child: TriagePatientMarker(
-                    TriageLevel.fromDb(p.triageColor) ?? TriageLevel.yellow,
-                    highlighted: p.id == highlightedPatientId,
-                    onTap: onPatientPinTap != null
-                        ? () => onPatientPinTap!(p)
-                        : null,
+        if (showIncidents && patientPinsFor != null)
+          Builder(
+            builder: (context) => MarkerLayer(
+              markers: [
+                for (final p in patientPinsFor!(MapCamera.of(context)))
+                  Marker(
+                    point: LatLng(p.latitude, p.longitude),
+                    width: TriageSizes.touchTarget,
+                    height: TriageSizes.touchTarget,
+                    child: TriagePatientMarker(
+                      TriageLevel.fromDb(p.triageColor) ?? TriageLevel.yellow,
+                      highlighted: p.id == highlightedPatientId,
+                      onTap: onPatientPinTap != null
+                          ? () => onPatientPinTap!(p)
+                          : null,
+                    ),
                   ),
-                ),
-            ],
+              ],
+            ),
           ),
         if (showIncidents)
           MarkerLayer(
