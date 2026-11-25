@@ -143,6 +143,14 @@ void main() {
 }
 
 class _MedicoRemote implements CaptureRemote {
+  @override
+  Future<void> discardRemovedIncidentPhoto(
+    String remoteId,
+    Capture photo,
+  ) async {
+    fail('Una captura de Médico no retira fotos de incidentes.');
+  }
+
   final records = <String, Capture>{};
   final accounts = <String>[];
   bool loseResponse = false;

@@ -15,6 +15,14 @@ ParamedicoIncidentsRepository _repo(List<http.Request> requests) {
     if (request.url.path.endsWith('/rpc/paramedico_update_patient_record')) {
       return http.Response('', 204, request: request);
     }
+    if (request.url.path.endsWith('/sign/patient_photos')) {
+      return http.Response(
+        jsonEncode([
+          {'path': 'patient/a.jpg', 'signedURL': '/object/sign/a?token=t'},
+        ]),
+        200,
+      );
+    }
     return http.Response(
       request.url.path.contains('/sign/')
           ? jsonEncode([
@@ -93,6 +101,17 @@ void main() {
     final requests = <http.Request>[];
     expect(await _repo(requests).signIncidentPhotos(const ['/a.jpg']), isEmpty);
     expect(requests, isEmpty);
+  });
+
+  test('solo firma rutas que pertenecen al paciente abierto', () async {
+    final requests = <http.Request>[];
+    final urls = await _repo(requests).signPatientPhotos('patient', [
+      'patient/a.jpg',
+      'another/b.jpg',
+      'patient-2/c.jpg',
+    ]);
+    expect(urls.keys, ['patient/a.jpg']);
+    expect(jsonDecode(requests.single.body)['paths'], ['patient/a.jpg']);
   });
 
   test('borra de Storage, pero nunca una ruta local', () async {

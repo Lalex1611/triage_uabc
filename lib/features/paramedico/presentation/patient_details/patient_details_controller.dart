@@ -102,9 +102,10 @@ class PatientDetailsController extends ChangeNotifier {
       }
       detail = d;
       try {
+        final paths = d?.demographics['photo_storage_paths'];
         storedPhotoUrls = await _repo.signPatientPhotos(
-          (d?.demographics['photo_storage_paths'] as List? ?? [])
-              .cast<String>(),
+          patientId,
+          paths is List ? paths.whereType<String>() : const [],
         );
       } catch (_) {
         storedPhotoUrls = {};

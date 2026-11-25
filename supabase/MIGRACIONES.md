@@ -46,6 +46,14 @@ corregir algo se crea una nueva.
 | 24 | `20261124120000_a08_recover_capture_photos.sql` | Recuperación de fotos de capturas y preservación de adjuntos al editar pacientes |
 | 25 | `20261125120000_offline_consultation_codes_and_photos.sql` | Vigencia de códigos en reintentos y actualizaciones seguras de fotos |
 | 26 | `20261125130000_paramedic_capture_photo_integrity.sql` | Vigencia de códigos de Paramédico y protección del vínculo y retiro de fotos |
+| 27 | `20261125140000_offline_retry_and_photo_access.sql` | Validación de fotos por paciente y aviso de adjuntos retirados durante un reintento |
+
+Antes de aplicar #26 en una instalación con capturas pendientes, comprueba si
+hay reintentos de fotos de incidentes. Si alguna ruta ya se retiró, concilia el
+retiro confirmado y su archivo de Storage antes de reanudar esos reintentos.
+La #26 registra los retiros a partir de su aplicación. Distribuye la app
+compatible con #27 para que limpie del bucket los adjuntos que se vuelvan a
+subir por un reintento.
 
 ### Si el historial ya contiene la versión `20261117120000`
 
@@ -80,6 +88,19 @@ select
   sustituye la entrada antigua de #12 por la canónica. Omite el primer
   comando si #22 ya figura como aplicada. Estos comandos reparan el historial
   sin volver a ejecutar la creación de tablas.
+
+  Usa el mismo destino para consultar el historial, ejecutar el SQL y
+  repararlo. En local, usa el Studio de `supabase status` y estos comandos.
+
+  ```bash
+  npx supabase migration repair 20261120150000 --status applied --local
+  npx supabase migration repair 20261117120000 --status reverted --local
+  npx supabase migration repair 20261117120000 --status applied --local
+  npx supabase migration list --local
+  ```
+
+  En la nube, confirma que `supabase link` apunta al mismo proyecto que
+  abriste en el SQL Editor y usa estos comandos.
 
   ```bash
   npx supabase migration repair 20261120150000 --status applied --linked

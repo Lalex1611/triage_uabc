@@ -34,17 +34,36 @@ void main() {
 
     final first = connectivity.refresh();
     final second = connectivity.refresh();
-    expect(second, same(first));
     expect(connectivity.isRefreshing, isTrue);
     await tester.pump();
     expect(checks, 1);
 
     pending.complete(['none']);
     await tester.pump();
-    await second;
+    await Future.wait([first, second]);
     expect(connectivity.isConnected, isFalse);
     expect(connectivity.isRefreshing, isFalse);
   });
+
+  testWidgets(
+    'un fallo de red no interrumpe a quien esperaba otra comprobación',
+    (tester) async {
+      final connectivity = AppConnectivityNotifier.instance;
+      final pending = Completer<List<String>>();
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        connectivityChannel,
+        (_) => pending.future,
+      );
+      final first = connectivity.refresh();
+      final waiting = connectivity.refresh();
+      final firstError = expectLater(first, throwsA(isA<PlatformException>()));
+      await tester.pump();
+      pending.completeError(PlatformException(code: 'NETWORK_CHECK_FAILED'));
+      await tester.pump();
+      await Future.wait([firstError, waiting]);
+      expect(connectivity.isRefreshing, isFalse);
+    },
+  );
 
   testWidgets('el aviso vuelve al cerrar Sin conexión sin cambiar de red', (
     tester,

@@ -81,6 +81,10 @@ begin
     raise exception 'Se esperaba rechazar el archivo de otra cuenta';
   exception when insufficient_privilege then null; end;
   insert into storage.objects(bucket_id,name,owner_id) values('patient_photos',photo,a::text);
+  reset role;
+  update public.patients set demographics = demographics || '{"photo_storage_paths":{"legacy":true}}'
+    where id = p;
+  set local role authenticated;
   perform public.link_paramedic_capture_photo(a,'patient',p,photo);
   perform public.link_paramedic_capture_photo(a,'patient',p,photo);
   assert (select jsonb_array_length(demographics->'photo_storage_paths')=1 from public.patients where id=p), 'duplicate photo link';
@@ -130,11 +134,17 @@ begin
   other_photo := i::text||'/a0830000-0000-0000-0000-000000000004.jpg';
   perform public.paramedico_update_incident_photo_path(i,other_photo,false);
   perform public.paramedico_update_incident_photo_path(i,photo,true);
-  perform public.link_paramedic_capture_photo(a,'incident',i,photo);
+  begin
+    perform public.link_paramedic_capture_photo(a,'incident',i,photo);
+    raise exception 'Se esperaba informar que la foto se retiró';
+  exception when sqlstate 'P0802' then null; end;
   delete from storage.objects where bucket_id = 'incident_photos' and name = photo;
   assert not exists (select 1 from storage.objects where bucket_id = 'incident_photos' and name = photo),
     'La prueba no borró la foto de Storage';
-  perform public.link_paramedic_capture_photo(a,'incident',i,photo);
+  begin
+    perform public.link_paramedic_capture_photo(a,'incident',i,photo);
+    raise exception 'Se esperaba informar el retiro aunque el archivo no exista';
+  exception when sqlstate 'P0802' then null; end;
   assert (select photo_local_paths = array[other_photo] from public.incidents where id=i),
     'Un reintento restauró una foto retirada';
   begin

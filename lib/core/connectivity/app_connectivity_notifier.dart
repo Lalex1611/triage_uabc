@@ -79,7 +79,7 @@ class AppConnectivityNotifier extends ChangeNotifier {
   /// Fuerza una nueva comprobación (p. ej. al pulsar el ícono Wi‑Fi del header)
   Future<void> refresh() {
     final running = _refreshInFlight;
-    if (running != null) return running;
+    if (running != null) return running.onError((Object _, StackTrace _) {});
     final attempt = Future<void>.microtask(() async {
       try {
         _isConnected = await _evaluateConnection();

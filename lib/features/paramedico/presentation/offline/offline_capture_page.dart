@@ -128,19 +128,20 @@ class OfflineCapturePage extends StatelessWidget {
                           ),
                         for (final photo
                             in (row['photos'] as List).cast<Capture>())
-                          OfflineCapturePhoto(
-                            key: ValueKey(photo['id']),
-                            requestIdentity: (
-                              session,
-                              row['id'],
-                              row['kind'],
-                              row['remote_id'],
-                              photo['id'],
-                              photo['extension'],
+                          if (photo['removed'] != true)
+                            OfflineCapturePhoto(
+                              key: ValueKey(photo['id']),
+                              requestIdentity: (
+                                session,
+                                row['id'],
+                                row['kind'],
+                                row['remote_id'],
+                                photo['id'],
+                                photo['extension'],
+                              ),
+                              synced: row['state'] == 'synced',
+                              loadBytes: () => runtime.photoBytes(row, photo),
                             ),
-                            synced: row['state'] == 'synced',
-                            loadBytes: () => runtime.photoBytes(row, photo),
-                          ),
                         if (isIncident) ...[
                           const SizedBox(height: 24),
                           const Text(

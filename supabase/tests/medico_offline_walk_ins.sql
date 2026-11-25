@@ -56,6 +56,23 @@ begin
   end;
 
   reset role;
+  perform set_config('request.jwt.claim.sub', '', true);
+  update public.patients set hospital_id = 'a8400000-0000-0000-0000-000000000002'
+    where id = patient;
+  set local role authenticated;
+  perform set_config('request.jwt.claim.sub', actor::text, true);
+  begin
+    perform public.sync_medico_walk_in_capture(actor, capture_id, request);
+    raise exception 'Se devolvió el código de un paciente trasladado a otro hospital';
+  exception when sqlstate 'P0002' then null;
+  end;
+  reset role;
+  perform set_config('request.jwt.claim.sub', '', true);
+  update public.patients set hospital_id = hospital where id = patient;
+  set local role authenticated;
+  perform set_config('request.jwt.claim.sub', actor::text, true);
+
+  reset role;
   update public.consultation_codes set expires_at = now() - interval '1 day'
     where patient_id = patient;
   set local role authenticated;

@@ -24,6 +24,7 @@ abstract class CaptureRemote {
     String remoteId,
     Capture photo,
   );
+  Future<void> discardRemovedIncidentPhoto(String remoteId, Capture photo);
 }
 
 abstract class SupabaseOfflineCaptureRemote implements CaptureRemote {
@@ -33,6 +34,17 @@ abstract class SupabaseOfflineCaptureRemote implements CaptureRemote {
 
   String photoPath(String id, Capture photo) =>
       '$id/${photo['id']}.${photo['extension']}';
+
+  @override
+  Future<void> discardRemovedIncidentPhoto(
+    String remoteId,
+    Capture photo,
+  ) async {
+    await client.storage
+        .from('incident_photos')
+        .remove([photoPath(remoteId, photo)])
+        .timeout(timeout);
+  }
 
   @override
   Future<void> upload(
@@ -83,7 +95,7 @@ class OfflineSyncService extends ChangeNotifier {
   Future<void>? _running;
   _SyncSession? _runningSession;
   bool _runningForced = false;
-  Completer<void>? _forcedFollowUp;
+  ({_SyncSession session, Completer<void> completion})? _forcedFollowUp;
   bool get syncing => _running != null;
   String? storageError;
   (String, int)? _authenticationRequired;
@@ -98,15 +110,20 @@ class OfflineSyncService extends ChangeNotifier {
 
   Future<void> sync({bool force = false}) {
     final session = _session;
-    if (_running case final running?) {
-      if (force && !_runningForced && session == _runningSession) {
-        return (_forcedFollowUp ??= Completer<void>()).future;
-      }
-      return running;
-    }
     if (session == null ||
         _authenticationRequired == (session.account, session.generation)) {
       return Future.value();
+    }
+    if (_running case final running?) {
+      if (force && (!_runningForced || session != _runningSession)) {
+        final queued = _forcedFollowUp;
+        if (queued?.session == session) return queued!.completion.future;
+        queued?.completion.complete();
+        final completion = Completer<void>();
+        _forcedFollowUp = (session: session, completion: completion);
+        return completion.future;
+      }
+      return running;
     }
     return _start(session, force, Completer<void>());
   }
@@ -128,15 +145,17 @@ class OfflineSyncService extends ChangeNotifier {
       ).whenComplete(() {
         final followUp = _forcedFollowUp;
         _forcedFollowUp = null;
-        if (followUp != null &&
-            _session == session &&
-            _authenticationRequired != (session.account, session.generation)) {
-          _start(session, true, followUp);
-          return;
+        if (followUp != null) {
+          final next = followUp.session;
+          if (_session == next &&
+              _authenticationRequired != (next.account, next.generation)) {
+            _start(next, true, followUp.completion);
+            return;
+          }
+          followUp.completion.complete();
         }
         _running = null;
         _runningSession = null;
-        followUp?.complete();
         notifyListeners();
       }),
     );
@@ -170,7 +189,7 @@ class OfflineSyncService extends ChangeNotifier {
         if (!force && next != null && next.isAfter(now())) continue;
         final payload = Capture.from(c['payload'] as Map);
         final parentId = c['parent_id'] as String?;
-        if (parentId != null) {
+        if (parentId != null && c['remote_id'] == null) {
           if (unreadable.contains(parentId)) continue;
           // Tras el borrado local, incident_id sigue identificando el incidente
           // en el servidor porque la RPC lo crea con el UUID de la captura.
@@ -216,7 +235,7 @@ class OfflineSyncService extends ChangeNotifier {
           }
           for (final raw in c['photos'] as List) {
             final photo = raw as Capture;
-            if (photo['linked'] == true) continue;
+            if (photo['linked'] == true || photo['removed'] == true) continue;
             for (var attempt = 0; attempt < 2; attempt++) {
               if (!authorized()) return;
               if (photo['uploaded'] != true) {
@@ -243,6 +262,17 @@ class OfflineSyncService extends ChangeNotifier {
                   photo,
                 );
               } on PostgrestException catch (error) {
+                if (error.code == 'P0802' && c['kind'] == 'incident') {
+                  if (!authorized()) return;
+                  await remote.discardRemovedIncidentPhoto(
+                    c['remote_id'] as String,
+                    photo,
+                  );
+                  photo['removed'] = true;
+                  photo['uploaded'] = false;
+                  await store.save(scope, c);
+                  break;
+                }
                 if (error.code != 'P0801') rethrow;
                 // Conserva el archivo y vuelve a subirlo si Storage lo perdió.
                 photo['uploaded'] = false;

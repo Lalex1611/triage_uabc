@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
 
@@ -18,8 +19,13 @@ const emptyCaptureReadResult = (rows: <Capture>[], unreadableIds: <String>[]);
 /// Los metadatos y las fotos usan AES-GCM con la cuenta y el identificador
 /// como datos asociados.
 class OfflineCaptureStore {
-  OfflineCaptureStore(this.db, this.keyForAccount, {DateTime Function()? now})
-    : _now = now ?? DateTime.now;
+  OfflineCaptureStore(
+    this.db,
+    this.keyForAccount, {
+    DateTime Function()? now,
+    Future<Directory> Function()? pickerDirectory,
+  }) : _now = now ?? DateTime.now,
+       _pickerDirectory = pickerDirectory;
 
   static const schemaVersion = 3;
   static const _retention = Duration(hours: 24);
@@ -28,6 +34,7 @@ class OfflineCaptureStore {
   final Database db;
   final Future<SecretKey> Function(String) keyForAccount;
   final DateTime Function() _now;
+  final Future<Directory> Function()? _pickerDirectory;
   final _cipher = AesGcm.with256bits();
 
   static Future<OfflineCaptureStore>? _deviceStore;
@@ -89,6 +96,9 @@ class OfflineCaptureStore {
           rethrow;
         }
       }),
+      pickerDirectory: Platform.isIOS
+          ? () async => Directory.systemTemp
+          : getTemporaryDirectory,
     );
     await store._cleanUp();
     AppLifecycleListener(onResume: () => unawaited(store._cleanUp()));
@@ -211,6 +221,7 @@ class OfflineCaptureStore {
   }) async {
     final bodies = <String, Uint8List>{};
     final blobs = <String, Map<String, Uint8List>>{};
+    final sources = <String>{};
     for (final capture in captures) {
       final id = capture['id'] as String;
       final photos = <Capture>[];
@@ -236,6 +247,7 @@ class OfflineCaptureStore {
             throw const FormatException('Foto vacía o mayor de 10 MB.');
           }
           blobs[id]![photoId] = await _seal(account, photoId, bytes);
+          sources.add(file.path);
           photos.add({
             'id': photoId,
             'extension': ext,
@@ -276,6 +288,27 @@ class OfflineCaptureStore {
         throw StateError('La sesión cambió. Vuelve a autenticarte.');
       }
     });
+    await _discardPickerCopies(sources);
+  }
+
+  Future<void> _discardPickerCopies(Set<String> sources) async {
+    final pickerDirectory = _pickerDirectory;
+    if (pickerDirectory == null || sources.isEmpty) return;
+    final String root;
+    try {
+      root = await (await pickerDirectory()).resolveSymbolicLinks();
+    } catch (_) {
+      return;
+    }
+    for (final source in sources) {
+      try {
+        final resolved = await File(source).resolveSymbolicLinks();
+        // La captura ya se guardó. Borra solo las copias temporales de la app.
+        if (p.isWithin(root, resolved)) await File(resolved).delete();
+      } on FileSystemException {
+        // Un archivo pudo desaparecer mientras se guardaba la captura.
+      }
+    }
   }
 
   Future<CaptureReadResult> list(String account) async {
@@ -287,17 +320,26 @@ class OfflineCaptureStore {
     final entries = await Future.wait(
       rows.map((row) async {
         final id = row['id']! as String;
+        final expiresAt = row['expires_at'] as int?;
         try {
-          return (id, await _decodeCapture(account, id, row['body']!));
+          return (
+            id,
+            expiresAt,
+            await _decodeCapture(account, id, row['body']!),
+          );
         } catch (_) {
-          return (id, null);
+          return (id, expiresAt, null);
         }
       }),
     );
+    final cutoff = _now().millisecondsSinceEpoch;
+    final current = entries.where(
+      (entry) => entry.$2 == null || entry.$2! > cutoff,
+    );
     return (
-      rows: [for (final (_, capture) in entries) ?capture],
+      rows: [for (final (_, _, capture) in current) ?capture],
       unreadableIds: [
-        for (final (id, capture) in entries)
+        for (final (id, _, capture) in current)
           if (capture == null) id,
       ],
     );
@@ -318,7 +360,17 @@ class OfflineCaptureStore {
       whereArgs: [account, id, _now().millisecondsSinceEpoch],
     );
     if (rows.isEmpty) return null;
-    return _decodeCapture(account, id, rows.single['body']!);
+    final row = rows.single;
+    final expiresAt = row['expires_at'] as int?;
+    bool expired() =>
+        expiresAt != null && expiresAt <= _now().millisecondsSinceEpoch;
+    try {
+      final capture = await _decodeCapture(account, id, row['body']!);
+      return expired() ? null : capture;
+    } catch (_) {
+      if (expired()) return null;
+      rethrow;
+    }
   }
 
   Future<Capture> _decodeCapture(
@@ -387,7 +439,8 @@ class OfflineCaptureStore {
   }) async {
     final id = row['id'] as String;
     final started = _now();
-    final originalDeadline = await _incidentCaptureDeadline(db, account, id);
+    final original = await _incidentCaptureExpiry(db, account, id);
+    final originalDeadline = original?.expiresAt;
     var deadline = started.add(_retention).millisecondsSinceEpoch;
     if (originalDeadline != null &&
         originalDeadline > started.millisecondsSinceEpoch &&
@@ -400,7 +453,11 @@ class OfflineCaptureStore {
       utf8.encode(jsonEncode(row)),
     );
     return db.transaction((tx) async {
-      final captureDeadline = await _incidentCaptureDeadline(tx, account, id);
+      final capture = await _incidentCaptureExpiry(tx, account, id);
+      // Una descarga independiente puede existir sin captura. Si dependía de
+      // una captura que desapareció durante el guardado, no restaura su copia.
+      if (original != null && capture == null) return false;
+      final captureDeadline = capture?.expiresAt;
       final currentTime = _now().millisecondsSinceEpoch;
       if (captureDeadline != null &&
           captureDeadline > started.millisecondsSinceEpoch &&
@@ -421,7 +478,7 @@ class OfflineCaptureStore {
     });
   }
 
-  Future<int?> _incidentCaptureDeadline(
+  Future<({int? expiresAt})?> _incidentCaptureExpiry(
     DatabaseExecutor db,
     String account,
     String id,
@@ -432,7 +489,7 @@ class OfflineCaptureStore {
       where: 'account = ? AND id = ?',
       whereArgs: [account, id],
     );
-    return rows.isEmpty ? null : rows.single['expires_at'] as int?;
+    return rows.isEmpty ? null : (expiresAt: rows.single['expires_at'] as int?);
   }
 
   Future<Capture?> cachedIncident(String account, String id) async {

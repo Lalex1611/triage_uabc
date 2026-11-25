@@ -872,8 +872,13 @@ class ParamedicoIncidentsRepository {
     return {for (final s in signed) s.path: s.signedUrl};
   }
 
-  Future<Map<String, String>> signPatientPhotos(Iterable<String> paths) async {
-    final stored = paths.toList();
+  Future<Map<String, String>> signPatientPhotos(
+    String patientId,
+    Iterable<String> paths,
+  ) async {
+    final stored = paths
+        .where((path) => path.startsWith('$patientId/'))
+        .toList();
     if (stored.isEmpty) return {};
     final signed = await _c.storage
         .from('patient_photos')
