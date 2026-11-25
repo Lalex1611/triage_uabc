@@ -266,7 +266,9 @@ class IncidentDetailsController extends ChangeNotifier {
     try {
       await _repo.closeIncident(incidentId);
       // Sin esperar al aviso del tiempo real: el mapa debe dejar de mostrarlo ya
-      unawaited(ParamedicoIncidentsStore.instance.refresh());
+      final store = ParamedicoIncidentsStore.instance;
+      store.closedHere.add(incidentId);
+      unawaited(store.refresh());
       if (!context.mounted) return;
       showAppSnackBar(context, 'Incidente cerrado.');
       context.go('/paramedico/mapa');
