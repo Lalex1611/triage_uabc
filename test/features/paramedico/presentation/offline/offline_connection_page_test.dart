@@ -6,9 +6,50 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sistema_triage/core/theme/app_theme.dart';
+import 'package:sistema_triage/features/paramedico/presentation/offline/offline_capture_page.dart';
 import 'package:sistema_triage/features/paramedico/presentation/offline/offline_connection_page.dart';
 
 void main() {
+  testWidgets('la foto reutiliza su carga al redibujar la captura', (
+    tester,
+  ) async {
+    final loads = <Completer<Uint8List>>[];
+
+    Future<void> pump({
+      String id = 'primera-foto',
+      int session = 1,
+      bool synced = false,
+    }) => tester.pumpWidget(
+      MaterialApp(
+        home: OfflineCapturePhoto(
+          requestIdentity: (id, session),
+          synced: synced,
+          loadBytes: () {
+            final next = Completer<Uint8List>();
+            loads.add(next);
+            return next.future;
+          },
+        ),
+      ),
+    );
+
+    await pump();
+    await pump();
+    expect(loads, hasLength(1));
+
+    await pump(synced: true);
+    await pump(synced: true);
+    expect(loads, hasLength(2));
+
+    await pump(synced: true, id: 'segunda-foto');
+    expect(loads, hasLength(3));
+
+    await pump(synced: true, id: 'segunda-foto', session: 2);
+    await pump(synced: true, id: 'segunda-foto', session: 2);
+    expect(loads, hasLength(4));
+    expect(find.text('Cargando foto…'), findsOneWidget);
+  });
+
   testWidgets('A08 renders the mobile reference layout', (tester) async {
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1;

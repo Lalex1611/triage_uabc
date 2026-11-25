@@ -11,6 +11,8 @@ import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
 
 typedef Capture = Map<String, dynamic>;
+typedef CaptureReadResult = ({List<Capture> rows, List<String> unreadableIds});
+const emptyCaptureReadResult = (rows: <Capture>[], unreadableIds: <String>[]);
 
 /// Los datos clínicos se guardan cifrados, incluso en los diarios de SQLite.
 /// Los metadatos y las fotos usan AES-GCM con la cuenta y el identificador
@@ -28,9 +30,13 @@ class OfflineCaptureStore {
   final DateTime Function() _now;
   final _cipher = AesGcm.with256bits();
 
-  static final Future<OfflineCaptureStore> _deviceStore = _open();
+  static Future<OfflineCaptureStore>? _deviceStore;
 
-  static Future<OfflineCaptureStore> open() => _deviceStore;
+  static Future<OfflineCaptureStore> open() =>
+      _deviceStore ??= _open().catchError((Object error, StackTrace trace) {
+        _deviceStore = null;
+        Error.throwWithStackTrace(error, trace);
+      });
 
   static Future<OfflineCaptureStore> _open() async {
     final directory = await const MethodChannel(
@@ -255,23 +261,28 @@ class OfflineCaptureStore {
     });
   }
 
-  Future<List<Capture>> list(String account) async {
+  Future<CaptureReadResult> list(String account) async {
     final rows = await db.query(
       'captures',
       where: 'account = ? AND $_unexpired',
       whereArgs: [account, _now().millisecondsSinceEpoch],
     );
-    return Future.wait(
-      rows.map(
-        (row) async => Capture.from(
-          jsonDecode(
-                utf8.decode(
-                  await _unseal(account, row['id']! as String, row['body']!),
-                ),
-              )
-              as Map,
-        ),
-      ),
+    final entries = await Future.wait(
+      rows.map((row) async {
+        final id = row['id']! as String;
+        try {
+          return (id, await _decodeCapture(account, id, row['body']!));
+        } catch (_) {
+          return (id, null);
+        }
+      }),
+    );
+    return (
+      rows: [for (final (_, capture) in entries) ?capture],
+      unreadableIds: [
+        for (final (id, capture) in entries)
+          if (capture == null) id,
+      ],
     );
   }
 
@@ -290,11 +301,16 @@ class OfflineCaptureStore {
       whereArgs: [account, id, _now().millisecondsSinceEpoch],
     );
     if (rows.isEmpty) return null;
-    return Capture.from(
-      jsonDecode(utf8.decode(await _unseal(account, id, rows.single['body']!)))
-          as Map,
-    );
+    return _decodeCapture(account, id, rows.single['body']!);
   }
+
+  Future<Capture> _decodeCapture(
+    String account,
+    String id,
+    Object body,
+  ) async => Capture.from(
+    jsonDecode(utf8.decode(await _unseal(account, id, body))) as Map,
+  );
 
   Future<void> save(String account, Capture capture) async {
     final id = capture['id'] as String;
@@ -341,12 +357,22 @@ class OfflineCaptureStore {
     return Uint8List.fromList(await _unseal(account, id, rows.single['body']!));
   }
 
-  Future<void> cacheIncident(String account, Capture row) async {
+  Future<void> cacheIncident(
+    String account,
+    Capture row, {
+    bool Function()? authorized,
+  }) async {
     final id = row['id'] as String;
+    final body = await _seal(
+      account,
+      'cache/$id',
+      utf8.encode(jsonEncode(row)),
+    );
+    if (authorized?.call() == false) return;
     await db.insert('incident_cache', {
       'account': account,
       'id': id,
-      'body': await _seal(account, 'cache/$id', utf8.encode(jsonEncode(row))),
+      'body': body,
     }, conflictAlgorithm: ConflictAlgorithm.replace);
   }
 

@@ -27,7 +27,7 @@ class OfflineConnectionFlowPage extends StatelessWidget {
         onContinue: () =>
             context.canPop() ? context.pop() : context.go('/paramedico/mapa'),
         pending: runtime.canCapture
-            ? FutureBuilder<List<Capture>>(
+            ? FutureBuilder<CaptureReadResult>(
                 key: ValueKey(runtime.account),
                 future: runtime.captures(),
                 builder: (context, snapshot) {
@@ -36,8 +36,9 @@ class OfflineConnectionFlowPage extends StatelessWidget {
                       'No se pudieron leer las capturas. Reintenta.',
                     );
                   }
-                  final rows = snapshot.data ?? [];
-                  if (rows.isEmpty) {
+                  final result = snapshot.data ?? emptyCaptureReadResult;
+                  final rows = result.rows;
+                  if (rows.isEmpty && result.unreadableIds.isEmpty) {
                     return const Text(
                       'No hay capturas guardadas en este teléfono.',
                       textAlign: TextAlign.center,
@@ -55,6 +56,8 @@ class OfflineConnectionFlowPage extends StatelessWidget {
                         'Capturas de esta cuenta',
                         style: TriageTextStyles.titleMedium,
                       ),
+                      if (result.unreadableIds.isNotEmpty)
+                        Text(unreadableCaptureMessage(result.unreadableIds)),
                       for (final row in rows)
                         Card(
                           child: ListTile(

@@ -1,8 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data';
 import 'package:cryptography/cryptography.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sistema_triage/features/paramedico/data/offline/offline_capture_store.dart';
 import 'package:sistema_triage/features/paramedico/data/offline/paramedico_sync_service.dart';
@@ -68,7 +68,11 @@ class FakeRemote implements CaptureRemote {
     Capture photo,
   ) async {
     if (failLink) throw TimeoutException('link unavailable');
-    links.add('$id/${photo['id']}');
+    final path = '$id/${photo['id']}';
+    if (!objects.contains(path)) {
+      throw const PostgrestException(message: 'Foto ausente', code: 'P0801');
+    }
+    links.add(path);
   }
 }
 
@@ -99,6 +103,7 @@ void main() {
     remote: remote,
     currentAccount: () => account,
     sessionGeneration: () => generation,
+    now: () => now,
   );
   Capture draft(String id, {String kind = 'incident', String? parent}) =>
       OfflineCaptureStore.draft(
@@ -126,6 +131,30 @@ void main() {
     await directory.delete(recursive: true);
   });
 
+  test('la apertura fallida se comparte y permite reintentar', () async {
+    const channel = MethodChannel('triage/offline_storage');
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    final firstResult = Completer<String?>();
+    var calls = 0;
+    messenger.setMockMethodCallHandler(channel, (_) async {
+      calls++;
+      return calls == 1 ? firstResult.future : null;
+    });
+    addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
+
+    final first = OfflineCaptureStore.open();
+    expect(OfflineCaptureStore.open(), same(first));
+    final firstFailure = expectLater(first, throwsStateError);
+    firstResult.complete(null);
+    await firstFailure;
+    expect(calls, 1);
+    final retry = OfflineCaptureStore.open();
+    expect(retry, isNot(same(first)));
+    await expectLater(retry, throwsStateError);
+    expect(calls, 2);
+  });
+
   test(
     'capture, outbox and photo survive closing SQLite and are encrypted',
     () async {
@@ -151,7 +180,7 @@ void main() {
         utf8.encode('photo ficticia'),
       );
       expect(await db.query('outbox'), hasLength(1));
-      expect(await store.list('bob'), isEmpty);
+      expect((await store.list('bob')).rows, isEmpty);
     },
   );
   test('missing attachment rolls back incident and patient together', () async {
@@ -164,7 +193,7 @@ void main() {
       ),
       throwsA(isA<FileSystemException>()),
     );
-    expect(await store.list('alice'), isEmpty);
+    expect((await store.list('alice')).rows, isEmpty);
     expect(await db.query('outbox'), isEmpty);
   });
   test(
@@ -266,6 +295,41 @@ void main() {
     await Future.wait([a, b]);
     expect(remote.calls, ['i']);
   });
+  test('el reintento manual espera un único lote forzado', () async {
+    await enqueue([draft('active'), draft('later')]);
+    final delayed = (await store.get('alice', 'later'))!;
+    delayed['next_attempt'] = now
+        .add(const Duration(hours: 1))
+        .toIso8601String();
+    await store.save('alice', delayed);
+    final holdFollowUp = Completer<void>();
+    remote.afterCreate = () => remote.hold = holdFollowUp;
+    final service = engine();
+
+    final automatic = service.sync();
+    final forced = service.sync(force: true);
+    expect(service.sync(), same(automatic));
+    expect(service.sync(force: true), same(forced));
+    expect(forced, isNot(same(automatic)));
+    await automatic;
+    expect(service.sync(force: true), same(forced));
+    holdFollowUp.complete();
+    await forced;
+    expect(remote.calls, ['active', 'later']);
+    expect(service.syncing, isFalse);
+  });
+
+  test('descarta el reintento forzado si cambia la sesión', () async {
+    await enqueue([draft('active'), draft('later')]);
+    remote.afterCreate = () => generation++;
+    final service = engine();
+    final automatic = service.sync();
+    final forced = service.sync(force: true);
+    await Future.wait([automatic, forced]);
+    expect(remote.calls, ['active']);
+    expect(await store.hasPending('alice'), isTrue);
+  });
+
   test('account changes during upload stop subsequent operations', () async {
     await enqueue([draft('i'), draft('p', kind: 'patient', parent: 'i')]);
     remote.afterCreate = () {
@@ -274,7 +338,7 @@ void main() {
     };
     await engine().sync(force: true);
     expect(remote.calls, ['i']);
-    expect(await store.list('bob'), isEmpty);
+    expect((await store.list('bob')).rows, isEmpty);
     account = 'alice';
     generation++;
     remote.afterCreate = null;
@@ -296,6 +360,33 @@ void main() {
       expect((await store.get('alice', 'i'))!['state'], 'synced');
     },
   );
+  test('repone la foto perdida en Storage desde el archivo cifrado', () async {
+    final file = await File(
+      '${directory.path}/photo.jpg',
+    ).writeAsBytes([1, 2, 3]);
+    await enqueue(
+      [draft('incident')],
+      files: {
+        'incident': [file.path],
+      },
+    );
+    remote.failLink = true;
+    await engine().sync(force: true);
+    final capture = (await store.get('alice', 'incident'))!;
+    expect(capture['photos'][0]['uploaded'], isTrue);
+    expect(await db.query('attachments'), hasLength(1));
+
+    remote.objects.clear();
+    remote.failLink = false;
+    await engine().sync(force: true);
+
+    expect(remote.objects, hasLength(1));
+    expect(remote.links, remote.objects);
+    expect(remote.calls, ['incident']);
+    expect(await db.query('attachments'), isEmpty);
+    expect(await db.query('outbox'), isEmpty);
+  });
+
   test(
     'lost photo response and failed link keep encrypted copy until all confirmed',
     () async {
@@ -354,18 +445,93 @@ void main() {
     await enqueue([draft('i')]);
     remote.failure = TimeoutException('network');
     await engine().sync();
+    final retry = DateTime.parse(
+      (await store.get('alice', 'i'))!['next_attempt'] as String,
+    );
+    now = retry.subtract(const Duration(milliseconds: 1));
     await engine().sync();
     expect(remote.calls, ['i']);
-    await engine().sync(force: true);
+    now = retry;
+    await engine().sync();
     expect(remote.calls, ['i', 'i']);
   });
   test('ciphertext cannot be reassigned to a different account', () async {
     await enqueue([draft('i')]);
     await db.update('captures', {'account': 'bob'});
-    await expectLater(
-      store.list('bob'),
-      throwsA(isA<SecretBoxAuthenticationError>()),
-    );
+    final result = await store.list('bob');
+    expect(result.rows, isEmpty);
+    expect(result.unreadableIds, ['i']);
+  });
+  test(
+    'conserva una captura ilegible y sincroniza las independientes',
+    () async {
+      final file = await File(
+        '${directory.path}/photo.jpg',
+      ).writeAsBytes([1, 2, 3]);
+      await enqueue(
+        [
+          draft('bad'),
+          draft('bad-json'),
+          draft('child', kind: 'patient', parent: 'bad'),
+          draft('good'),
+        ],
+        files: {
+          'bad': [file.path],
+        },
+      );
+      await db.update(
+        'captures',
+        {'body': Uint8List(40)},
+        where: 'id = ?',
+        whereArgs: ['bad'],
+      );
+      final malformed = await AesGcm.with256bits().encrypt(
+        utf8.encode('['),
+        secretKey: key,
+        aad: utf8.encode('alice/bad-json'),
+      );
+      await db.update(
+        'captures',
+        {'body': Uint8List.fromList(malformed.concatenation())},
+        where: 'id = ?',
+        whereArgs: ['bad-json'],
+      );
+      final result = await store.list('alice');
+      expect(
+        result.rows.map((row) => row['id']),
+        unorderedEquals(['child', 'good']),
+      );
+      expect(result.unreadableIds, unorderedEquals(['bad', 'bad-json']));
+
+      await engine().sync(force: true);
+
+      expect(remote.calls, ['good']);
+      expect(
+        await db.query('outbox', columns: ['id']),
+        unorderedEquals([
+          {'id': 'bad'},
+          {'id': 'bad-json'},
+          {'id': 'child'},
+        ]),
+      );
+      expect(await db.query('attachments'), hasLength(1));
+      expect(
+        (await store.list('alice')).unreadableIds,
+        unorderedEquals(['bad', 'bad-json']),
+      );
+    },
+  );
+  test('omite la caché si la sesión cambia durante el cifrado', () async {
+    final pendingKey = Completer<SecretKey>();
+    final pendingStore = OfflineCaptureStore(db, (_) => pendingKey.future);
+    var authorized = true;
+    final pending = pendingStore.cacheIncident('alice', {
+      'id': 'late',
+    }, authorized: () => authorized);
+    authorized = false;
+    pendingKey.complete(key);
+    await pending;
+    expect(await store.cachedIncident('alice', 'late'), isNull);
   });
   test('incomplete server confirmation never marks a capture synced', () async {
     await enqueue([draft('p', kind: 'patient')]);

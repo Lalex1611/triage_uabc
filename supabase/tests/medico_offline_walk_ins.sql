@@ -30,6 +30,7 @@ declare
   confirmed jsonb;
   patient uuid;
   photo text;
+  other_photo text;
 begin
   perform set_config('request.jwt.claim.sub', actor::text, true);
   confirmed := public.sync_medico_walk_in_capture(actor, capture_id, request);
@@ -57,6 +58,14 @@ begin
   begin
     perform public.link_medico_walk_in_photo(actor, patient, photo);
     raise exception 'No se esperaba confirmar una foto sin subir';
+  exception when sqlstate 'P0801' then null;
+  end;
+  other_photo := patient::text || '/a8430000-0000-0000-0000-000000000002.jpg';
+  insert into storage.objects (bucket_id, name, owner_id)
+    values ('patient_photos', other_photo, colleague::text);
+  begin
+    perform public.link_medico_walk_in_photo(actor, patient, other_photo);
+    raise exception 'Se esperaba rechazar el archivo de otra cuenta';
   exception when insufficient_privilege then null;
   end;
   insert into storage.objects (bucket_id, name, owner_id) values ('patient_photos', photo, actor::text);

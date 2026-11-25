@@ -12,6 +12,9 @@ const _bucket = '/storage/v1/object/incident_photos';
 ParamedicoIncidentsRepository _repo(List<http.Request> requests) {
   final client = MockClient((request) async {
     requests.add(request);
+    if (request.url.path.endsWith('/rpc/paramedico_update_patient_record')) {
+      return http.Response('', 204, request: request);
+    }
     return http.Response(
       request.url.path.contains('/sign/')
           ? jsonEncode([
@@ -35,6 +38,30 @@ ParamedicoIncidentsRepository _repo(List<http.Request> requests) {
 }
 
 void main() {
+  test('edita el paciente con la RPC que conserva fotos verificadas', () async {
+    final requests = <http.Request>[];
+    await _repo(requests).updatePatientRecord(
+      patientId: 'paciente',
+      displayName: 'Paciente ficticio',
+      triageColor: 'amarillo',
+      demographics: {
+        'photo_local_paths': ['edicion.jpg'],
+      },
+    );
+
+    final request = requests.single;
+    expect(request.url.path, '/rest/v1/rpc/paramedico_update_patient_record');
+    expect(request.method, 'POST');
+    expect(jsonDecode(request.body), {
+      'p_patient_id': 'paciente',
+      'p_display_name': 'Paciente ficticio',
+      'p_triage_color': 'amarillo',
+      'p_demographics': {
+        'photo_local_paths': ['edicion.jpg'],
+      },
+    });
+  });
+
   test('sube dentro de la carpeta del incidente y devuelve la ruta', () async {
     final dir = Directory.systemTemp.createTempSync('b9');
     addTearDown(() => dir.deleteSync(recursive: true));

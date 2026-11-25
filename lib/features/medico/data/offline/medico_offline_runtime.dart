@@ -154,14 +154,16 @@ class MedicoOfflineRuntime extends ChangeNotifier with WidgetsBindingObserver {
     _changed();
   }
 
-  Future<List<Capture>> captures() async {
+  Future<CaptureReadResult> captures() async {
     final owner = session;
     final store = _store;
-    if (owner == null || store == null) return [];
+    if (owner == null || store == null) return emptyCaptureReadResult;
     final generation = _auth.sessionGeneration;
-    final rows = await store.list(storageScope(owner));
-    if (session != owner || generation != _auth.sessionGeneration) return [];
-    return rows;
+    final result = await store.list(storageScope(owner));
+    if (session != owner || generation != _auth.sessionGeneration) {
+      return emptyCaptureReadResult;
+    }
+    return result;
   }
 
   Future<void> retryReviewedCapture(String id) async {

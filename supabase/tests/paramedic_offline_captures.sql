@@ -21,6 +21,7 @@ declare
   first_result jsonb;
   again jsonb;
   photo text;
+  other_photo text;
 begin
   first_result := public.sync_paramedic_capture(a,'incident',i,request);
   again := public.sync_paramedic_capture(a,'incident',i,request);
@@ -31,7 +32,8 @@ begin
     raise exception 'Expected conflict';
   exception when unique_violation then null; end;
   patient := jsonb_build_object('incident_id',i,'triage_color','verde','display_name','Paciente ficticio A08',
-    'demographics',jsonb_build_object('description','Datos ficticios'),'lat',32.5,'lng',-117.0,
+    'demographics','{"description":"Datos ficticios","photo_local_paths":["local.jpg"],"photo_storage_paths":["sin-verificar.jpg"]}'::jsonb,
+    'lat',32.5,'lng',-117.0,
     'captured_at','2026-11-16T12:00:00Z');
   first_result := public.sync_paramedic_capture(a,'patient',p,patient);
   again := public.sync_paramedic_capture(a,'patient',p,patient);
@@ -40,6 +42,8 @@ begin
   assert (select count(*)=1 from public.consultation_codes where patient_id=p), 'duplicate consultation code';
   assert (select location is not null and incident_id=i from public.patients where id=p), 'location or parent missing';
   assert (select location_captured_at='2026-11-16T12:00:00Z'::timestamptz from public.patients where id=p), 'capture date missing';
+  assert (select demographics = '{"description":"Datos ficticios"}'::jsonb
+    from public.patients where id=p), 'Se aceptaron referencias a fotos sin verificar';
   begin
     perform 1 from public.paramedic_capture_receipts;
     raise exception 'Expected private receipt rejection';
@@ -54,11 +58,33 @@ begin
   begin
     perform public.link_paramedic_capture_photo(a,'patient',p,photo);
     raise exception 'Expected missing upload';
-  exception when invalid_parameter_value then null; end;
+  exception when sqlstate 'P0801' then null; end;
+  other_photo := p::text||'/a0830000-0000-0000-0000-000000000003.jpg';
+  insert into storage.objects(bucket_id,name,owner_id)
+    values('patient_photos',other_photo,'a0800000-0000-0000-0000-000000000002');
+  begin
+    perform public.link_paramedic_capture_photo(a,'patient',p,other_photo);
+    raise exception 'Se esperaba rechazar el archivo de otra cuenta';
+  exception when insufficient_privilege then null; end;
   insert into storage.objects(bucket_id,name,owner_id) values('patient_photos',photo,a::text);
   perform public.link_paramedic_capture_photo(a,'patient',p,photo);
   perform public.link_paramedic_capture_photo(a,'patient',p,photo);
   assert (select jsonb_array_length(demographics->'photo_storage_paths')=1 from public.patients where id=p), 'duplicate photo link';
+  perform public.paramedico_update_patient_record(
+    p,
+    '{"description":"Descripción editada","photo_local_paths":["foto-local.jpg"],"photo_storage_paths":["ruta antigua"]}',
+    p_display_name => 'Paciente ficticio editado',
+    p_triage_color => 'amarillo'
+  );
+  assert (select display_name = 'Paciente ficticio editado' and triage_color = 'amarillo'
+      and demographics->>'description' = 'Descripción editada'
+      and demographics->'photo_local_paths' = '["foto-local.jpg"]'::jsonb
+      and demographics->'photo_storage_paths' = jsonb_build_array(photo)
+    from public.patients where id = p), 'La edición reemplazó fotos verificadas o perdió datos del formulario';
+  perform public.paramedico_update_patient_record(p, '{"description":"Otra edición","photo_local_paths":[]}');
+  assert (select demographics->'photo_local_paths' = '[]'::jsonb
+      and demographics->'photo_storage_paths' = jsonb_build_array(photo)
+    from public.patients where id = p), 'Se perdieron fotos remotas al quitar las fotos locales';
   photo := i::text||'/a0830000-0000-0000-0000-000000000002.jpg';
   insert into storage.objects(bucket_id,name,owner_id) values('incident_photos',photo,a::text);
   perform public.link_paramedic_capture_photo(a,'incident',i,photo);
@@ -88,7 +114,10 @@ reset role;
 -- Provoca un fallo al generar el código después de insertar al paciente para
 -- comprobar que se revierta toda la transacción de la RPC.
 create function public.a08_fail_code() returns trigger language plpgsql as $$
-begin raise exception 'simulated code failure'; end; $$;
+begin
+  raise exception using errcode='P0899', message='Fallo simulado al generar el código';
+end;
+$$;
 create trigger a08_code_failure before insert on public.consultation_codes for each row execute function public.a08_fail_code();
 set local role authenticated;
 select set_config('request.jwt.claim.sub','a0800000-0000-0000-0000-000000000001',true);
@@ -98,7 +127,7 @@ begin
     perform public.sync_paramedic_capture('a0800000-0000-0000-0000-000000000001','patient',
       'a0820000-0000-0000-0000-000000000003','{"incident_id":"a0810000-0000-0000-0000-000000000001","triage_color":"verde","demographics":{},"lat":32.5,"lng":-117}');
     raise exception using errcode='22023',message='Expected code failure';
-  exception when raise_exception then null; end;
+  exception when sqlstate 'P0899' then null; end;
   assert not exists(select 1 from public.patients where id='a0820000-0000-0000-0000-000000000003'), 'partial patient after code failure';
 end;
 $$;

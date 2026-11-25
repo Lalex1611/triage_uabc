@@ -7,6 +7,7 @@ import 'package:sistema_triage/features/paramedico/data/offline/paramedico_offli
 
 import 'package:latlong2/latlong.dart';
 import 'package:sistema_triage/core/config/supabase_env.dart';
+import 'package:sistema_triage/core/session/auth_gate.dart';
 import 'package:sistema_triage/features/paramedico/domain/entities/map/map_patient_pin.dart';
 import 'package:sistema_triage/features/paramedico/domain/services/map_incident_coverage_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -451,6 +452,8 @@ class ParamedicoIncidentsRepository {
         return ParamedicoIncidentSummary.fromJson(local);
       }
     }
+    final cacheOwner = usesLocalCaptures ? offline.account : null;
+    final cacheGeneration = AuthGate.instance.sessionGeneration;
     try {
       final row = await _c
           .from('incidents')
@@ -463,8 +466,12 @@ class ParamedicoIncidentsRepository {
           .maybeSingle()
           .timeout(const Duration(seconds: 8));
       if (row == null) return null;
-      if (usesLocalCaptures) {
-        await offline.cacheIncident(Map<String, dynamic>.from(row));
+      if (cacheOwner != null) {
+        await offline.cacheIncident(
+          Map<String, dynamic>.from(row),
+          owner: cacheOwner,
+          generation: cacheGeneration,
+        );
       }
       return ParamedicoIncidentSummary.fromJson(Map<String, dynamic>.from(row));
     } on TimeoutException {
@@ -1032,7 +1039,15 @@ class ParamedicoIncidentsRepository {
     if (hospitalId != null) patch['hospital_id'] = hospitalId;
     if (regulationFolio != null) patch['regulation_folio'] = regulationFolio;
     if (ambulanceUnitId != null) patch['ambulance_unit_id'] = ambulanceUnitId;
-    if (patch.isNotEmpty) {
+    if (demographics != null) {
+      await _c.rpc<void>(
+        'paramedico_update_patient_record',
+        params: {
+          'p_patient_id': patientId,
+          for (final entry in patch.entries) 'p_${entry.key}': entry.value,
+        },
+      );
+    } else if (patch.isNotEmpty) {
       await _c.from('patients').update(patch).eq('id', patientId);
     }
 

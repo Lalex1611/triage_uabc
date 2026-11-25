@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:sistema_triage/core/session/auth_gate.dart';
 import 'package:sistema_triage/features/paramedico/data/offline/offline_capture_store.dart';
 import 'package:sistema_triage/features/paramedico/data/offline/paramedico_offline_runtime.dart';
 import 'package:sistema_triage/features/paramedico/presentation/offline/offline_connection_page.dart';
@@ -29,11 +30,12 @@ class OfflineCapturePage extends StatelessWidget {
             ),
           );
         }
-        return FutureBuilder<List<Capture>>(
-          key: ValueKey(runtime.account),
+        final session = (runtime.account, AuthGate.instance.sessionGeneration);
+        return FutureBuilder<CaptureReadResult>(
+          key: ValueKey(session),
           future: runtime.captures(),
           builder: (context, snapshot) {
-            final rows = snapshot.data ?? [];
+            final rows = snapshot.data?.rows ?? [];
             final matches = rows.where((r) => r['id'] == id);
             final row = matches.isEmpty ? null : matches.first;
             if (row == null) {
@@ -43,6 +45,8 @@ class OfflineCapturePage extends StatelessWidget {
                   child: Text(
                     snapshot.connectionState == ConnectionState.waiting
                         ? 'Cargando…'
+                        : (snapshot.data?.unreadableIds.contains(id) ?? false)
+                        ? unreadableCaptureMessage([id])
                         : 'Captura no disponible para esta cuenta.',
                   ),
                 ),
@@ -120,10 +124,20 @@ class OfflineCapturePage extends StatelessWidget {
                                     }
                                   },
                           ),
-                        for (final raw in row['photos'] as List)
-                          _CapturePhoto(
-                            capture: row,
-                            photo: Capture.from(raw as Map),
+                        for (final photo
+                            in (row['photos'] as List).cast<Capture>())
+                          OfflineCapturePhoto(
+                            key: ValueKey(photo['id']),
+                            requestIdentity: (
+                              session,
+                              row['id'],
+                              row['kind'],
+                              row['remote_id'],
+                              photo['id'],
+                              photo['extension'],
+                            ),
+                            synced: row['state'] == 'synced',
+                            loadBytes: () => runtime.photoBytes(row, photo),
                           ),
                         if (isIncident) ...[
                           const SizedBox(height: 24),
@@ -210,13 +224,38 @@ class OfflineCapturePage extends StatelessWidget {
       key;
 }
 
-class _CapturePhoto extends StatelessWidget {
-  const _CapturePhoto({required this.capture, required this.photo});
-  final Capture capture;
-  final Capture photo;
+class OfflineCapturePhoto extends StatefulWidget {
+  const OfflineCapturePhoto({
+    super.key,
+    required this.requestIdentity,
+    required this.synced,
+    required this.loadBytes,
+  });
+
+  final Object requestIdentity;
+  final bool synced;
+  final Future<Uint8List> Function() loadBytes;
+
+  @override
+  State<OfflineCapturePhoto> createState() => _OfflineCapturePhotoState();
+}
+
+class _OfflineCapturePhotoState extends State<OfflineCapturePhoto> {
+  late Future<Uint8List> _photo = widget.loadBytes();
+
+  @override
+  void didUpdateWidget(covariant OfflineCapturePhoto oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.requestIdentity != widget.requestIdentity ||
+        oldWidget.synced != widget.synced) {
+      _photo = widget.loadBytes();
+    }
+  }
+
   @override
   Widget build(BuildContext context) => FutureBuilder<Uint8List>(
-    future: ParamedicoOfflineRuntime.instance.photoBytes(capture, photo),
+    key: ValueKey(_photo),
+    future: _photo,
     builder: (context, snapshot) {
       if (snapshot.hasData) {
         return Padding(
@@ -233,7 +272,7 @@ class _CapturePhoto extends StatelessWidget {
         padding: const EdgeInsets.all(12),
         child: Text(
           snapshot.hasError
-              ? capture['state'] == 'synced'
+              ? widget.synced
                     ? 'Foto conservada en el servidor; requiere conexión para consultarla.'
                     : 'No se pudo abrir la foto local. Reintenta; la captura sigue guardada.'
               : 'Cargando foto…',

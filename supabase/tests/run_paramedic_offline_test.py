@@ -17,12 +17,32 @@ CONTAINER = 'triage-a08-test'
 ROOT = Path(__file__).resolve().parents[1]
 DATABASE = 'a08_tests_' + str(time.time_ns())
 
+def wait_for_postgres(timeout=30):
+    deadline = time.monotonic() + timeout
+    while (remaining := deadline - time.monotonic()) > 0:
+        try:
+            # El servidor temporal de inicialización solo escucha por socket Unix.
+            result = subprocess.run(
+                ['docker', 'exec', CONTAINER, 'psql', '-h', '127.0.0.1',
+                 '-U', 'postgres', '-d', 'postgres', '-w', '-Atqc', 'select 1'],
+                capture_output=True,
+                encoding='utf-8',
+                timeout=min(2, remaining),
+            )
+            if result.returncode == 0 and result.stdout.strip() == '1':
+                return
+        except subprocess.TimeoutExpired:
+            pass
+        time.sleep(min(0.25, max(0, deadline - time.monotonic())))
+    raise RuntimeError(f'PostgreSQL en {CONTAINER} no aceptó conexiones TCP en {timeout} s.')
+
 def sql(text, database=DATABASE):
     result = subprocess.run(['docker','exec','-i',CONTAINER,'psql','-U','postgres',
         '-d',database,'-v','ON_ERROR_STOP=1','-q'],input=text,encoding='utf-8',capture_output=True)
     if result.returncode:
         raise RuntimeError(result.stderr)
 
+wait_for_postgres()
 sql('create database ' + DATABASE + ';', 'postgres')
 sql("""
 do $$ begin create role anon nologin; exception when duplicate_object then null; end; $$;

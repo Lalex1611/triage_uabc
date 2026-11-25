@@ -45,6 +45,7 @@ class ParamedicoOfflineRuntime extends ChangeNotifier
 
   Future<Uint8List> photoBytes(Capture capture, Capture photo) async {
     final owner = account;
+    final generation = AuthGate.instance.sessionGeneration;
     if (owner == null || store == null) {
       throw StateError('Sesión no disponible.');
     }
@@ -60,7 +61,9 @@ class ParamedicoOfflineRuntime extends ChangeNotifier
               )
               .timeout(const Duration(seconds: 10))
         : await store!.attachment(owner, photo['id'] as String);
-    if (account != owner) throw StateError('La sesión cambió.');
+    if (account != owner || AuthGate.instance.sessionGeneration != generation) {
+      throw StateError('La sesión cambió.');
+    }
     return bytes;
   }
 
@@ -134,14 +137,14 @@ class ParamedicoOfflineRuntime extends ChangeNotifier
     if (!offline) await synchronize(force: true);
   }
 
-  Future<List<Capture>> captures() async {
+  Future<CaptureReadResult> captures() async {
     final owner = account;
     final generation = AuthGate.instance.sessionGeneration;
-    if (owner == null || store == null) return [];
-    final rows = await store!.list(owner);
+    if (owner == null || store == null) return emptyCaptureReadResult;
+    final result = await store!.list(owner);
     return account == owner && generation == AuthGate.instance.sessionGeneration
-        ? rows
-        : [];
+        ? result
+        : emptyCaptureReadResult;
   }
 
   Future<Capture?> local(String id) async {
@@ -175,9 +178,15 @@ class ParamedicoOfflineRuntime extends ChangeNotifier
     };
   }
 
-  Future<void> cacheIncident(Capture row) async {
-    final owner = account;
-    if (owner != null && store != null) await store!.cacheIncident(owner, row);
+  Future<void> cacheIncident(
+    Capture row, {
+    required String owner,
+    required int generation,
+  }) async {
+    bool authorized() =>
+        account == owner && AuthGate.instance.sessionGeneration == generation;
+    if (store == null || !authorized()) return;
+    await store!.cacheIncident(owner, row, authorized: authorized);
   }
 
   Future<Capture> capture({

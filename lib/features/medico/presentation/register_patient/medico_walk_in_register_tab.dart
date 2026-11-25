@@ -323,6 +323,9 @@ class _MedicoWalkInRegisterTabState extends State<MedicoWalkInRegisterTab> {
           return;
         }
       }
+      if (AuthGate.instance.hospitalId != hosp) {
+        throw StateError('Verifica tu sesión de Médico con conexión.');
+      }
       final result = await _patientsRepo.registerWalkInPatient(
         triageColor: triage,
         displayName: name,

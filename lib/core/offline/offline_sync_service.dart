@@ -61,6 +61,8 @@ abstract class SupabaseOfflineCaptureRemote implements CaptureRemote {
   }
 }
 
+typedef _SyncSession = ({String account, String scope, int generation});
+
 /// Procesa un solo lote a la vez y guarda el avance para retomarlo si la app
 /// se cierra.
 class OfflineSyncService extends ChangeNotifier {
@@ -79,24 +81,67 @@ class OfflineSyncService extends ChangeNotifier {
   final String? Function(String account)? storageScope;
   final DateTime Function() now;
   Future<void>? _running;
+  _SyncSession? _runningSession;
+  bool _runningForced = false;
+  Completer<void>? _forcedFollowUp;
   bool get syncing => _running != null;
   String? storageError;
   (String, int)? _authenticationRequired;
 
-  Future<void> sync({bool force = false}) {
-    if (_running != null) return _running!;
+  _SyncSession? get _session {
     final account = currentAccount();
-    if (account == null) return Future.value();
-    final generation = sessionGeneration();
+    if (account == null) return null;
     final scope = storageScope == null ? account : storageScope!(account);
-    if (scope == null) return Future.value();
-    if (_authenticationRequired == (account, generation)) return Future.value();
-    _running = _run(account, scope, generation, force).whenComplete(() {
-      _running = null;
-      notifyListeners();
-    });
+    if (scope == null) return null;
+    return (account: account, scope: scope, generation: sessionGeneration());
+  }
+
+  Future<void> sync({bool force = false}) {
+    final session = _session;
+    if (_running case final running?) {
+      if (force && !_runningForced && session == _runningSession) {
+        return (_forcedFollowUp ??= Completer<void>()).future;
+      }
+      return running;
+    }
+    if (session == null ||
+        _authenticationRequired == (session.account, session.generation)) {
+      return Future.value();
+    }
+    return _start(session, force, Completer<void>());
+  }
+
+  Future<void> _start(
+    _SyncSession session,
+    bool force,
+    Completer<void> completion,
+  ) {
+    _runningSession = session;
+    _runningForced = force;
+    _running = completion.future;
+    completion.complete(
+      _run(
+        session.account,
+        session.scope,
+        session.generation,
+        force,
+      ).whenComplete(() {
+        final followUp = _forcedFollowUp;
+        _forcedFollowUp = null;
+        if (followUp != null &&
+            _session == session &&
+            _authenticationRequired != (session.account, session.generation)) {
+          _start(session, true, followUp);
+          return;
+        }
+        _running = null;
+        _runningSession = null;
+        followUp?.complete();
+        notifyListeners();
+      }),
+    );
     notifyListeners();
-    return _running!;
+    return completion.future;
   }
 
   Future<void> _run(
@@ -111,7 +156,8 @@ class OfflineSyncService extends ChangeNotifier {
         (storageScope == null || storageScope!(account) == scope);
     try {
       storageError = null;
-      final captures = await store.list(scope);
+      final (rows: captures, :unreadableIds) = await store.list(scope);
+      final unreadable = unreadableIds.toSet();
       captures.sort(
         (a, b) => (a['kind'] == 'incident' ? 0 : 1).compareTo(
           b['kind'] == 'incident' ? 0 : 1,
@@ -125,6 +171,7 @@ class OfflineSyncService extends ChangeNotifier {
         final payload = Capture.from(c['payload'] as Map);
         final parentId = c['parent_id'] as String?;
         if (parentId != null) {
+          if (unreadable.contains(parentId)) continue;
           // Tras el borrado local, incident_id sigue identificando el incidente
           // en el servidor porque la RPC lo crea con el UUID de la captura.
           final parent = await store.get(scope, parentId);
@@ -168,32 +215,43 @@ class OfflineSyncService extends ChangeNotifier {
           }
           for (final raw in c['photos'] as List) {
             final photo = raw as Capture;
-            if (!authorized()) return;
-            if (photo['uploaded'] != true) {
-              final bytes = await store.attachment(
-                scope,
-                photo['id'] as String,
-              );
+            if (photo['linked'] == true) continue;
+            for (var attempt = 0; attempt < 2; attempt++) {
               if (!authorized()) return;
-              await remote.upload(
-                c['kind'] as String,
-                c['remote_id'] as String,
-                photo,
-                bytes,
-              );
-              photo['uploaded'] = true;
-              await store.save(scope, c);
-            }
-            if (!authorized()) return;
-            if (photo['linked'] != true) {
-              await remote.link(
-                account,
-                c['kind'] as String,
-                c['remote_id'] as String,
-                photo,
-              );
+              if (photo['uploaded'] != true) {
+                final bytes = await store.attachment(
+                  scope,
+                  photo['id'] as String,
+                );
+                if (!authorized()) return;
+                await remote.upload(
+                  c['kind'] as String,
+                  c['remote_id'] as String,
+                  photo,
+                  bytes,
+                );
+                photo['uploaded'] = true;
+                await store.save(scope, c);
+              }
+              if (!authorized()) return;
+              try {
+                await remote.link(
+                  account,
+                  c['kind'] as String,
+                  c['remote_id'] as String,
+                  photo,
+                );
+              } on PostgrestException catch (error) {
+                if (error.code != 'P0801') rethrow;
+                // Conserva el archivo y vuelve a subirlo si Storage lo perdió.
+                photo['uploaded'] = false;
+                await store.save(scope, c);
+                if (attempt == 1) rethrow;
+                continue;
+              }
               photo['linked'] = true;
               await store.save(scope, c);
+              break;
             }
           }
           c['state'] = 'synced';

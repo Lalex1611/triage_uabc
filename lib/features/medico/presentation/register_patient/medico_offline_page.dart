@@ -29,16 +29,17 @@ class MedicoOfflinePage extends StatelessWidget {
         captureMessage:
             'Los registros de pacientes que llegan por su cuenta se guardan en este teléfono y se envían al recuperar la conexión.',
         pending: runtime.canCapture
-            ? FutureBuilder<List<Capture>>(
+            ? FutureBuilder<CaptureReadResult>(
                 key: ValueKey(runtime.session),
                 future: runtime.captures(),
                 builder: (context, snapshot) {
                   if (snapshot.hasError) {
                     return const Text('No se pudieron leer los registros.');
                   }
-                  final rows = snapshot.data;
-                  if (rows == null) return const LinearProgressIndicator();
-                  if (rows.isEmpty) {
+                  final result = snapshot.data;
+                  if (result == null) return const LinearProgressIndicator();
+                  final rows = result.rows;
+                  if (rows.isEmpty && result.unreadableIds.isEmpty) {
                     return const Center(
                       child: Text(
                         'No hay registros guardados en este teléfono.',
@@ -53,6 +54,8 @@ class MedicoOfflinePage extends StatelessWidget {
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
+                      if (result.unreadableIds.isNotEmpty)
+                        Text(unreadableCaptureMessage(result.unreadableIds)),
                       for (final row in rows)
                         _captureCard(context, runtime, row),
                     ],

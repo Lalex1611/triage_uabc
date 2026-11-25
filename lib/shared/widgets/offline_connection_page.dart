@@ -18,6 +18,9 @@ String captureTitle(Capture row) {
       : 'Paciente · ${(row['id'] as String).substring(0, 8).toUpperCase()}';
 }
 
+String unreadableCaptureMessage(List<String> ids) =>
+    'No se pudieron leer estas capturas. Se conservan para recuperación: ${ids.join(', ')}';
+
 /// A08 ofrece la captura local cuando el almacenamiento está listo y la sesión
 /// ya se verificó.
 class OfflineConnectionPage extends StatefulWidget {
