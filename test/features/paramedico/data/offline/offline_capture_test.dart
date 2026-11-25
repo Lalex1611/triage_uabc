@@ -21,6 +21,7 @@ class FakeRemote implements CaptureRemote {
   Object? linkFailure;
   Object? failure;
   bool incompleteConfirmation = false;
+  bool codeExpired = false;
   String Function(String id) recordId = (id) => 'remote-$id';
   Completer<void>? hold;
   void Function()? afterCreate;
@@ -44,7 +45,9 @@ class FakeRemote implements CaptureRemote {
       loseResponse = false;
       throw TimeoutException('response lost');
     }
-    return result;
+    return kind == 'patient' && codeExpired
+        ? {...result, 'code': null}
+        : result;
   }
 
   @override
@@ -274,10 +277,9 @@ void main() {
       draft('pending', kind: 'patient', parent: 'incident'),
       draft('attention')..['state'] = 'attention',
     ]);
+    now = now.add(const Duration(hours: 23, minutes: 59));
     await store.cacheIncident('alice', {'id': 'incident'});
     await store.cacheIncident('bob', {'id': 'incident'});
-
-    now = now.add(const Duration(hours: 23, minutes: 59));
     await store.purgeExpired();
     expect(await store.get('alice', 'incident'), isNotNull);
     expect(await store.cachedIncident('alice', 'incident'), isNotNull);
@@ -295,6 +297,72 @@ void main() {
     expect(await store.hasPending('alice'), isTrue);
     expect(await store.cachedIncident('alice', 'incident'), isNull);
     expect(await store.cachedIncident('bob', 'incident'), isNotNull);
+  });
+
+  test('una copia descargada sin captura local caduca en 24 horas', () async {
+    await enqueue([draft('i')]);
+    await engine().sync(force: true);
+    now = now.add(const Duration(hours: 24));
+    await store.purgeExpired();
+    expect(await store.get('alice', 'i'), isNull);
+
+    expect(await store.cacheIncident('alice', {'id': 'i'}), isTrue);
+    expect(await store.cachedIncident('alice', 'i'), isNotNull);
+    now = now.add(const Duration(hours: 24));
+    expect(await store.cachedIncident('alice', 'i'), isNull);
+    await store.purgeExpired();
+    expect(await db.query('incident_cache'), isEmpty);
+  });
+
+  test('un guardado en curso no revive la copia local vencida', () async {
+    await enqueue([draft('i')]);
+    await engine().sync(force: true);
+    now = now.add(const Duration(hours: 23));
+    final startedEncryption = Completer<void>();
+    final pendingKey = Completer<SecretKey>();
+    final pendingStore = OfflineCaptureStore(db, (_) {
+      startedEncryption.complete();
+      return pendingKey.future;
+    }, now: () => now);
+    final write = pendingStore.cacheIncident('alice', {'id': 'i'});
+    await startedEncryption.future;
+    now = now.add(const Duration(hours: 1));
+    await store.purgeExpired();
+    pendingKey.complete(key);
+
+    expect(await write, isFalse);
+    expect(await db.query('incident_cache'), isEmpty);
+  });
+
+  test('actualizar SQLite elimina solo las copias sin vencimiento', () async {
+    await enqueue([draft('pending')]);
+    // Reproduce la tabla de caché de la versión anterior.
+    await db.execute('DROP TABLE incident_cache');
+    await db.execute(
+      'CREATE TABLE incident_cache (account TEXT NOT NULL, id TEXT NOT NULL, '
+      'body BLOB NOT NULL, PRIMARY KEY(account,id))',
+    );
+    await db.insert('incident_cache', {
+      'account': 'alice',
+      'id': 'viejo',
+      'body': Uint8List.fromList([0]),
+    });
+    await db.setVersion(2);
+    await db.close();
+    db = await databaseFactoryFfi.openDatabase(
+      '${directory.path}/test.db',
+      options: OpenDatabaseOptions(
+        version: OfflineCaptureStore.schemaVersion,
+        onUpgrade: OfflineCaptureStore.upgradeSchema,
+      ),
+    );
+    store = OfflineCaptureStore(db, (_) async => key, now: () => now);
+
+    expect(await db.query('incident_cache'), isEmpty);
+    expect(await store.hasPending('alice'), isTrue);
+    expect(await store.get('alice', 'pending'), isNotNull);
+    expect(await store.cacheIncident('alice', {'id': 'nuevo'}), isTrue);
+    expect(await store.cachedIncident('alice', 'nuevo'), isNotNull);
   });
 
   test('patient can still sync after its confirmed incident expires', () async {
@@ -561,6 +629,31 @@ void main() {
     await pending;
     expect(await store.cachedIncident('alice', 'late'), isNull);
   });
+  test(
+    'sincroniza la foto tras confirmar al paciente con código nulo',
+    () async {
+      final photo = await File(
+        '${directory.path}/photo.jpg',
+      ).writeAsBytes([1, 2, 3]);
+      await enqueue(
+        [draft('p', kind: 'patient')],
+        files: {
+          'p': [photo.path],
+        },
+      );
+      remote.loseResponse = true;
+      await engine().sync(force: true);
+      remote.codeExpired = true;
+      await engine().sync(force: true);
+
+      final patient = (await store.get('alice', 'p'))!;
+      expect(patient['state'], 'synced');
+      expect(patient['code'], isNull);
+      expect(remote.records, hasLength(1));
+      expect(remote.links, hasLength(1));
+      expect(await db.query('attachments'), isEmpty);
+    },
+  );
   test('incomplete server confirmation never marks a capture synced', () async {
     await enqueue([draft('p', kind: 'patient')]);
     remote.incompleteConfirmation = true;

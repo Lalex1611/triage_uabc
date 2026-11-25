@@ -45,8 +45,52 @@ corregir algo se crea una nueva.
 | 23 | `20261120160000_medico_offline_walk_ins.sql` | Sincronización de admisiones y fotos capturadas sin conexión por Médico |
 | 24 | `20261124120000_a08_recover_capture_photos.sql` | Recuperación de fotos de capturas y preservación de adjuntos al editar pacientes |
 | 25 | `20261125120000_offline_consultation_codes_and_photos.sql` | Vigencia de códigos en reintentos y actualizaciones seguras de fotos |
+| 26 | `20261125130000_paramedic_capture_photo_integrity.sql` | Vigencia de códigos de Paramédico y protección del vínculo y retiro de fotos |
 
-La migración de Paramédico pasó de `20261117120000` a `20261120150000` para que su versión sea única y se ejecute después de las migraciones de Médico ya incorporadas a `main`. Si el SQL de A08 ya se ejecutó manualmente en un entorno, verifica sus tablas y funciones antes de registrar esa nueva versión en el historial.
+### Si el historial ya contiene la versión `20261117120000`
+
+La versión se usó para el registro de Médico (#12) y en una versión anterior del
+modo sin conexión de Paramédico, que pasó a `20261120150000` (#22). La CLI
+compara las versiones por fecha. En el SQL Editor revisa el nombre y las
+sentencias registradas, si existe la tabla de historial, y los objetos instalados.
+
+```sql
+select version, name, statements
+from supabase_migrations.schema_migrations
+where version in ('20261117120000', '20261120150000');
+
+select
+  to_regprocedure(
+    'public.medico_register_walk_in_patient(text,public.triage_color,jsonb,jsonb,text)'
+  ) as registro_medico,
+  to_regclass('public.paramedic_capture_receipts') as comprobantes_paramedico,
+  to_regprocedure('public.sync_paramedic_capture(uuid,text,uuid,jsonb)') as captura_paramedico,
+  to_regprocedure('public.link_paramedic_capture_photo(uuid,text,uuid,text)') as fotos_paramedico;
+```
+
+- Si la entrada corresponde al SQL de Médico, conserva `20261117120000`.
+  Si Paramédico se instaló aparte, verifica sus objetos y permisos antes de
+  registrar #22 como aplicada.
+- Si la entrada corresponde únicamente al SQL anterior de Paramédico, aplica
+  el archivo #12 en el SQL Editor si el registro de Médico sigue ausente.
+  Verifica que exista `medico_register_walk_in_patient`, que
+  `authenticated` pueda ejecutarla y que su definición corresponda a #12.
+  Comprueba también la tabla, RLS, RPC y permisos de Paramédico según #22.
+  Cuando ambos conjuntos estén instalados, registra #22 como aplicada y
+  sustituye la entrada antigua de #12 por la canónica. Omite el primer
+  comando si #22 ya figura como aplicada. Estos comandos reparan el historial
+  sin volver a ejecutar la creación de tablas.
+
+  ```bash
+  npx supabase migration repair 20261120150000 --status applied --linked
+  npx supabase migration repair 20261117120000 --status reverted --linked
+  npx supabase migration repair 20261117120000 --status applied --linked
+  npx supabase migration list --linked
+  ```
+
+Si falta el historial o la entrada carece de sentencias, confirma el origen
+con el SQL aplicado, las definiciones instaladas y el registro del despliegue
+antes de reparar. [Referencia de Supabase CLI](https://supabase.com/docs/reference/cli/supabase-migration-repair)
 
 ## Opción A: Supabase local (Docker)
 

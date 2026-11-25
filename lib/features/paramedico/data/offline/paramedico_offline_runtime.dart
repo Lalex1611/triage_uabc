@@ -195,6 +195,7 @@ class ParamedicoOfflineRuntime extends ChangeNotifier
     List<String> photos = const [],
     String? parentId,
     Capture? quickIncident,
+    Future<Capture?> Function(String)? fetchParent,
   }) async {
     final owner = account;
     final generation = AuthGate.instance.sessionGeneration;
@@ -203,6 +204,9 @@ class ParamedicoOfflineRuntime extends ChangeNotifier
         error ?? 'Autentícate como paramédico antes de capturar.',
       );
     }
+    bool authorized() =>
+        account == owner && AuthGate.instance.sessionGeneration == generation;
+    final captureStore = store!;
     final entries = <Capture>[];
     if (quickIncident != null) {
       parentId = const Uuid().v4();
@@ -215,11 +219,29 @@ class ParamedicoOfflineRuntime extends ChangeNotifier
       );
       payload = {...payload, 'incident_id': parentId};
     } else if (parentId != null &&
-        await store!.get(owner, parentId) == null &&
-        await store!.cachedIncident(owner, parentId) == null) {
-      throw StateError(
-        'Abre este incidente con conexión antes de registrar pacientes sin red.',
-      );
+        await captureStore.get(owner, parentId) == null &&
+        await captureStore.cachedIncident(owner, parentId) == null) {
+      if (offline || fetchParent == null) {
+        throw StateError(
+          'Abre este incidente con conexión antes de registrar pacientes sin red.',
+        );
+      }
+      try {
+        final parent = authorized() ? await fetchParent(parentId) : null;
+        if (!authorized() ||
+            parent == null ||
+            !await captureStore.cacheIncident(
+              owner,
+              parent,
+              authorized: authorized,
+            )) {
+          throw StateError('Incidente no disponible.');
+        }
+      } catch (_) {
+        throw StateError(
+          'No se pudo guardar una copia del incidente. Revisa la conexión y vuelve a intentarlo.',
+        );
+      }
     }
     final id = const Uuid().v4();
     final row = OfflineCaptureStore.draft(
@@ -230,14 +252,9 @@ class ParamedicoOfflineRuntime extends ChangeNotifier
     );
     entries.add(row);
     try {
-      await store!.enqueue(
-        owner,
-        entries,
-        {id: photos},
-        authorized: () =>
-            account == owner &&
-            AuthGate.instance.sessionGeneration == generation,
-      );
+      await captureStore.enqueue(owner, entries, {
+        id: photos,
+      }, authorized: authorized);
     } on FormatException {
       rethrow;
     } on FileSystemException {

@@ -2,8 +2,10 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:sistema_triage/core/session/auth_gate.dart';
+import 'package:sistema_triage/core/ui/app_snackbar.dart';
 import 'package:sistema_triage/features/paramedico/data/offline/offline_capture_store.dart';
 import 'package:sistema_triage/features/paramedico/data/offline/paramedico_offline_runtime.dart';
+import 'package:sistema_triage/features/paramedico/data/repositories/paramedico_incidents_repository.dart';
 import 'package:sistema_triage/features/paramedico/presentation/offline/offline_connection_page.dart';
 import 'package:sistema_triage/features/paramedico/presentation/patient_intake/patient_intake_flow.dart';
 import 'package:sistema_triage/shared/patient/consultation_code_qr_dialog.dart';
@@ -54,7 +56,7 @@ class OfflineCapturePage extends StatelessWidget {
             }
             final payload = row['payload'] as Map;
             final isIncident = row['kind'] == 'incident';
-            final code = row['code'] as String?;
+            final remoteId = row['remote_id'] as String?;
             return Scaffold(
               backgroundColor: TriageColors.canvas,
               body: Column(
@@ -156,18 +158,45 @@ class OfflineCapturePage extends StatelessWidget {
                               ),
                             ),
                         ],
-                        if (!isIncident && code?.isNotEmpty == true)
+                        if (!isIncident && remoteId != null && !runtime.offline)
                           TriageButton(
                             label: 'Código de consulta',
                             variant: TriageButtonVariant.secondary,
-                            onPressed: () => ConsultationCodeQrDialog.show(
-                              context,
-                              code: code!,
-                            ),
+                            onPressed: () async {
+                              bool sameSession() =>
+                                  !runtime.offline &&
+                                  (
+                                        runtime.account,
+                                        AuthGate.instance.sessionGeneration,
+                                      ) ==
+                                      session;
+                              if (!sameSession()) return;
+                              String? code;
+                              try {
+                                code = await ParamedicoIncidentsRepository()
+                                    .getActiveConsultationCode(remoteId);
+                              } catch (_) {
+                                // Sin respuesta no se puede confirmar el QR.
+                              }
+                              if (!context.mounted || !sameSession()) return;
+                              if (code == null) {
+                                showAppSnackBar(
+                                  context,
+                                  'No se pudo confirmar un código de consulta vigente.',
+                                  isError: true,
+                                );
+                                return;
+                              }
+                              await ConsultationCodeQrDialog.show(
+                                context,
+                                code: code,
+                              );
+                            },
                           ),
-                        if (!isIncident && code?.isNotEmpty != true)
+                        if (!isIncident &&
+                            (remoteId == null || runtime.offline))
                           const Text(
-                            'El QR estará disponible cuando el servidor confirme el código.',
+                            'Se necesita conexión para comprobar el código del paciente en el servidor.',
                           ),
                         const SizedBox(height: 16),
                         if (row['state'] == 'synced')

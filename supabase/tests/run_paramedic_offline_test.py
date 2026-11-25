@@ -36,11 +36,24 @@ def wait_for_postgres(timeout=30):
         time.sleep(min(0.25, max(0, deadline - time.monotonic())))
     raise RuntimeError(f'PostgreSQL en {CONTAINER} no aceptó conexiones TCP en {timeout} s.')
 
+def psql(database):
+    return ['docker', 'exec', '-i', CONTAINER, 'psql', '-U', 'postgres',
+            '-d', database, '-v', 'ON_ERROR_STOP=1', '-qAt']
+
 def sql(text, database=DATABASE):
-    result = subprocess.run(['docker','exec','-i',CONTAINER,'psql','-U','postgres',
-        '-d',database,'-v','ON_ERROR_STOP=1','-q'],input=text,encoding='utf-8',capture_output=True)
+    result = subprocess.run(psql(database), input=text, encoding='utf-8',
+                            capture_output=True, timeout=30)
     if result.returncode:
         raise RuntimeError(result.stderr)
+    return result.stdout.strip()
+
+def wait_for_condition(query, failure, timeout=10):
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if sql(query) == 't':
+            return
+        time.sleep(0.1)
+    raise RuntimeError(failure)
 
 wait_for_postgres()
 sql('create database ' + DATABASE + ';', 'postgres')
@@ -82,11 +95,43 @@ select public.sync_paramedic_capture('a0800000-0000-0000-0000-000000000010','inc
 select public.sync_paramedic_capture('a0800000-0000-0000-0000-000000000010','patient',
 'a0820000-0000-0000-0000-000000000010','{"incident_id":"a0810000-0000-0000-0000-000000000010","triage_color":"verde","demographics":{},"lat":32.5,"lng":-117}');
 """
-with ThreadPoolExecutor(max_workers=6) as pool:
-    list(pool.map(sql,[request]*6))
+with ThreadPoolExecutor(max_workers=5) as pool:
+    with subprocess.Popen(psql(DATABASE), stdin=subprocess.PIPE,
+                          stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
+                          encoding='utf-8') as first:
+        first.stdin.write("set application_name = 'offline-replay-first';\nbegin;\n" + request)
+        first.stdin.flush()
+        try:
+            wait_for_condition("""
+                select exists (
+                  select 1 from pg_stat_activity where application_name = 'offline-replay-first'
+                  and state = 'idle in transaction'
+                );
+            """, 'La primera solicitud no quedó abierta después de registrar la captura.')
+            retries = [
+                pool.submit(sql, "set application_name = 'offline-replay-retry';\n" + request)
+                for _ in range(5)
+            ]
+            wait_for_condition("""
+                select exists (
+                  select 1 from pg_stat_activity retry
+                  join pg_stat_activity first on first.pid = any(pg_blocking_pids(retry.pid))
+                  where retry.application_name = 'offline-replay-retry'
+                  and retry.wait_event_type = 'Lock' and retry.wait_event = 'advisory'
+                  and first.application_name = 'offline-replay-first'
+                );
+            """, 'Ningún reintento llegó al bloqueo de la primera transacción.')
+            first.stdin.write("commit;\n")
+        finally:
+            # Si falla la espera, cerrar la entrada revierte la transacción abierta.
+            _, error = first.communicate(timeout=10)
+            if first.returncode:
+                raise RuntimeError(error)
+    for retry in retries:
+        retry.result()
 sql("""do $$ begin
 assert (select count(*)=1 from public.incidents where sync_client_id='a0810000-0000-0000-0000-000000000010');
 assert (select count(*)=1 from public.patients where sync_client_id='a0820000-0000-0000-0000-000000000010');
 assert (select count(*)=1 from public.consultation_codes where patient_id='a0820000-0000-0000-0000-000000000010');
 end; $$;""")
-print('PASS: six concurrent retries create one incident, one patient and one code')
+print('PASS: seis solicitudes sobre la misma clave crean un incidente, un paciente y un código')

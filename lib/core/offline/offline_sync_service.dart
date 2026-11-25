@@ -200,17 +200,18 @@ class OfflineSyncService extends ChangeNotifier {
               c['id'] as String,
               payload,
             );
+            final code = result['code'];
             if (result['id'] is! String ||
                 (result['id'] as String).isEmpty ||
                 (c['kind'] == 'patient' &&
-                    (result['code'] is! String ||
-                        (result['code'] as String).isEmpty))) {
+                    (!result.containsKey('code') ||
+                        (code != null && (code is! String || code.isEmpty))))) {
               throw const FormatException(
                 'El servidor no confirmó el registro y su código.',
               );
             }
             c['remote_id'] = result['id'];
-            c['code'] = result['code'];
+            c['code'] = code;
             await store.save(scope, c);
           }
           for (final raw in c['photos'] as List) {

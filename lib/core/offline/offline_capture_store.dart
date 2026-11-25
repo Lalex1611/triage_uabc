@@ -21,7 +21,7 @@ class OfflineCaptureStore {
   OfflineCaptureStore(this.db, this.keyForAccount, {DateTime Function()? now})
     : _now = now ?? DateTime.now;
 
-  static const schemaVersion = 2;
+  static const schemaVersion = 3;
   static const _retention = Duration(hours: 24);
   static const _unexpired = '(expires_at IS NULL OR expires_at > ?)';
 
@@ -49,6 +49,7 @@ class OfflineCaptureStore {
       p.join(directory, 'captures.db'),
       version: schemaVersion,
       onCreate: createSchema,
+      onUpgrade: upgradeSchema,
       onConfigure: (db) async {
         await db.execute('PRAGMA synchronous = FULL');
         // SQLite devuelve el nuevo valor y Android necesita leerlo como fila.
@@ -115,8 +116,25 @@ class OfflineCaptureStore {
       'CREATE TABLE attachments (account TEXT NOT NULL, capture_id TEXT NOT NULL, id TEXT NOT NULL, body BLOB NOT NULL, PRIMARY KEY(account,id))',
     );
     await db.execute(
-      'CREATE TABLE incident_cache (account TEXT NOT NULL, id TEXT NOT NULL, body BLOB NOT NULL, PRIMARY KEY(account,id))',
+      'CREATE TABLE incident_cache (account TEXT NOT NULL, id TEXT NOT NULL, '
+      'body BLOB NOT NULL, expires_at INTEGER NOT NULL, PRIMARY KEY(account,id))',
     );
+    await db.execute(
+      'CREATE INDEX incident_cache_expires_at ON incident_cache(expires_at)',
+    );
+  }
+
+  static Future<void> upgradeSchema(Database db, int oldVersion, int _) async {
+    if (oldVersion < 3) {
+      // Las copias anteriores carecen de fecha y se pueden descargar otra vez.
+      await db.delete('incident_cache');
+      await db.execute(
+        'ALTER TABLE incident_cache ADD COLUMN expires_at INTEGER NOT NULL DEFAULT 0',
+      );
+      await db.execute(
+        'CREATE INDEX incident_cache_expires_at ON incident_cache(expires_at)',
+      );
+    }
   }
 
   Future<void> _cleanUp() async {
@@ -134,11 +152,10 @@ class OfflineCaptureStore {
         'SELECT 1 FROM outbox o WHERE o.account = captures.account '
         'AND o.id = captures.id)';
     await db.transaction((tx) async {
-      await tx.rawDelete(
-        'DELETE FROM incident_cache WHERE rowid IN ('
-        'SELECT cache.rowid FROM captures '
-        'JOIN incident_cache cache USING (account, id) WHERE $expired)',
-        [cutoff],
+      await tx.delete(
+        'incident_cache',
+        where: 'expires_at <= ?',
+        whereArgs: [cutoff],
       );
       await tx.delete('captures', where: expired, whereArgs: [cutoff]);
     });
@@ -331,6 +348,12 @@ class OfflineCaptureStore {
         throw StateError('Captura local no encontrada.');
       }
       if (synced) {
+        await tx.rawUpdate(
+          'UPDATE incident_cache SET expires_at = MIN(expires_at, ('
+          'SELECT expires_at FROM captures WHERE account = ? AND id = ?'
+          ')) WHERE account = ? AND id = ?',
+          [account, id, account, id],
+        );
         await tx.delete(
           'outbox',
           where: 'account = ? AND id = ?',
@@ -357,33 +380,69 @@ class OfflineCaptureStore {
     return Uint8List.fromList(await _unseal(account, id, rows.single['body']!));
   }
 
-  Future<void> cacheIncident(
+  Future<bool> cacheIncident(
     String account,
     Capture row, {
     bool Function()? authorized,
   }) async {
     final id = row['id'] as String;
+    final started = _now();
+    final originalDeadline = await _incidentCaptureDeadline(db, account, id);
+    var deadline = started.add(_retention).millisecondsSinceEpoch;
+    if (originalDeadline != null &&
+        originalDeadline > started.millisecondsSinceEpoch &&
+        originalDeadline < deadline) {
+      deadline = originalDeadline;
+    }
     final body = await _seal(
       account,
       'cache/$id',
       utf8.encode(jsonEncode(row)),
     );
-    if (authorized?.call() == false) return;
-    await db.insert('incident_cache', {
-      'account': account,
-      'id': id,
-      'body': body,
-    }, conflictAlgorithm: ConflictAlgorithm.replace);
+    return db.transaction((tx) async {
+      final captureDeadline = await _incidentCaptureDeadline(tx, account, id);
+      final currentTime = _now().millisecondsSinceEpoch;
+      if (captureDeadline != null &&
+          captureDeadline > started.millisecondsSinceEpoch &&
+          captureDeadline < deadline) {
+        deadline = captureDeadline;
+      }
+      if (deadline <= currentTime || authorized?.call() == false) return false;
+      await tx.insert('incident_cache', {
+        'account': account,
+        'id': id,
+        'body': body,
+        'expires_at': deadline,
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
+      if (authorized?.call() == false) {
+        throw StateError('La sesión cambió al guardar el incidente.');
+      }
+      return true;
+    });
+  }
+
+  Future<int?> _incidentCaptureDeadline(
+    DatabaseExecutor db,
+    String account,
+    String id,
+  ) async {
+    final rows = await db.query(
+      'captures',
+      columns: ['expires_at'],
+      where: 'account = ? AND id = ?',
+      whereArgs: [account, id],
+    );
+    return rows.isEmpty ? null : rows.single['expires_at'] as int?;
   }
 
   Future<Capture?> cachedIncident(String account, String id) async {
     final rows = await db.query(
       'incident_cache',
-      where: 'account = ? AND id = ?',
-      whereArgs: [account, id],
+      where: 'account = ? AND id = ? AND expires_at > ?',
+      whereArgs: [account, id, _now().millisecondsSinceEpoch],
     );
     if (rows.isEmpty) return null;
-    return Capture.from(
+    final result = Capture.from(
       jsonDecode(
             utf8.decode(
               await _unseal(account, 'cache/$id', rows.single['body']!),
@@ -391,5 +450,8 @@ class OfflineCaptureStore {
           )
           as Map,
     );
+    return (rows.single['expires_at'] as int) > _now().millisecondsSinceEpoch
+        ? result
+        : null;
   }
 }

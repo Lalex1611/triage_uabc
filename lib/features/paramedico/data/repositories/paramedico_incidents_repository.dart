@@ -449,10 +449,9 @@ class ParamedicoIncidentsRepository {
         offline.account == cacheOwner &&
         AuthGate.instance.sessionGeneration == cacheGeneration;
 
-    Map<String, dynamic>? local;
     if (cacheOwner != null) {
-      local = await offline.incident(incidentId);
       final capture = await offline.local(incidentId);
+      final local = await offline.incident(incidentId);
       if (local != null &&
           sameLocalSession() &&
           (offline.offline ||
@@ -461,16 +460,7 @@ class ParamedicoIncidentsRepository {
       }
     }
     try {
-      final row = await _c
-          .from('incidents')
-          .select(
-            'id, generated_title, emergency_type, description, photo_local_paths, '
-            'created_at, status, created_by, location',
-          )
-          .eq('id', incidentId)
-          .eq('is_deleted', false)
-          .maybeSingle()
-          .timeout(const Duration(seconds: 8));
+      final row = await fetchIncidentForCapture(incidentId);
       if (row == null) return null;
       if (cacheOwner != null) {
         await offline.cacheIncident(
@@ -482,14 +472,27 @@ class ParamedicoIncidentsRepository {
       return ParamedicoIncidentSummary.fromJson(Map<String, dynamic>.from(row));
     } catch (error) {
       if ((error is TimeoutException || error is SocketException) &&
-          local != null &&
           offline.canCapture &&
           sameLocalSession()) {
-        return ParamedicoIncidentSummary.fromJson(local);
+        final fallback = await offline.incident(incidentId);
+        if (fallback != null && sameLocalSession()) {
+          return ParamedicoIncidentSummary.fromJson(fallback);
+        }
       }
       rethrow;
     }
   }
+
+  Future<Map<String, dynamic>?> fetchIncidentForCapture(String incidentId) => _c
+      .from('incidents')
+      .select(
+        'id, generated_title, emergency_type, description, photo_local_paths, '
+        'created_at, status, created_by, location',
+      )
+      .eq('id', incidentId)
+      .eq('is_deleted', false)
+      .maybeSingle()
+      .timeout(const Duration(seconds: 8));
 
   Future<String> _createConsultationCode(String patientId) async {
     final code = await _c.rpc(
@@ -984,6 +987,7 @@ class ParamedicoIncidentsRepository {
       final row = await ParamedicoOfflineRuntime.instance.capture(
         kind: 'patient',
         parentId: incidentId,
+        fetchParent: fetchIncidentForCapture,
         payload: {
           'incident_id': incidentId,
           'triage_color': triageColor,
@@ -1168,8 +1172,9 @@ class ParamedicoIncidentsRepository {
     for (final raw in list) {
       final m = raw as Map<String, dynamic>;
       if (m['revoked_at'] != null) continue;
-      final exp = DateTime.tryParse(m['expires_at'] as String? ?? '');
-      if (exp != null && exp.isBefore(now)) continue;
+      final expiresAt = m['expires_at'] as String?;
+      final exp = expiresAt == null ? null : DateTime.tryParse(expiresAt);
+      if (expiresAt != null && (exp == null || !exp.isAfter(now))) continue;
       final code = m['code'] as String?;
       if (code != null && code.trim().isNotEmpty) return code.trim();
     }

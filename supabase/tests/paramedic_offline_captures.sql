@@ -49,6 +49,20 @@ begin
     raise exception 'Expected private receipt rejection';
   exception when insufficient_privilege then null; end;
   assert (public.get_patient_status_by_code(first_result->>'code')->>'found')::boolean, 'consultation contract broken';
+  reset role;
+  update public.consultation_codes set expires_at = now() - interval '1 day'
+    where patient_id = p;
+  set local role authenticated;
+  again := public.sync_paramedic_capture(a,'patient',p,patient);
+  assert again = jsonb_build_object('id',p,'code',null), 'El reintento devolvió un código vencido';
+  reset role;
+  update public.consultation_codes set expires_at = now() + interval '1 day', revoked_at = now()
+    where patient_id = p;
+  set local role authenticated;
+  again := public.sync_paramedic_capture(a,'patient',p,patient);
+  assert again = jsonb_build_object('id',p,'code',null), 'El reintento devolvió un código revocado';
+  assert (select count(*)=1 from public.patients where sync_client_id=p), 'Se duplicó el paciente';
+  assert (select count(*)=1 from public.consultation_codes where patient_id=p), 'Se generó otro código';
   begin
     perform public.sync_paramedic_capture(a,'patient','a0820000-0000-0000-0000-000000000002',patient||'{"lat":100}');
     raise exception 'Expected invalid coordinates';
@@ -112,6 +126,22 @@ begin
     perform public.link_paramedic_capture_photo('a0800000-0000-0000-0000-000000000002','incident',i,photo);
     raise exception 'Expected photo owner rejection';
   exception when insufficient_privilege then null; end;
+  perform set_config('request.jwt.claim.sub',a::text,true);
+  other_photo := i::text||'/a0830000-0000-0000-0000-000000000004.jpg';
+  perform public.paramedico_update_incident_photo_path(i,other_photo,false);
+  perform public.paramedico_update_incident_photo_path(i,photo,true);
+  perform public.link_paramedic_capture_photo(a,'incident',i,photo);
+  delete from storage.objects where bucket_id = 'incident_photos' and name = photo;
+  assert not exists (select 1 from storage.objects where bucket_id = 'incident_photos' and name = photo),
+    'La prueba no borró la foto de Storage';
+  perform public.link_paramedic_capture_photo(a,'incident',i,photo);
+  assert (select photo_local_paths = array[other_photo] from public.incidents where id=i),
+    'Un reintento restauró una foto retirada';
+  begin
+    perform public.link_paramedic_capture_photo(a,'incident',i,
+      i::text||'/a0830000-0000-0000-0000-000000000009.jpg');
+    raise exception 'Se esperaba reponer un archivo ausente que sigue pendiente';
+  exception when sqlstate 'P0801' then null; end;
   perform set_config('request.jwt.claim.sub','a0800000-0000-0000-0000-000000000003',true);
   assert (select count(*)=0 from public.patients), 'consulta externa read leaked';
   assert (select count(*)=0 from public.incidents), 'consulta externa incidents leaked';

@@ -92,7 +92,7 @@ class PatientRegistrationController extends ChangeNotifier {
         patientLng = pos.lng;
       }
     } catch (_) {
-      // keep defaults
+      // Conserva las coordenadas iniciales.
     } finally {
       patientCoordsLoading = false;
       notifyListeners();
@@ -130,7 +130,7 @@ class PatientRegistrationController extends ChangeNotifier {
         patientLng = inc.longitude!;
       }
     } catch (_) {
-      // keep defaults
+      // Conserva las coordenadas iniciales.
     } finally {
       patientCoordsLoading = false;
       notifyListeners();
@@ -391,6 +391,7 @@ class PatientRegistrationController extends ChangeNotifier {
         final row = await runtime.capture(
           kind: 'patient',
           parentId: incidentId,
+          fetchParent: _repo.fetchIncidentForCapture,
           quickIncident: incidentId == null
               ? {
                   'title': IncidentTitleFormatter.formatAuto(
