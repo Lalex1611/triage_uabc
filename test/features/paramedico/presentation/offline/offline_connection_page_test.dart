@@ -1,15 +1,129 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:sistema_triage/core/connectivity/app_connectivity_notifier.dart';
+import 'package:sistema_triage/core/router/app_router.dart';
 import 'package:sistema_triage/core/theme/app_theme.dart';
 import 'package:sistema_triage/features/paramedico/presentation/offline/offline_capture_page.dart';
 import 'package:sistema_triage/features/paramedico/presentation/offline/offline_connection_page.dart';
+import 'package:sistema_triage/shared/widgets/offline_connection_banner.dart';
 
 void main() {
+  const connectivityChannel = MethodChannel(
+    'dev.fluttercommunity.plus/connectivity',
+  );
+
+  testWidgets('dos comprobaciones de red esperan el mismo resultado', (
+    tester,
+  ) async {
+    final connectivity = AppConnectivityNotifier.instance;
+    final pending = Completer<List<String>>();
+    var checks = 0;
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      connectivityChannel,
+      (_) {
+        checks++;
+        return pending.future;
+      },
+    );
+
+    final first = connectivity.refresh();
+    final second = connectivity.refresh();
+    expect(second, same(first));
+    expect(connectivity.isRefreshing, isTrue);
+    await tester.pump();
+    expect(checks, 1);
+
+    pending.complete(['none']);
+    await tester.pump();
+    await second;
+    expect(connectivity.isConnected, isFalse);
+    expect(connectivity.isRefreshing, isFalse);
+  });
+
+  testWidgets('el aviso vuelve al cerrar Sin conexión sin cambiar de red', (
+    tester,
+  ) async {
+    final connectivity = AppConnectivityNotifier.instance;
+    var checks = 0;
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      connectivityChannel,
+      (_) async {
+        checks++;
+        return ['none'];
+      },
+    );
+    await connectivity.refresh();
+    await tester.pumpWidget(
+      MaterialApp.router(
+        routerConfig: appRouter,
+        builder: (context, child) =>
+            Stack(children: [child!, const OfflineConnectionBanner()]),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final banner = find.text('Sin conexión · Ver opciones');
+    expect(banner, findsOneWidget);
+    await tester.tap(banner);
+    await tester.pumpAndSettle();
+    expect(appRouter.state.uri.path, '/sin-conexion');
+    expect(banner, findsNothing);
+
+    appRouter.pop();
+    await tester.pumpAndSettle();
+    expect(appRouter.state.uri.path, '/auth');
+    expect(banner, findsOneWidget);
+    expect(checks, 1);
+  });
+
+  testWidgets('la foto fallida se vuelve a cargar al pulsar Reintentar', (
+    tester,
+  ) async {
+    final loads = <Completer<Uint8List>>[];
+    Future<void> pump() => tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: OfflineCapturePhoto(
+            requestIdentity: 'foto',
+            synced: true,
+            loadBytes: () {
+              final next = Completer<Uint8List>();
+              loads.add(next);
+              return next.future;
+            },
+          ),
+        ),
+      ),
+    );
+
+    await pump();
+    loads.single.completeError(StateError('Descarga interrumpida'));
+    await tester.pump();
+    final retry = find.text('Reintentar foto');
+    expect(retry, findsOneWidget);
+    await tester.tap(retry);
+    await tester.pump();
+    expect(loads, hasLength(2));
+    expect(retry, findsNothing);
+
+    loads.last.complete(
+      base64Decode(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAA'
+        'C0lEQVR4nGNgAAIAAAUAAXpeqz8AAAAASUVORK5CYII=',
+      ),
+    );
+    await tester.pumpAndSettle();
+    await pump();
+    expect(find.byType(Image), findsOneWidget);
+    expect(loads, hasLength(2));
+  });
+
   testWidgets('la foto reutiliza su carga al redibujar la captura', (
     tester,
   ) async {

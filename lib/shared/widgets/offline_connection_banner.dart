@@ -12,11 +12,10 @@ class OfflineConnectionBanner extends StatelessWidget {
     return ListenableBuilder(
       listenable: Listenable.merge([
         AppConnectivityNotifier.instance,
-        appRouter.routeInformationProvider,
+        appRouter.routerDelegate,
       ]),
       builder: (context, _) {
-        if (appRouter.routeInformationProvider.value.uri.path ==
-            '/sin-conexion') {
+        if (appRouter.state.uri.path == '/sin-conexion') {
           return const SizedBox.shrink();
         }
         final connected = AppConnectivityNotifier.instance.isConnected;
@@ -35,8 +34,7 @@ class OfflineConnectionBanner extends StatelessWidget {
                   alignment: Alignment.topCenter,
                   child: GestureDetector(
                     onTap: () {
-                      if (appRouter.routeInformationProvider.value.uri.path !=
-                          '/sin-conexion') {
+                      if (appRouter.state.uri.path != '/sin-conexion') {
                         appRouter.push('/sin-conexion');
                       }
                     },

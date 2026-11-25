@@ -268,15 +268,29 @@ class _OfflineCapturePhotoState extends State<OfflineCapturePhoto> {
           ),
         );
       }
-      return Padding(
-        padding: const EdgeInsets.all(12),
-        child: Text(
-          snapshot.hasError
-              ? widget.synced
-                    ? 'Foto conservada en el servidor; requiere conexión para consultarla.'
-                    : 'No se pudo abrir la foto local. Reintenta; la captura sigue guardada.'
-              : 'Cargando foto…',
-        ),
+      if (snapshot.hasError) {
+        return Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            children: [
+              Text(
+                widget.synced
+                    ? 'No se pudo cargar la foto del servidor.'
+                    : 'No se pudo abrir la foto local. La captura sigue guardada.',
+              ),
+              TextButton(
+                onPressed: () => setState(() {
+                  _photo = widget.loadBytes();
+                }),
+                child: const Text('Reintentar foto'),
+              ),
+            ],
+          ),
+        );
+      }
+      return const Padding(
+        padding: EdgeInsets.all(12),
+        child: Text('Cargando foto…'),
       );
     },
   );

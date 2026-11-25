@@ -176,7 +176,7 @@ class OfflineSyncService extends ChangeNotifier {
           // en el servidor porque la RPC lo crea con el UUID de la captura.
           final parent = await store.get(scope, parentId);
           if (parent != null) {
-            if (parent['remote_id'] == null || parent['state'] != 'synced') {
+            if (parent['remote_id'] == null) {
               c['message'] = parent['state'] == 'attention'
                   ? 'El incidente requiere atención antes de enviar este paciente.'
                   : 'Espera la confirmación del incidente.';
@@ -202,7 +202,7 @@ class OfflineSyncService extends ChangeNotifier {
             );
             if (result['id'] is! String ||
                 (result['id'] as String).isEmpty ||
-                (c['kind'] != 'incident' &&
+                (c['kind'] == 'patient' &&
                     (result['code'] is! String ||
                         (result['code'] as String).isEmpty))) {
               throw const FormatException(

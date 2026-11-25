@@ -17,10 +17,10 @@ class AppConnectivityNotifier extends ChangeNotifier {
   StreamSubscription<AuthState>? _authSub;
   Timer? _pollTimer;
   bool _isConnected = true;
-  bool _refreshing = false;
+  Future<void>? _refreshInFlight;
 
   bool get isConnected => _isConnected;
-  bool get isRefreshing => _refreshing;
+  bool get isRefreshing => _refreshInFlight != null;
 
   String get statusMessage {
     if (!_isConnected) {
@@ -77,19 +77,20 @@ class AppConnectivityNotifier extends ChangeNotifier {
   }
 
   /// Fuerza una nueva comprobación (p. ej. al pulsar el ícono Wi‑Fi del header)
-  Future<void> refresh() async {
-    if (_refreshing) return;
-    _refreshing = true;
-    notifyListeners();
-    try {
-      final next = await _evaluateConnection();
-      if (_isConnected != next) {
-        _isConnected = next;
+  Future<void> refresh() {
+    final running = _refreshInFlight;
+    if (running != null) return running;
+    final attempt = Future<void>.microtask(() async {
+      try {
+        _isConnected = await _evaluateConnection();
+      } finally {
+        _refreshInFlight = null;
+        notifyListeners();
       }
-    } finally {
-      _refreshing = false;
-      notifyListeners();
-    }
+    });
+    _refreshInFlight = attempt;
+    notifyListeners();
+    return attempt;
   }
 
   Future<bool> _evaluateConnection() async {

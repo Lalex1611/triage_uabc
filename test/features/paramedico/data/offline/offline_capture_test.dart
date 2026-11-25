@@ -18,6 +18,7 @@ class FakeRemote implements CaptureRemote {
   bool loseResponse = false;
   bool loseUploadResponse = false;
   bool failLink = false;
+  Object? linkFailure;
   Object? failure;
   bool incompleteConfirmation = false;
   String Function(String id) recordId = (id) => 'remote-$id';
@@ -67,6 +68,7 @@ class FakeRemote implements CaptureRemote {
     String id,
     Capture photo,
   ) async {
+    if (linkFailure != null) throw linkFailure!;
     if (failLink) throw TimeoutException('link unavailable');
     final path = '$id/${photo['id']}';
     if (!objects.contains(path)) {
@@ -238,6 +240,32 @@ void main() {
       );
     },
   );
+  test('envía al paciente aunque se rechace la foto del incidente', () async {
+    final photo = await File(
+      '${directory.path}/photo.jpg',
+    ).writeAsBytes([1, 2, 3]);
+    await enqueue(
+      [draft('i'), draft('p', kind: 'patient', parent: 'i')],
+      files: {
+        'i': [photo.path],
+      },
+    );
+    remote.linkFailure = const PostgrestException(
+      code: '42501',
+      message: 'Foto no autorizada',
+    );
+
+    await engine().sync(force: true);
+
+    final incident = (await store.get('alice', 'i'))!;
+    expect(incident['state'], 'attention');
+    expect(incident['remote_id'], 'remote-i');
+    expect(await db.query('attachments'), hasLength(1));
+    final patient = (await store.get('alice', 'p'))!;
+    expect(patient['state'], 'synced');
+    expect(patient['payload']['incident_id'], 'remote-i');
+    expect(remote.order, ['incident', 'patient']);
+  });
   test('keeps synced captures for 24 hours from confirmation', () async {
     await enqueue([draft('incident')]);
     now = now.add(const Duration(days: 3));

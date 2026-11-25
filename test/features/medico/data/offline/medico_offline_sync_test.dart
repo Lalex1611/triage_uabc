@@ -100,6 +100,32 @@ void main() {
     expect(await store.hasPending(ownerScope), isFalse);
   });
 
+  test('confirma la foto al repetir un alta con código vencido', () async {
+    final directory = await Directory.systemTemp.createTemp(
+      'triage_medico_test_',
+    );
+    addTearDown(() => directory.delete(recursive: true));
+    final photo = await File(
+      '${directory.path}/photo.jpg',
+    ).writeAsBytes([1, 2, 3]);
+    await enqueue(photoPath: photo.path);
+
+    remote.loseResponse = true;
+    await service.sync(force: true);
+    expect(await store.hasPending(ownerScope), isTrue);
+
+    remote.codeExpired = true;
+    await service.sync(force: true);
+
+    final capture = (await store.get(ownerScope, 'alta-1'))!;
+    expect(capture['state'], 'synced');
+    expect(capture['remote_id'], 'servidor-1');
+    expect(capture['code'], isNull);
+    expect(remote.records, hasLength(1));
+    expect(remote.links, 1);
+    expect(await store.hasPending(ownerScope), isFalse);
+  });
+
   test('otra cuenta u otro hospital no envían el alta', () async {
     await enqueue();
     session = (account: owner.account, hospitalId: 'hospital-b');
@@ -121,6 +147,7 @@ class _MedicoRemote implements CaptureRemote {
   final accounts = <String>[];
   bool loseResponse = false;
   bool failLink = false;
+  bool codeExpired = false;
   int uploads = 0;
   int links = 0;
 
@@ -143,7 +170,7 @@ class _MedicoRemote implements CaptureRemote {
       loseResponse = false;
       throw TimeoutException('Respuesta perdida');
     }
-    return result;
+    return codeExpired ? {...result, 'code': null} : result;
   }
 
   @override

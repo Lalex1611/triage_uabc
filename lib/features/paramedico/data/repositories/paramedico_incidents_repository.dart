@@ -442,18 +442,24 @@ class ParamedicoIncidentsRepository {
 
   Future<ParamedicoIncidentSummary?> getIncident(String incidentId) async {
     final offline = ParamedicoOfflineRuntime.instance;
+    final cacheOwner = usesLocalCaptures ? offline.account : null;
+    final cacheGeneration = AuthGate.instance.sessionGeneration;
+    bool sameLocalSession() =>
+        cacheOwner != null &&
+        offline.account == cacheOwner &&
+        AuthGate.instance.sessionGeneration == cacheGeneration;
+
     Map<String, dynamic>? local;
-    if (usesLocalCaptures) {
+    if (cacheOwner != null) {
       local = await offline.incident(incidentId);
       final capture = await offline.local(incidentId);
       if (local != null &&
+          sameLocalSession() &&
           (offline.offline ||
               capture != null && capture['state'] != 'synced')) {
         return ParamedicoIncidentSummary.fromJson(local);
       }
     }
-    final cacheOwner = usesLocalCaptures ? offline.account : null;
-    final cacheGeneration = AuthGate.instance.sessionGeneration;
     try {
       final row = await _c
           .from('incidents')
@@ -474,13 +480,11 @@ class ParamedicoIncidentsRepository {
         );
       }
       return ParamedicoIncidentSummary.fromJson(Map<String, dynamic>.from(row));
-    } on TimeoutException {
-      if (local != null && offline.canCapture) {
-        return ParamedicoIncidentSummary.fromJson(local);
-      }
-      rethrow;
-    } on SocketException {
-      if (local != null && offline.canCapture) {
+    } catch (error) {
+      if ((error is TimeoutException || error is SocketException) &&
+          local != null &&
+          offline.canCapture &&
+          sameLocalSession()) {
         return ParamedicoIncidentSummary.fromJson(local);
       }
       rethrow;
@@ -887,6 +891,17 @@ class ParamedicoIncidentsRepository {
         .from('incidents')
         .update({'photo_local_paths': photoPaths})
         .eq('id', incidentId);
+  }
+
+  Future<void> changeIncidentPhotoPath({
+    required String incidentId,
+    required String path,
+    required bool remove,
+  }) async {
+    await _c.rpc(
+      'paramedico_update_incident_photo_path',
+      params: {'p_incident_id': incidentId, 'p_path': path, 'p_remove': remove},
+    );
   }
 
   /// Actualiza `incidents.location` (geography Point). GeoJSON; si el API lo rechaza, intenta EWKT

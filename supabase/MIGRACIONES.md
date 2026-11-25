@@ -43,6 +43,8 @@ corregir algo se crea una nueva.
 | 21 | `20261120140000_medico_update_patient_info.sql` | Editar datos sin borrar fotos |
 | 22 | `20261120150000_paramedic_offline_captures.sql` | Sincronización de incidentes, pacientes y fotos capturados sin conexión por Paramédico |
 | 23 | `20261120160000_medico_offline_walk_ins.sql` | Sincronización de admisiones y fotos capturadas sin conexión por Médico |
+| 24 | `20261124120000_a08_recover_capture_photos.sql` | Recuperación de fotos de capturas y preservación de adjuntos al editar pacientes |
+| 25 | `20261125120000_offline_consultation_codes_and_photos.sql` | Vigencia de códigos en reintentos y actualizaciones seguras de fotos |
 
 La migración de Paramédico pasó de `20261117120000` a `20261120150000` para que su versión sea única y se ejecute después de las migraciones de Médico ya incorporadas a `main`. Si el SQL de A08 ya se ejecutó manualmente en un entorno, verifica sus tablas y funciones antes de registrar esa nueva versión en el historial.
 

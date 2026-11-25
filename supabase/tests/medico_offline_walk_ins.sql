@@ -28,6 +28,7 @@ declare
     'vital_signs', '{"heart_rate":72}'::jsonb, 'descriptive_notes', 'Motivo ficticio'
   );
   confirmed jsonb;
+  replay jsonb;
   patient uuid;
   photo text;
   other_photo text;
@@ -54,6 +55,14 @@ begin
   exception when insufficient_privilege then null;
   end;
 
+  reset role;
+  update public.consultation_codes set expires_at = now() - interval '1 day'
+    where patient_id = patient;
+  set local role authenticated;
+  replay := public.sync_medico_walk_in_capture(actor, capture_id, request);
+  assert replay = jsonb_build_object('id', patient, 'code', null), 'Se devolvió el código vencido';
+  assert (select count(*) = 1 from public.patients where created_by = actor), 'Paciente duplicado tras vencer el código';
+
   photo := patient::text || '/a8430000-0000-0000-0000-000000000001.jpg';
   begin
     perform public.link_medico_walk_in_photo(actor, patient, photo);
@@ -71,6 +80,14 @@ begin
   insert into storage.objects (bucket_id, name, owner_id) values ('patient_photos', photo, actor::text);
   perform public.link_medico_walk_in_photo(actor, patient, photo);
   perform public.link_medico_walk_in_photo(actor, patient, photo);
+
+  reset role;
+  update public.consultation_codes set expires_at = now() + interval '1 day', revoked_at = now()
+    where patient_id = patient;
+  set local role authenticated;
+  replay := public.sync_medico_walk_in_capture(actor, capture_id, request);
+  assert replay = jsonb_build_object('id', patient, 'code', null), 'Se devolvió el código revocado';
+  assert (select count(*) = 1 from public.consultation_codes where patient_id = patient), 'El reintento emitió otro código';
 
   perform set_config('request.jwt.claim.sub', colleague::text, true);
   begin

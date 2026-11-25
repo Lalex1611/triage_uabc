@@ -90,7 +90,20 @@ begin
   perform public.link_paramedic_capture_photo(a,'incident',i,photo);
   perform public.link_paramedic_capture_photo(a,'incident',i,photo);
   assert (select cardinality(photo_local_paths)=1 from public.incidents where id=i), 'duplicate incident photo';
+  other_photo := i::text||'/a0830000-0000-0000-0000-000000000003.jpg';
+  perform public.paramedico_update_incident_photo_path(i, other_photo, false);
+  perform public.paramedico_update_incident_photo_path(i, other_photo, false);
+  assert (select photo_local_paths = array[photo, other_photo]
+    from public.incidents where id = i), 'La foto manual duplicó o reemplazó un adjunto';
+  perform public.paramedico_update_incident_photo_path(i, other_photo, true);
+  assert (select photo_local_paths = array[photo]
+    from public.incidents where id = i), 'Se quitó una foto distinta de la seleccionada';
+
   perform set_config('request.jwt.claim.sub','a0800000-0000-0000-0000-000000000002',true);
+  begin
+    perform public.paramedico_update_incident_photo_path(i, photo, true);
+    raise exception 'Se esperaba rechazar la edición de un incidente ajeno';
+  exception when insufficient_privilege then null; end;
   begin
     perform public.sync_paramedic_capture('a0800000-0000-0000-0000-000000000002','incident',i,request);
     raise exception 'Expected owner rejection';

@@ -67,7 +67,9 @@ for migration in sorted((ROOT/'migrations').glob('*.sql')):
     sql(migration.read_text(encoding='utf-8'))
     print('Applied',migration.name)
 sql((ROOT/'tests'/'paramedic_offline_captures.sql').read_text(encoding='utf-8'))
-print('PASS: idempotency, conflicts, ownership, locations, codes, attachments, atomic rollback and RLS')
+print('PASS Paramédico: idempotencia, adjuntos, reversión y RLS')
+sql((ROOT/'tests'/'medico_offline_walk_ins.sql').read_text(encoding='utf-8'))
+print('PASS Médico: idempotencia, vigencia del código, fotos y RLS')
 sql("""
 insert into auth.users(id,email) values('a0800000-0000-0000-0000-000000000010','concurrency@example.test');
 update public.profiles set role='paramedico' where id='a0800000-0000-0000-0000-000000000010';

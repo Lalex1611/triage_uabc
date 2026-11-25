@@ -3,8 +3,10 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:sistema_triage/core/offline/offline_capture_store.dart';
+import 'package:sistema_triage/core/session/auth_gate.dart';
 import 'package:sistema_triage/core/ui/app_snackbar.dart';
 import 'package:sistema_triage/features/medico/data/offline/medico_offline_runtime.dart';
+import 'package:sistema_triage/features/paramedico/data/repositories/paramedico_incidents_repository.dart';
 import 'package:sistema_triage/shared/patient/consultation_code_qr_dialog.dart';
 import 'package:sistema_triage/shared/widgets/offline_connection_page.dart';
 
@@ -73,8 +75,9 @@ class MedicoOfflinePage extends StatelessWidget {
     Capture row,
   ) {
     final state = row['state'];
-    final code = row['code'] as String?;
     final patient = row['remote_id'] as String?;
+    final session = runtime.session;
+    final generation = AuthGate.instance.sessionGeneration;
     return Card(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -105,10 +108,34 @@ class MedicoOfflinePage extends StatelessWidget {
                     },
               child: const Text('Reintentar registro revisado'),
             ),
-          if (state == 'synced' && code != null)
+          if (state == 'synced' && patient != null && runtime.connected)
             TextButton(
-              onPressed: () =>
-                  unawaited(ConsultationCodeQrDialog.show(context, code: code)),
+              onPressed: () async {
+                bool canShowCode() =>
+                    session != null &&
+                    runtime.session == session &&
+                    runtime.connected &&
+                    AuthGate.instance.sessionGeneration == generation;
+
+                if (!canShowCode()) return;
+                String? code;
+                try {
+                  code = await ParamedicoIncidentsRepository()
+                      .getActiveConsultationCode(patient);
+                } catch (_) {
+                  // Sin una respuesta del servidor no se puede confirmar el QR.
+                }
+                if (!context.mounted || !canShowCode()) return;
+                if (code == null) {
+                  showAppSnackBar(
+                    context,
+                    'No se pudo confirmar un código de consulta vigente.',
+                    isError: true,
+                  );
+                  return;
+                }
+                await ConsultationCodeQrDialog.show(context, code: code);
+              },
               child: const Text('Código de consulta'),
             ),
           if (state == 'synced' && patient != null && runtime.connected)
