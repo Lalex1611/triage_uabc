@@ -6,7 +6,7 @@ String captureStatus(Capture row) => switch (row['state']) {
   'synced' => 'Sincronizado',
   'syncing' => 'Sincronizando',
   'attention' => 'Requiere atención',
-  _ => 'Guardado en este teléfono',
+  _ => 'Guardado en este dispositivo',
 };
 String captureTitle(Capture row) {
   final payload = row['payload'] as Map;
@@ -18,8 +18,8 @@ String captureTitle(Capture row) {
       : 'Paciente · ${(row['id'] as String).substring(0, 8).toUpperCase()}';
 }
 
-/// A08 uses real availability: it never promises local capture before storage
-/// and a previously verified session are ready.
+/// A08 ofrece la captura local cuando el almacenamiento está listo y la sesión
+/// ya se verificó.
 class OfflineConnectionPage extends StatefulWidget {
   const OfflineConnectionPage({
     super.key,
@@ -106,11 +106,19 @@ class _OfflineConnectionPageState extends State<OfflineConnectionPage> {
                 Text(
                   widget.canContinue
                       ? widget.captureMessage ??
-                            'Lo que captures se guarda en el teléfono y se envía cuando el servidor esté disponible con tu sesión autorizada. Puedes seguir trabajando.'
-                      : 'Necesitas iniciar sesión con conexión para acceder a las capturas de tu cuenta en este teléfono.',
+                            'Lo que captures se guarda en el dispositivo y se envía cuando el servidor esté disponible con tu sesión autorizada. Puedes seguir trabajando.'
+                      : 'Necesitas iniciar sesión con conexión para acceder a las capturas de tu cuenta en este dispositivo.',
                   textAlign: TextAlign.center,
                   style: TriageTextStyles.bodyMedium,
                 ),
+                if (widget.canContinue) ...[
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Puedes consultar las capturas en Conexión y capturas durante 24 horas después de sincronizarlas. Luego se borran del dispositivo.',
+                    textAlign: TextAlign.center,
+                    style: TriageTextStyles.bodyMedium,
+                  ),
+                ],
                 if (widget.error != null || _error != null)
                   Padding(
                     padding: const EdgeInsets.only(top: 16),

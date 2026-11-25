@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
 import 'package:cryptography/cryptography.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:path/path.dart' as p;
 import 'package:sqflite/sqflite.dart';
@@ -10,12 +12,20 @@ import 'package:uuid/uuid.dart';
 
 typedef Capture = Map<String, dynamic>;
 
-/// No clinical content is stored in plaintext, including SQLite journals.
-/// Metadata and photo bytes use AES-GCM with account/id as associated data.
+/// Los datos clínicos se guardan cifrados, incluso en los diarios de SQLite.
+/// Los metadatos y las fotos usan AES-GCM con la cuenta y el identificador
+/// como datos asociados.
 class OfflineCaptureStore {
-  OfflineCaptureStore(this.db, this.keyForAccount);
+  OfflineCaptureStore(this.db, this.keyForAccount, {DateTime Function()? now})
+    : _now = now ?? DateTime.now;
+
+  static const schemaVersion = 2;
+  static const _retention = Duration(hours: 24);
+  static const _unexpired = '(expires_at IS NULL OR expires_at > ?)';
+
   final Database db;
   final Future<SecretKey> Function(String) keyForAccount;
+  final DateTime Function() _now;
   final _cipher = AesGcm.with256bits();
 
   static final Future<OfflineCaptureStore> _deviceStore = _open();
@@ -31,11 +41,12 @@ class OfflineCaptureStore {
     }
     final db = await openDatabase(
       p.join(directory, 'captures.db'),
-      version: 1,
+      version: schemaVersion,
       onCreate: createSchema,
       onConfigure: (db) async {
         await db.execute('PRAGMA synchronous = FULL');
-        await db.execute('PRAGMA secure_delete = ON');
+        // SQLite devuelve el nuevo valor y Android necesita leerlo como fila.
+        await db.rawQuery('PRAGMA secure_delete = ON');
       },
     );
     const secure = FlutterSecureStorage(
@@ -45,7 +56,7 @@ class OfflineCaptureStore {
       ),
     );
     final keys = <String, Future<SecretKey>>{};
-    return OfflineCaptureStore(
+    final store = OfflineCaptureStore(
       db,
       (account) => keys.putIfAbsent(account, () async {
         try {
@@ -72,11 +83,24 @@ class OfflineCaptureStore {
         }
       }),
     );
+    await store._cleanUp();
+    AppLifecycleListener(onResume: () => unawaited(store._cleanUp()));
+    Timer.periodic(const Duration(seconds: 15), (_) {
+      if (WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed) {
+        unawaited(store._cleanUp());
+      }
+    });
+    return store;
   }
 
-  static Future<void> createSchema(Database db, int version) async {
+  static Future<void> createSchema(Database db, int _) async {
     await db.execute(
-      'CREATE TABLE captures (account TEXT NOT NULL, id TEXT NOT NULL, body BLOB NOT NULL, PRIMARY KEY(account,id))',
+      'CREATE TABLE captures (account TEXT NOT NULL, id TEXT NOT NULL, '
+      'body BLOB NOT NULL, expires_at INTEGER, PRIMARY KEY(account,id))',
+    );
+    await db.execute(
+      'CREATE INDEX captures_expires_at ON captures(expires_at) '
+      'WHERE expires_at IS NOT NULL',
     );
     await db.execute(
       'CREATE TABLE outbox (account TEXT NOT NULL, id TEXT NOT NULL, PRIMARY KEY(account,id))',
@@ -87,6 +111,31 @@ class OfflineCaptureStore {
     await db.execute(
       'CREATE TABLE incident_cache (account TEXT NOT NULL, id TEXT NOT NULL, body BLOB NOT NULL, PRIMARY KEY(account,id))',
     );
+  }
+
+  Future<void> _cleanUp() async {
+    try {
+      await purgeExpired();
+    } on DatabaseException {
+      debugPrint('No se pudieron limpiar las capturas vencidas.');
+    }
+  }
+
+  Future<void> purgeExpired() async {
+    final cutoff = _now().millisecondsSinceEpoch;
+    const expired =
+        'expires_at <= ? AND NOT EXISTS ('
+        'SELECT 1 FROM outbox o WHERE o.account = captures.account '
+        'AND o.id = captures.id)';
+    await db.transaction((tx) async {
+      await tx.rawDelete(
+        'DELETE FROM incident_cache WHERE rowid IN ('
+        'SELECT cache.rowid FROM captures '
+        'JOIN incident_cache cache USING (account, id) WHERE $expired)',
+        [cutoff],
+      );
+      await tx.delete('captures', where: expired, whereArgs: [cutoff]);
+    });
   }
 
   Future<Uint8List> _seal(String account, String id, List<int> bytes) async {
@@ -128,8 +177,9 @@ class OfflineCaptureStore {
     };
   }
 
-  /// A quick-registration incident and patient can share this transaction.
-  /// Files are read and encrypted first; any failure leaves no accepted capture.
+  /// El incidente y el paciente de un registro rápido se pueden guardar en la
+  /// misma transacción. Primero se leen y cifran los archivos. Si algún paso
+  /// falla, la captura no se confirma.
   Future<void> enqueue(
     String account,
     List<Capture> captures,
@@ -208,8 +258,8 @@ class OfflineCaptureStore {
   Future<List<Capture>> list(String account) async {
     final rows = await db.query(
       'captures',
-      where: 'account = ?',
-      whereArgs: [account],
+      where: 'account = ? AND $_unexpired',
+      whereArgs: [account, _now().millisecondsSinceEpoch],
     );
     return Future.wait(
       rows.map(
@@ -236,8 +286,8 @@ class OfflineCaptureStore {
   Future<Capture?> get(String account, String id) async {
     final rows = await db.query(
       'captures',
-      where: 'account = ? AND id = ?',
-      whereArgs: [account, id],
+      where: 'account = ? AND id = ? AND $_unexpired',
+      whereArgs: [account, id, _now().millisecondsSinceEpoch],
     );
     if (rows.isEmpty) return null;
     return Capture.from(
@@ -249,17 +299,22 @@ class OfflineCaptureStore {
   Future<void> save(String account, Capture capture) async {
     final id = capture['id'] as String;
     final body = await _seal(account, id, utf8.encode(jsonEncode(capture)));
+    final synced = capture['state'] == 'synced';
     await db.transaction((tx) async {
-      if (await tx.update(
-            'captures',
-            {'body': body},
-            where: 'account = ? AND id = ?',
-            whereArgs: [account, id],
+      if (await tx.rawUpdate(
+            'UPDATE captures SET body = ?, '
+            'expires_at = COALESCE(expires_at, ?) WHERE account = ? AND id = ?',
+            [
+              body,
+              synced ? _now().add(_retention).millisecondsSinceEpoch : null,
+              account,
+              id,
+            ],
           ) !=
           1) {
         throw StateError('Captura local no encontrada.');
       }
-      if (capture['state'] == 'synced') {
+      if (synced) {
         await tx.delete(
           'outbox',
           where: 'account = ? AND id = ?',

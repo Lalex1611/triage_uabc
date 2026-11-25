@@ -79,7 +79,8 @@ class ParamedicoOfflineRuntime extends ChangeNotifier
       AuthGate.instance.addListener(_changed);
       AppConnectivityNotifier.instance.addListener(_changed);
       _timer = Timer.periodic(const Duration(seconds: 15), (_) {
-        notifyListeners(); // hides local UI as soon as the session expires
+        // Oculta las pantallas de capturas locales al vencer la sesión.
+        notifyListeners();
         _changed();
       });
       _changed();
@@ -106,7 +107,8 @@ class ParamedicoOfflineRuntime extends ChangeNotifier
     if (!_active || syncService == null || account == null || offline) {
       return Future.value();
     }
-    // Deferring one microtask installs the lock before auth notifies listeners.
+    // Se difiere la verificación de sesión para registrar el lote antes de
+    // que AuthGate notifique a sus observadores.
     _running =
         Future<void>(() async {
           await AuthGate.instance.syncFromSession();
@@ -125,7 +127,8 @@ class ParamedicoOfflineRuntime extends ChangeNotifier
 
   Future<void> retryNow() async {
     await AppConnectivityNotifier.instance.refresh();
-    // refresh may have triggered an automatic batch: await it, then force due work.
+    // La comprobación de conexión puede haber iniciado un lote automático.
+    // Espera a que termine antes de forzar el reintento de lo pendiente.
     if (_running != null) await _running;
     if (!offline && account == null) await AuthGate.instance.syncFromSession();
     if (!offline) await synchronize(force: true);
@@ -236,7 +239,8 @@ class ParamedicoOfflineRuntime extends ChangeNotifier
       );
     }
     notifyListeners();
-    // Local commit defines success; a remote failure cannot roll it back.
+    // La captura queda confirmada al guardarse en el teléfono, incluso si
+    // después falla el envío al servidor.
     _changed();
     return row;
   }

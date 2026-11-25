@@ -1,6 +1,7 @@
--- Additive contract: existing clients and RPCs remain available.
--- Immutable request receipts avoid comparing retries against subsequently
--- edited clinical records. No client can write or read these receipts directly.
+-- La sincronización se incorpora conservando las RPC y los clientes actuales.
+-- Los recibos inmutables permiten comparar cada reintento con la solicitud
+-- original, aunque se edite el registro clínico después. El acceso directo
+-- a los recibos está restringido para los clientes.
 create table public.paramedic_capture_receipts (
   sync_client_id uuid primary key,
   account_id uuid not null references public.profiles(id),
@@ -34,11 +35,12 @@ begin
      or p_payload is null or jsonb_typeof(p_payload) <> 'object' then
     raise exception using errcode = '22023', message = 'Solicitud inválida';
   end if;
-  -- Serialize concurrent retries, including the first insert.
+  -- Procesa una solicitud a la vez por identificador, desde el primer registro.
   perform pg_advisory_xact_lock(hashtextextended(p_sync_client_id::text, 0));
   if p_kind = 'patient' then
     v_parent := (p_payload->>'incident_id')::uuid;
-    -- Same visibility as incidents_select for active paramedics; rechecked on retry.
+    -- Aplica la visibilidad de incidents_select para paramédicos activos y
+    -- vuelve a comprobarla en cada reintento.
     if v_parent is null or not exists(select 1 from public.incidents where id=v_parent and not is_deleted) then
       raise exception using errcode = '42501', message = 'Incidente no disponible';
     end if;

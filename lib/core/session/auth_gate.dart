@@ -5,7 +5,8 @@ import 'package:sistema_triage/core/config/supabase_env.dart';
 import 'package:sistema_triage/features/auth/domain/user_role.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-/// Keeps [role] in sync with Supabase auth + `profiles.role` for GoRouter redirects
+/// Sincroniza [role] con la sesión de Supabase y `profiles.role` para las
+/// redirecciones de GoRouter.
 class AuthGate extends ChangeNotifier {
   AuthGate._();
 
@@ -46,8 +47,8 @@ class AuthGate extends ChangeNotifier {
 
   StreamSubscription<dynamic>? _sub;
 
-  /// Set when a session is closed because `profiles.role` is [AppUserRole.consultaExterna]
-  /// (consulta por código es anónima; no hay “home” con correo para ese rol)
+  /// Se activa al cerrar una sesión cuyo `profiles.role` es
+  /// [AppUserRole.consultaExterna]. Ese rol accede de forma anónima por código.
   bool _consultaExternaStaffBlockPending = false;
 
   /// Consume el aviso de que el último inicio de sesión fue rechazado por rol solo-consulta
@@ -152,8 +153,8 @@ class AuthGate extends ChangeNotifier {
           sessionGeneration != requestGeneration) {
         return;
       }
-      // Never restore offline authorization from disk. A verified, unexpired
-      // session in this process can keep capturing during a network outage.
+      // La autorización sin conexión se mantiene solo en memoria. Una sesión
+      // verificada y vigente puede seguir capturando si se pierde la conexión.
       if (offlineAccount == session.user.id ||
           medicoOfflineSession?.account == session.user.id) {
         notifyListeners();

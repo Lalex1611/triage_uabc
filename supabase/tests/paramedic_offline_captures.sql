@@ -1,4 +1,5 @@
--- Run only in an isolated test database after all migrations. Rolls back fixtures.
+-- Ejecutar solo en una base de pruebas aislada con todas las migraciones.
+-- Los datos de prueba se revierten al final.
 begin;
 insert into auth.users(id,email,raw_user_meta_data) values
  ('a0800000-0000-0000-0000-000000000001','a08-paramedic-a@example.test','{}'),
@@ -84,7 +85,8 @@ begin
 end;
 $$;
 reset role;
--- Force code creation to fail AFTER patient insert: the whole RPC must roll back.
+-- Provoca un fallo al generar el código después de insertar al paciente para
+-- comprobar que se revierta toda la transacción de la RPC.
 create function public.a08_fail_code() returns trigger language plpgsql as $$
 begin raise exception 'simulated code failure'; end; $$;
 create trigger a08_code_failure before insert on public.consultation_codes for each row execute function public.a08_fail_code();

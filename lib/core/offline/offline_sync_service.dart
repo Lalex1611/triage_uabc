@@ -53,14 +53,16 @@ abstract class SupabaseOfflineCaptureRemote implements CaptureRemote {
           )
           .timeout(timeout);
     } on StorageException catch (e) {
-      // Immutable UUID path: a lost response leaves the same object. The RPC
-      // independently verifies its existence and ownership before linking.
+      // La ruta con UUID se conserva al reintentar si se pierde la respuesta.
+      // La RPC comprueba que el archivo exista y pertenezca a la cuenta antes
+      // de vincularlo.
       if (e.statusCode != '409' && e.error != 'Duplicate') rethrow;
     }
   }
 }
 
-/// One in-flight batch. Durable step checkpoints survive process death.
+/// Procesa un solo lote a la vez y guarda el avance para retomarlo si la app
+/// se cierra.
 class OfflineSyncService extends ChangeNotifier {
   OfflineSyncService({
     required this.store,
@@ -123,6 +125,8 @@ class OfflineSyncService extends ChangeNotifier {
         final payload = Capture.from(c['payload'] as Map);
         final parentId = c['parent_id'] as String?;
         if (parentId != null) {
+          // Tras el borrado local, incident_id sigue identificando el incidente
+          // en el servidor porque la RPC lo crea con el UUID de la captura.
           final parent = await store.get(scope, parentId);
           if (parent != null) {
             if (parent['remote_id'] == null || parent['state'] != 'synced') {

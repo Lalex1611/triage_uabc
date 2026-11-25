@@ -20,6 +20,7 @@ class FakeRemote implements CaptureRemote {
   bool failLink = false;
   Object? failure;
   bool incompleteConfirmation = false;
+  String Function(String id) recordId = (id) => 'remote-$id';
   Completer<void>? hold;
   void Function()? afterCreate;
   @override
@@ -35,7 +36,7 @@ class FakeRemote implements CaptureRemote {
     if (incompleteConfirmation) return {};
     final result = records.putIfAbsent(id, () {
       order.add(kind);
-      return {'id': 'remote-$id', if (kind == 'patient') 'code': 'ABC234'};
+      return {'id': recordId(id), if (kind == 'patient') 'code': 'ABC234'};
     });
     afterCreate?.call();
     if (loseResponse) {
@@ -79,17 +80,18 @@ void main() {
   late OfflineCaptureStore store;
   late SecretKey key;
   late FakeRemote remote;
+  late DateTime now;
   String? account;
   var generation = 0;
   Future<void> reopen() async {
     db = await databaseFactoryFfi.openDatabase(
       '${directory.path}/test.db',
       options: OpenDatabaseOptions(
-        version: 1,
+        version: OfflineCaptureStore.schemaVersion,
         onCreate: OfflineCaptureStore.createSchema,
       ),
     );
-    store = OfflineCaptureStore(db, (_) async => key);
+    store = OfflineCaptureStore(db, (_) async => key, now: () => now);
   }
 
   ParamedicoSyncService engine() => ParamedicoSyncService(
@@ -115,6 +117,7 @@ void main() {
     key = await AesGcm.with256bits().newSecretKey();
     account = 'alice';
     generation = 0;
+    now = DateTime.utc(2026, 11, 23);
     remote = FakeRemote();
     await reopen();
   });
@@ -206,6 +209,52 @@ void main() {
       );
     },
   );
+  test('keeps synced captures for 24 hours from confirmation', () async {
+    await enqueue([draft('incident')]);
+    now = now.add(const Duration(days: 3));
+    await engine().sync(force: true);
+    await enqueue([
+      draft('pending', kind: 'patient', parent: 'incident'),
+      draft('attention')..['state'] = 'attention',
+    ]);
+    await store.cacheIncident('alice', {'id': 'incident'});
+    await store.cacheIncident('bob', {'id': 'incident'});
+
+    now = now.add(const Duration(hours: 23, minutes: 59));
+    await store.purgeExpired();
+    expect(await store.get('alice', 'incident'), isNotNull);
+    expect(await store.cachedIncident('alice', 'incident'), isNotNull);
+
+    now = now.add(const Duration(minutes: 1));
+    await db.close();
+    await reopen();
+    expect(await store.get('alice', 'incident'), isNull);
+    await store.purgeExpired();
+    expect(await db.query('captures', columns: ['id'], orderBy: 'id'), [
+      {'id': 'attention'},
+      {'id': 'pending'},
+    ]);
+    expect(await db.query('outbox'), hasLength(2));
+    expect(await store.hasPending('alice'), isTrue);
+    expect(await store.cachedIncident('alice', 'incident'), isNull);
+    expect(await store.cachedIncident('bob', 'incident'), isNotNull);
+  });
+
+  test('patient can still sync after its confirmed incident expires', () async {
+    remote.recordId = (id) => id;
+    await enqueue([draft('incident')]);
+    await engine().sync(force: true);
+    await enqueue([draft('patient', kind: 'patient', parent: 'incident')]);
+
+    now = now.add(const Duration(hours: 24));
+    await store.purgeExpired();
+    await engine().sync(force: true);
+    final patient = await store.get('alice', 'patient');
+    expect(patient?['state'], 'synced');
+    expect(patient?['payload']['incident_id'], 'incident');
+    expect(remote.calls, ['incident', 'patient']);
+  });
+
   test('repeated retry buttons share one batch', () async {
     await enqueue([draft('i')]);
     remote.hold = Completer<void>();

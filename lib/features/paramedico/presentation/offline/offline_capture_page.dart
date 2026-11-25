@@ -8,7 +8,8 @@ import 'package:sistema_triage/features/paramedico/presentation/patient_intake/p
 import 'package:sistema_triage/shared/patient/consultation_code_qr_dialog.dart';
 import 'package:sistema_triage/shared/widgets/triage_ui.dart';
 
-/// Read-only local receipt. Remote edits/transfers remain in existing screens.
+/// Consulta de una captura local. La edición y el traslado se realizan en las
+/// pantallas del registro en el servidor.
 class OfflineCapturePage extends StatelessWidget {
   const OfflineCapturePage({super.key, required this.id});
   final String id;

@@ -1,11 +1,12 @@
-"""SQL contract tests in a disposable PostGIS container (not a deployed Supabase).
+"""Pruebas del contrato SQL en un contenedor temporal de PostGIS.
 
 docker run --rm --name triage-a08-test --network none -e POSTGRES_HOST_AUTH_METHOD=trust -d postgis/postgis:17-3.5
 python supabase/tests/run_paramedic_offline_test.py
 docker stop triage-a08-test
 
-Auth/Storage infrastructure below is a minimal SQL fixture, not GoTrue or Storage
-HTTP. All project migrations, triggers, RPCs and RLS policies run unchanged.
+La autenticación y el almacenamiento se simulan con datos de prueba en SQL.
+Las migraciones, los disparadores, las RPC y las políticas RLS del proyecto
+se ejecutan tal como están.
 """
 from pathlib import Path
 import subprocess
