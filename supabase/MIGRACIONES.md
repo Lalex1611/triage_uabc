@@ -41,6 +41,83 @@ corregir algo se crea una nueva.
 | 19 | `20261120120000_medico_append_patient_photo.sql` | Agregar foto sin pisar otros datos |
 | 20 | `20261120130000_medico_set_hospital_triage.sql` | Cambiar el triage hospitalario desde sala |
 | 21 | `20261120140000_medico_update_patient_info.sql` | Editar datos sin borrar fotos |
+| 22 | `20261120150000_paramedic_offline_captures.sql` | Sincronización de incidentes, pacientes y fotos capturados sin conexión por Paramédico |
+| 23 | `20261120160000_medico_offline_walk_ins.sql` | Sincronización de admisiones y fotos capturadas sin conexión por Médico |
+| 24 | `20261124120000_a08_recover_capture_photos.sql` | Recuperación de fotos de capturas y preservación de adjuntos al editar pacientes |
+| 25 | `20261125120000_offline_consultation_codes_and_photos.sql` | Vigencia de códigos en reintentos y actualizaciones seguras de fotos |
+| 26 | `20261125130000_paramedic_capture_photo_integrity.sql` | Vigencia de códigos de Paramédico y protección del vínculo y retiro de fotos |
+| 27 | `20261125140000_offline_retry_and_photo_access.sql` | Validación de fotos por paciente y aviso de adjuntos retirados durante un reintento |
+| 28 | `20261125150000_offline_incident_photo_and_account_guards.sql` | Impide restaurar fotos retiradas con una carga tardía o una lista anterior y verifica el perfil al reanudar la captura |
+| 29 | `20261125160000_incident_photo_path_updates.sql` | Cambia las fotos de incidentes por ruta y bloquea el reemplazo directo de la lista desde la API |
+
+La #29 requiere la app que usa la RPC por ruta al agregar fotos en la creación
+en línea de incidentes. Las versiones que reemplazan la lista recibirán un error
+hasta que se actualicen.
+
+Antes de aplicar #26 en una instalación con capturas pendientes, comprueba si
+hay reintentos de fotos de incidentes. Si alguna ruta ya se retiró, concilia el
+retiro confirmado y su archivo de Storage antes de reanudar esos reintentos.
+La #26 registra los retiros a partir de su aplicación. Distribuye la app
+compatible con #27 para que limpie del bucket los adjuntos que se vuelvan a
+subir por un reintento.
+
+### Si el historial ya contiene la versión `20261117120000`
+
+La versión se usó para el registro de Médico (#12) y en una versión anterior del
+modo sin conexión de Paramédico, que pasó a `20261120150000` (#22). La CLI
+compara las versiones por fecha. En el SQL Editor revisa el nombre y las
+sentencias registradas, si existe la tabla de historial, y los objetos instalados.
+
+```sql
+select version, name, statements
+from supabase_migrations.schema_migrations
+where version in ('20261117120000', '20261120150000');
+
+select
+  to_regprocedure(
+    'public.medico_register_walk_in_patient(text,public.triage_color,jsonb,jsonb,text)'
+  ) as registro_medico,
+  to_regclass('public.paramedic_capture_receipts') as comprobantes_paramedico,
+  to_regprocedure('public.sync_paramedic_capture(uuid,text,uuid,jsonb)') as captura_paramedico,
+  to_regprocedure('public.link_paramedic_capture_photo(uuid,text,uuid,text)') as fotos_paramedico;
+```
+
+- Si la entrada corresponde al SQL de Médico, conserva `20261117120000`.
+  Si Paramédico se instaló aparte, verifica sus objetos y permisos antes de
+  registrar #22 como aplicada.
+- Si la entrada corresponde únicamente al SQL anterior de Paramédico, aplica
+  el archivo #12 en el SQL Editor si el registro de Médico sigue ausente.
+  Verifica que exista `medico_register_walk_in_patient`, que
+  `authenticated` pueda ejecutarla y que su definición corresponda a #12.
+  Comprueba también la tabla, RLS, RPC y permisos de Paramédico según #22.
+  Cuando ambos conjuntos estén instalados, registra #22 como aplicada y
+  sustituye la entrada antigua de #12 por la canónica. Omite el primer
+  comando si #22 ya figura como aplicada. Estos comandos reparan el historial
+  sin volver a ejecutar la creación de tablas.
+
+  Usa el mismo destino para consultar el historial, ejecutar el SQL y
+  repararlo. En local, usa el Studio de `supabase status` y estos comandos.
+
+  ```bash
+  npx supabase migration repair 20261120150000 --status applied --local
+  npx supabase migration repair 20261117120000 --status reverted --local
+  npx supabase migration repair 20261117120000 --status applied --local
+  npx supabase migration list --local
+  ```
+
+  En la nube, confirma que `supabase link` apunta al mismo proyecto que
+  abriste en el SQL Editor y usa estos comandos.
+
+  ```bash
+  npx supabase migration repair 20261120150000 --status applied --linked
+  npx supabase migration repair 20261117120000 --status reverted --linked
+  npx supabase migration repair 20261117120000 --status applied --linked
+  npx supabase migration list --linked
+  ```
+
+Si falta el historial o la entrada carece de sentencias, confirma el origen
+con el SQL aplicado, las definiciones instaladas y el registro del despliegue
+antes de reparar. [Referencia de Supabase CLI](https://supabase.com/docs/reference/cli/supabase-migration-repair)
 
 ## Opción A: Supabase local (Docker)
 

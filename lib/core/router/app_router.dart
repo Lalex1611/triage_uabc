@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:sistema_triage/features/paramedico/presentation/offline/offline_connection_page.dart';
+import 'package:sistema_triage/features/paramedico/presentation/offline/offline_capture_page.dart';
 import 'package:go_router/go_router.dart';
 import 'package:sistema_triage/core/config/supabase_env.dart';
 import 'package:sistema_triage/core/session/auth_gate.dart';
@@ -9,6 +11,7 @@ import 'package:sistema_triage/features/consulta_externa/presentation/screens/co
 import 'package:sistema_triage/features/consulta_externa/presentation/screens/consulta_status_screen.dart';
 import 'package:sistema_triage/features/medico/presentation/routing/medico_home_flow_page.dart';
 import 'package:sistema_triage/features/medico/presentation/routing/medico_patient_details_flow_page.dart';
+import 'package:sistema_triage/features/medico/presentation/register_patient/medico_offline_page.dart';
 import 'package:sistema_triage/features/paramedico/presentation/routing/incident_details_flow_page.dart';
 import 'package:sistema_triage/features/paramedico/presentation/routing/paramedico_home_tab_page.dart';
 import 'package:sistema_triage/features/paramedico/presentation/routing/paramedico_incidents_tab_page.dart';
@@ -29,6 +32,20 @@ final GoRouter appRouter = GoRouter(
   refreshListenable: AuthGate.instance,
   redirect: _redirect,
   routes: [
+    GoRoute(
+      path: '/sin-conexion',
+      builder: (context, state) => ListenableBuilder(
+        listenable: AuthGate.instance,
+        builder: (context, _) => AuthGate.instance.role == AppUserRole.medico
+            ? const MedicoOfflinePage()
+            : const OfflineConnectionFlowPage(),
+      ),
+    ),
+    GoRoute(
+      path: '/paramedico/captura/:id',
+      builder: (context, state) =>
+          OfflineCapturePage(id: state.pathParameters['id']!),
+    ),
     GoRoute(path: '/auth', builder: (context, state) => const LoginScreen()),
     GoRoute(
       path: '/paramedico',
@@ -171,6 +188,10 @@ final GoRouter appRouter = GoRouter(
       builder: (context, state) => const MedicoHomeFlowPage(),
     ),
     GoRoute(
+      path: '/medico/capturas',
+      builder: (context, state) => const MedicoOfflinePage(),
+    ),
+    GoRoute(
       parentNavigatorKey: rootNavigatorKey,
       path: '/medico/paciente/:patientId',
       builder: (context, state) {
@@ -197,6 +218,7 @@ final GoRouter appRouter = GoRouter(
 
 String? _redirect(BuildContext context, GoRouterState state) {
   final loc = state.matchedLocation;
+  if (loc == '/sin-conexion') return null;
   final configured = SupabaseEnv.isConfigured;
 
   final publicRoutes =

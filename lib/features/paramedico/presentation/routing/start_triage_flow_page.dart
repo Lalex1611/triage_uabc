@@ -192,6 +192,7 @@ class _StartTriageFlowPageState extends State<StartTriageFlowPage> {
           StartTriageHeaderWidget(
             data: StartTriageHeaderData(
               patientNumber: c.patientNumber,
+              localCapture: c.localCapture,
               onCloseTap: () => c.leave(context),
             ),
           ),

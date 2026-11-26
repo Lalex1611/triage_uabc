@@ -277,7 +277,11 @@ class _PatientDetailsFlowPageState extends State<PatientDetailsFlowPage> {
                                       : TriagePhoto(
                                           image: FileImage(File(photos[i])),
                                         ),
-                                if (editing || photos.isEmpty)
+                                if (!editing)
+                                  for (final url in c.storedPhotoUrls.values)
+                                    TriagePhoto(image: NetworkImage(url)),
+                                if (editing ||
+                                    (photos.isEmpty && c.storedPhotoUrls.isEmpty))
                                   TriagePhoto(
                                     onTap: () => editing
                                         ? c.showEditImageSourceDialog(context)

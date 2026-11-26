@@ -41,14 +41,14 @@ class StartTriageHeaderWidget extends StatelessWidget {
           const SizedBox(height: 4),
           RichText(
             text: TextSpan(
-              text: 'No. de Paciente: ',
+              text: data.localCapture ? 'Nueva captura' : 'No. de Paciente: ',
               style: AppTextStyles.ESC_Thin_bodyLarge.copyWith(
                 color: Colors.white,
                 fontSize: 20, // Thin de 20pts
               ),
               children: [
                 TextSpan(
-                  text: data.patientNumber.toString(),
+                  text: data.localCapture ? '' : data.patientNumber.toString(),
                   style: AppTextStyles.ESC_Regular_bodyLarge.copyWith(
                     color: Colors.white,
                     fontSize: 20, // Regular de 20pts

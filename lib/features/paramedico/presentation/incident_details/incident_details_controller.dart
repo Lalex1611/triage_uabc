@@ -495,9 +495,10 @@ class IncidentDetailsController extends ChangeNotifier {
         incidentId: incidentId,
         localPath: image.path,
       );
-      await _repo.updateIncidentPhotoPaths(
+      await _repo.changeIncidentPhotoPath(
         incidentId: incidentId,
-        photoPaths: [...inc.photoPaths, storedPath],
+        path: storedPath,
+        remove: false,
       );
       await load(showLoader: false);
       if (context.mounted) {
@@ -536,6 +537,7 @@ class IncidentDetailsController extends ChangeNotifier {
     if (inc == null || index < 0 || index >= inc.photoPaths.length) {
       return false;
     }
+    final removed = inc.photoPaths[index];
     final confirmed = await showTriageConfirm(
       context,
       icon: const TriageMessageIcon(TriageIcons.trash, tone: TriageTone.danger),
@@ -547,12 +549,11 @@ class IncidentDetailsController extends ChangeNotifier {
     );
     if (!confirmed) return false;
 
-    final removed = inc.photoPaths[index];
-    final nextPhotos = List<String>.from(inc.photoPaths)..removeAt(index);
     try {
-      await _repo.updateIncidentPhotoPaths(
+      await _repo.changeIncidentPhotoPath(
         incidentId: incidentId,
-        photoPaths: nextPhotos,
+        path: removed,
+        remove: true,
       );
       unawaited(_discardStoredPhoto(removed));
       await load(showLoader: false);

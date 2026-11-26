@@ -38,6 +38,7 @@ class PatientDetailsController extends ChangeNotifier {
 
   ParamedicoPatientDetail? detail;
   String? consultationCode;
+  Map<String, String> storedPhotoUrls = {};
   ParamedicoIncidentSummary? incident;
   HospitalRow? assignedHospital;
   List<HospitalRow> hospitals = [];
@@ -100,6 +101,15 @@ class PatientDetailsController extends ChangeNotifier {
         code = await _repo.getActiveConsultationCode(patientId);
       }
       detail = d;
+      try {
+        final paths = d?.demographics['photo_storage_paths'];
+        storedPhotoUrls = await _repo.signPatientPhotos(
+          patientId,
+          paths is List ? paths.whereType<String>() : const [],
+        );
+      } catch (_) {
+        storedPhotoUrls = {};
+      }
       consultationCode = code;
       incident = inc;
       assignedHospital = hosp;

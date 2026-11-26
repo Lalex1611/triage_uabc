@@ -17,10 +17,12 @@ class AppConnectivityNotifier extends ChangeNotifier {
   StreamSubscription<AuthState>? _authSub;
   Timer? _pollTimer;
   bool _isConnected = true;
-  bool _refreshing = false;
+  Future<void>? _refreshInFlight;
+  int _nextCheck = 0;
+  int _lastPublishedCheck = 0;
 
   bool get isConnected => _isConnected;
-  bool get isRefreshing => _refreshing;
+  bool get isRefreshing => _refreshInFlight != null;
 
   String get statusMessage {
     if (!_isConnected) {
@@ -49,9 +51,12 @@ class AppConnectivityNotifier extends ChangeNotifier {
     });
 
     if (SupabaseEnv.isConfigured) {
-      _authSub ??= Supabase.instance.client.auth.onAuthStateChange.listen((_) {
-        unawaited(_updateConnection());
-      });
+      _authSub ??= Supabase.instance.client.auth.onAuthStateChange.listen(
+        (_) => unawaited(_updateConnection()),
+        onError: (Object _) {
+          // Los fallos de renovación no determinan el estado de la red.
+        },
+      );
     }
 
     // En Android la red / Supabase a veces no están listos en el primer frame
@@ -68,28 +73,28 @@ class AppConnectivityNotifier extends ChangeNotifier {
     }
   }
 
-  Future<void> _updateConnection() async {
+  Future<void> _updateConnection({bool notifyOnChange = true}) async {
+    final check = ++_nextCheck;
     final next = await _evaluateConnection();
+    if (check < _lastPublishedCheck) return;
+    _lastPublishedCheck = check;
     if (_isConnected != next) {
       _isConnected = next;
-      notifyListeners();
+      if (notifyOnChange) notifyListeners();
     }
   }
 
   /// Fuerza una nueva comprobación (p. ej. al pulsar el ícono Wi‑Fi del header)
-  Future<void> refresh() async {
-    if (_refreshing) return;
-    _refreshing = true;
-    notifyListeners();
-    try {
-      final next = await _evaluateConnection();
-      if (_isConnected != next) {
-        _isConnected = next;
-      }
-    } finally {
-      _refreshing = false;
+  Future<void> refresh() {
+    final running = _refreshInFlight;
+    if (running != null) return running.onError((Object _, StackTrace _) {});
+    final attempt = _updateConnection(notifyOnChange: false).whenComplete(() {
+      _refreshInFlight = null;
       notifyListeners();
-    }
+    });
+    _refreshInFlight = attempt;
+    notifyListeners();
+    return attempt;
   }
 
   Future<bool> _evaluateConnection() async {

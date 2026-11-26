@@ -14,8 +14,12 @@ Future<PatientRegisteredNext?> showPatientRegisteredDialog(
     context: context,
     builder: (dialogContext) => TriageDialog(
       icon: TriageMessageIcon.level(TriageIcons.check, patient.level),
-      title: '${patient.folio} quedó registrado',
-      message: classifiedCount == 1
+      title: patient.pending
+          ? 'Guardado en este teléfono'
+          : '${patient.folio} quedó registrado',
+      message: patient.pending
+          ? 'Puedes consultar la captura y su estado de envío. El QR estará disponible cuando lo confirme el servidor.'
+          : classifiedCount == 1
           ? 'Va 1 paciente clasificado en este incidente.'
           : 'Van $classifiedCount pacientes clasificados en este incidente.',
       content: Center(child: TriageLevelPill(patient.level)),

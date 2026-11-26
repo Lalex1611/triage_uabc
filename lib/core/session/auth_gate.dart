@@ -1,17 +1,48 @@
 import 'dart:async';
+import 'dart:io' show SocketException;
 
 import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
 import 'package:sistema_triage/core/config/supabase_env.dart';
 import 'package:sistema_triage/features/auth/domain/user_role.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-/// Keeps [role] in sync with Supabase auth + `profiles.role` for GoRouter redirects
+/// Sincroniza [role] con la sesión de Supabase y `profiles.role` para las
+/// redirecciones de GoRouter.
 class AuthGate extends ChangeNotifier {
   AuthGate._();
 
   static final AuthGate instance = AuthGate._();
 
   AppUserRole? role;
+  String? _verifiedAccount;
+  int sessionGeneration = 0;
+  int _profileRequestSequence = 0;
+  bool lastVerificationSucceeded = false;
+  String? get _verifiedSessionAccount {
+    if (!SupabaseEnv.isConfigured) return null;
+    final session = Supabase.instance.client.auth.currentSession;
+    return session != null &&
+            !session.isExpired &&
+            session.user.id == _verifiedAccount
+        ? _verifiedAccount
+        : null;
+  }
+
+  String? get offlineAccount =>
+      role == AppUserRole.paramedico ? _verifiedSessionAccount : null;
+
+  ({String account, String hospitalId})? get medicoOfflineSession {
+    final account = _verifiedSessionAccount;
+    final hospital = _hospitalId;
+    return role == AppUserRole.medico &&
+            account != null &&
+            hospital != null &&
+            hospital.isNotEmpty
+        ? (account: account, hospitalId: hospital)
+        : null;
+  }
+
   String? _hospitalId;
   String? _fullName;
   String? get hospitalId => _hospitalId;
@@ -19,8 +50,8 @@ class AuthGate extends ChangeNotifier {
 
   StreamSubscription<dynamic>? _sub;
 
-  /// Set when a session is closed because `profiles.role` is [AppUserRole.consultaExterna]
-  /// (consulta por código es anónima; no hay “home” con correo para ese rol)
+  /// Se activa al cerrar una sesión cuyo `profiles.role` es
+  /// [AppUserRole.consultaExterna]. Ese rol accede de forma anónima por código.
   bool _consultaExternaStaffBlockPending = false;
 
   /// Consume el aviso de que el último inicio de sesión fue rechazado por rol solo-consulta
@@ -38,14 +69,28 @@ class AuthGate extends ChangeNotifier {
       return;
     }
 
-    _sub ??= Supabase.instance.client.auth.onAuthStateChange.listen((_) {
-      syncFromSession();
-    });
+    _sub ??= Supabase.instance.client.auth.onAuthStateChange.listen(
+      (event) {
+        if (event.event == AuthChangeEvent.signedIn ||
+            event.event == AuthChangeEvent.tokenRefreshed ||
+            event.event == AuthChangeEvent.signedOut) {
+          sessionGeneration++;
+        }
+        unawaited(syncFromSession());
+      },
+      onError: (Object error) {
+        // Una renovación sin red no cambia la sesión. Para otros errores
+        // consultamos el perfil de la cuenta que sigue activa.
+        if (!_isTemporaryFailure(error)) unawaited(syncFromSession());
+      },
+    );
 
     await syncFromSession();
   }
 
   Future<void> syncFromSession() async {
+    final requestSequence = ++_profileRequestSequence;
+    lastVerificationSucceeded = false;
     if (!SupabaseEnv.isConfigured) {
       role = null;
       _hospitalId = null;
@@ -56,6 +101,8 @@ class AuthGate extends ChangeNotifier {
 
     final session = Supabase.instance.client.auth.currentSession;
     if (session == null) {
+      _verifiedAccount = null;
+      sessionGeneration++;
       role = null;
       _hospitalId = null;
       _fullName = null;
@@ -65,32 +112,63 @@ class AuthGate extends ChangeNotifier {
 
     _consultaExternaStaffBlockPending = false;
 
+    final requestGeneration = sessionGeneration;
+    bool isCurrentRequest() =>
+        requestSequence == _profileRequestSequence &&
+        sessionGeneration == requestGeneration &&
+        Supabase.instance.client.auth.currentSession?.user.id ==
+            session.user.id;
     try {
       final row = await Supabase.instance.client
           .from('profiles')
-          .select('role, hospital_id, full_name')
+          .select('role, hospital_id, full_name, is_active')
           .eq('id', session.user.id)
-          .maybeSingle();
+          .maybeSingle()
+          .timeout(const Duration(seconds: 8));
 
-      final parsed = AppUserRole.fromDb(row?['role'] as String?);
-      if (parsed == AppUserRole.consultaExterna) {
+      if (!isCurrentRequest()) return;
+
+      final storedRole = AppUserRole.fromDb(row?['role'] as String?);
+      if (storedRole == AppUserRole.consultaExterna) {
         _consultaExternaStaffBlockPending = true;
-        await Supabase.instance.client.auth.signOut();
+        _verifiedAccount = null;
         role = null;
         _hospitalId = null;
         _fullName = null;
         notifyListeners();
+        await Supabase.instance.client.auth.signOut();
         return;
       }
 
+      final parsed = row?['is_active'] == true ? storedRole : null;
+      final hospital = row?['hospital_id']?.toString();
+      final verified =
+          parsed == AppUserRole.paramedico || parsed == AppUserRole.medico
+          ? session.user.id
+          : null;
+      if (_verifiedAccount != verified ||
+          role != parsed ||
+          _hospitalId != hospital) {
+        sessionGeneration++;
+      }
       role = parsed;
-      final hid = row?['hospital_id'];
-      _hospitalId = hid?.toString();
+      _verifiedAccount = verified;
+      lastVerificationSucceeded = true;
+      _hospitalId = hospital;
       final fn = row?['full_name'] as String?;
       _fullName = (fn != null && fn.trim().isNotEmpty)
           ? fn.trim()
           : session.user.email;
-    } catch (_) {
+    } catch (error) {
+      if (!isCurrentRequest()) return;
+      if (_isTemporaryFailure(error) &&
+          (offlineAccount == session.user.id ||
+              medicoOfflineSession?.account == session.user.id)) {
+        notifyListeners();
+        return;
+      }
+      if (_verifiedAccount != null || role != null) sessionGeneration++;
+      _verifiedAccount = null;
       role = null;
       _hospitalId = null;
       _fullName = null;
@@ -98,14 +176,32 @@ class AuthGate extends ChangeNotifier {
     notifyListeners();
   }
 
+  static bool _isTemporaryFailure(Object error) {
+    if (error is TimeoutException ||
+        error is SocketException ||
+        error is http.ClientException ||
+        error is AuthRetryableFetchException) {
+      return true;
+    }
+    if (error is! PostgrestException) return false;
+    final code = error.code;
+    final status = int.tryParse(code ?? '') ?? 0;
+    return status == 408 ||
+        status == 429 ||
+        (status >= 500 && status < 600) ||
+        const {'PGRST000', 'PGRST001', 'PGRST002', 'PGRST003'}.contains(code);
+  }
+
   Future<void> signOut() async {
     if (!SupabaseEnv.isConfigured) return;
     _consultaExternaStaffBlockPending = false;
-    await Supabase.instance.client.auth.signOut();
+    _verifiedAccount = null;
+    sessionGeneration++;
     role = null;
     _hospitalId = null;
     _fullName = null;
     notifyListeners();
+    await Supabase.instance.client.auth.signOut(scope: SignOutScope.local);
   }
 
   @override

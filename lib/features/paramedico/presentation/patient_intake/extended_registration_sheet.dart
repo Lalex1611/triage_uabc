@@ -133,7 +133,7 @@ class _ExtendedRegistrationPanelState extends State<ExtendedRegistrationPanel> {
       child: TriageSheet(
         title: 'Registro extendido',
         subtitle:
-            'Paciente ${widget.session.nextNumber} · '
+            '${widget.session.patientLabel} · '
             '${widget.session.incidentFolio}',
         onClose: _requestClose,
         showGrip: false,

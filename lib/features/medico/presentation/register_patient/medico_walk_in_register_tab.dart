@@ -1,10 +1,13 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:sistema_triage/core/config/supabase_env.dart';
+import 'package:sistema_triage/core/connectivity/app_connectivity_notifier.dart';
 import 'package:sistema_triage/core/session/auth_gate.dart';
 import 'package:sistema_triage/core/ui/app_snackbar.dart';
+import 'package:sistema_triage/features/medico/data/offline/medico_offline_runtime.dart';
 import 'package:sistema_triage/features/medico/data/repositories/patients_repository.dart';
 import 'package:sistema_triage/features/medico/domain/constants/medico_insurance_institution.dart';
 import 'package:sistema_triage/features/medico/domain/constants/medico_patient_gender.dart';
@@ -288,14 +291,47 @@ class _MedicoWalkInRegisterTabState extends State<MedicoWalkInRegisterTab> {
     }
 
     FocusScope.of(context).unfocus();
+    final runtime = MedicoOfflineRuntime.instance;
+    final connectivity = AppConnectivityNotifier.instance;
+    final session = runtime.session;
+    final name = _name.text.trim();
+    final triage = _triageSql(_triage!);
+    final demographics = _buildDemographics();
+    final vitals = _buildVitals();
+    final reason = _reason.text.trim();
+    final photoPath = _photoPath;
     setState(() => _saving = true);
     try {
+      if (runtime.supported) {
+        await connectivity.refresh();
+        if (!mounted) return;
+        if (!runtime.connected) {
+          if (session?.hospitalId != hosp || runtime.session != session) {
+            throw StateError('Verifica tu sesión de Médico con conexión.');
+          }
+          await runtime.saveWalkIn(
+            triageColor: triage,
+            displayName: name,
+            demographics: demographics,
+            vitalSigns: vitals,
+            reason: reason,
+            photoPath: photoPath,
+          );
+          if (!mounted) return;
+          _resetForm();
+          unawaited(context.push<void>('/medico/capturas'));
+          return;
+        }
+      }
+      if (AuthGate.instance.hospitalId != hosp) {
+        throw StateError('Verifica tu sesión de Médico con conexión.');
+      }
       final result = await _patientsRepo.registerWalkInPatient(
-        triageColor: _triageSql(_triage!),
-        displayName: _name.text,
-        demographics: _buildDemographics(),
-        vitalSigns: _buildVitals(),
-        reasonForVisit: _reason.text,
+        triageColor: triage,
+        displayName: name,
+        demographics: demographics,
+        vitalSigns: vitals,
+        reasonForVisit: reason,
       );
       _anyRegistered = true;
       if (!mounted) return;
@@ -303,7 +339,7 @@ class _MedicoWalkInRegisterTabState extends State<MedicoWalkInRegisterTab> {
         () => _registered = (
           patientId: result.patientId,
           consultationCode: result.consultationCode,
-          name: _name.text.trim(),
+          name: name,
         ),
       );
       if (_scrollController.hasClients) _scrollController.jumpTo(0);
@@ -437,6 +473,16 @@ class _MedicoWalkInRegisterTabState extends State<MedicoWalkInRegisterTab> {
                 ),
               ),
             ),
+            if (isFirst && MedicoOfflineRuntime.instance.supported)
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton.icon(
+                  onPressed: () =>
+                      unawaited(context.push<void>('/medico/capturas')),
+                  icon: const Icon(Icons.cloud_sync_outlined),
+                  label: const Text('Capturas en este teléfono'),
+                ),
+              ),
             Expanded(
               child: SingleChildScrollView(
                 controller: _scrollController,

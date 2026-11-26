@@ -21,7 +21,7 @@ Future<RegisteredPatient?> showAssignColorSheet(
     title: emergency ? 'Emergencias' : 'Asignar color',
     subtitle: emergency
         ? 'Registro continuo · ${session.incidentFolio}'
-        : 'Paciente ${session.nextNumber} · ${session.incidentFolio}',
+        : '${session.patientLabel} · ${session.incidentFolio}',
     builder: (_) => AssignColorForm(
       session: session,
       emergency: emergency,

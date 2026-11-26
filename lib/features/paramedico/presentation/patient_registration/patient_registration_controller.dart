@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:sistema_triage/features/paramedico/data/offline/paramedico_offline_runtime.dart';
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -91,7 +92,7 @@ class PatientRegistrationController extends ChangeNotifier {
         patientLng = pos.lng;
       }
     } catch (_) {
-      // keep defaults
+      // Conserva las coordenadas iniciales.
     } finally {
       patientCoordsLoading = false;
       notifyListeners();
@@ -129,7 +130,7 @@ class PatientRegistrationController extends ChangeNotifier {
         patientLng = inc.longitude!;
       }
     } catch (_) {
-      // keep defaults
+      // Conserva las coordenadas iniciales.
     } finally {
       patientCoordsLoading = false;
       notifyListeners();
@@ -368,6 +369,7 @@ class PatientRegistrationController extends ChangeNotifier {
   }
 
   Future<void> submit(BuildContext context) async {
+    if (submitting) return;
     if (!SupabaseEnv.isConfigured) {
       showAppSnackBar(context, 'Supabase no configurado.', isError: true);
       return;
@@ -383,6 +385,51 @@ class PatientRegistrationController extends ChangeNotifier {
     submitting = true;
     notifyListeners();
     try {
+      if (_repo.usesLocalCaptures) {
+        final runtime = ParamedicoOfflineRuntime.instance;
+        final typeId = EmergencyCatalog.defaultTypeId;
+        final row = await runtime.capture(
+          kind: 'patient',
+          parentId: incidentId,
+          fetchParent: _repo.fetchIncidentForCapture,
+          quickIncident: incidentId == null
+              ? {
+                  'title': IncidentTitleFormatter.formatAuto(
+                    atLocal: DateTime.now(),
+                    locationKey:
+                        '${patientLat.toStringAsFixed(4)}, ${patientLng.toStringAsFixed(4)}',
+                  ),
+                  'emergency_type': typeId == 'OTRO' ? 'otro' : typeId,
+                  'lat': patientLat,
+                  'lng': patientLng,
+                }
+              : null,
+          payload: {
+            'incident_id': incidentId,
+            'triage_color': triageCategory!.sqlValue,
+            'display_name': displayName.trim(),
+            'lat': patientLat,
+            'lng': patientLng,
+            'demographics': {
+              'injury_types': selectedInjuries.map((e) => e.name).toList(),
+              'description': description,
+              'gender': gender?.name,
+              'blood_type': bloodType?.name,
+              if (birthDay != null) 'birth_day': birthDay,
+              if (birthMonth != null) 'birth_month': birthMonth,
+              if (birthYear != null) 'birth_year': birthYear,
+              if (contactNumber.trim().isNotEmpty)
+                'emergency_contact': contactNumber.trim(),
+            },
+          },
+          photos: List<String>.of(photos),
+        );
+        if (context.mounted) {
+          showAppSnackBar(context, 'Guardado en este teléfono');
+          context.go('/paramedico/captura/${row['id']}');
+        }
+        return;
+      }
       final effectiveIncidentId = await _ensureIncidentId();
       final existingCount = await _repo.countPatientsForIncident(
         effectiveIncidentId,

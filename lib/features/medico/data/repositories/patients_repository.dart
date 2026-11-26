@@ -26,10 +26,11 @@ class PatientsRepository {
 
   SupabaseClient get _c {
     final x = _client;
-    if (x == null)
+    if (x == null) {
       throw Exception(
         'El servicio no se encuentra configurado en este momento',
       );
+    }
     return x;
   }
 
@@ -90,7 +91,7 @@ class PatientsRepository {
 
   /// Datos para revisar a un paciente que viene en camino (mockup 02):
   /// paciente + incidente + unidad + paramédico, hora de clasificación y
-  /// enlaces temporales de las fotos del incidente.
+  /// enlaces temporales de las fotos del incidente y del paciente.
   Future<MedicoIncomingReview?> fetchIncomingReview(String patientId) async {
     final row = await _c
         .from('patients')
@@ -137,6 +138,26 @@ class PatientsRepository {
               .from(_incidentPhotosBucket)
               .createSignedUrls(stored, const Duration(hours: 1).inSeconds);
           photoUrls.addAll(signed.map((s) => s.signedUrl));
+        } catch (_) {}
+      }
+    }
+
+    final demographics = row['demographics'];
+    final patientPhotos = demographics is Map
+        ? demographics['photo_storage_paths']
+        : null;
+    if (patientPhotos is List) {
+      final stored = patientPhotos
+          .whereType<String>()
+          .where((path) => path.startsWith('$patientId/'))
+          .toSet()
+          .toList();
+      if (stored.isNotEmpty) {
+        try {
+          final signed = await _c.storage
+              .from('patient_photos')
+              .createSignedUrls(stored, const Duration(hours: 1).inSeconds);
+          photoUrls.addAll(signed.map((photo) => photo.signedUrl));
         } catch (_) {}
       }
     }

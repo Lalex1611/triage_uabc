@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:sistema_triage/core/router/app_router.dart';
 import 'package:sistema_triage/core/connectivity/app_connectivity_notifier.dart';
 import 'package:sistema_triage/core/constants/app_colors.dart';
 import 'package:sistema_triage/core/theme/app_theme.dart';
@@ -9,8 +10,14 @@ class OfflineConnectionBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: AppConnectivityNotifier.instance,
+      listenable: Listenable.merge([
+        AppConnectivityNotifier.instance,
+        appRouter.routerDelegate,
+      ]),
       builder: (context, _) {
+        if (appRouter.state.uri.path == '/sin-conexion') {
+          return const SizedBox.shrink();
+        }
         final connected = AppConnectivityNotifier.instance.isConnected;
         return IgnorePointer(
           ignoring: connected,
@@ -25,45 +32,52 @@ class OfflineConnectionBanner extends StatelessWidget {
                 bottom: false,
                 child: Align(
                   alignment: Alignment.topCenter,
-                  child: Container(
-                    margin: const EdgeInsets.fromLTRB(14, 6, 14, 0),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 7,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                        color: AppColors.primaryParamedico.withValues(
-                          alpha: 0.35,
-                        ),
+                  child: GestureDetector(
+                    onTap: () {
+                      if (appRouter.state.uri.path != '/sin-conexion') {
+                        appRouter.push('/sin-conexion');
+                      }
+                    },
+                    child: Container(
+                      margin: const EdgeInsets.fromLTRB(14, 6, 14, 0),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 7,
                       ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.08),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(
-                          Icons.wifi_off_rounded,
-                          color: AppColors.primaryParamedico,
-                          size: 16,
-                        ),
-                        const SizedBox(width: 7),
-                        Text(
-                          'Sin conexion',
-                          style: AppTextStyles.ESC_Medium_bodyMedium.copyWith(
-                            color: AppColors.primaryParamedico,
-                            fontSize: 12,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: AppColors.primaryParamedico.withValues(
+                            alpha: 0.35,
                           ),
                         ),
-                      ],
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.08),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.wifi_off_rounded,
+                            color: AppColors.primaryParamedico,
+                            size: 16,
+                          ),
+                          const SizedBox(width: 7),
+                          Text(
+                            'Sin conexión · Ver opciones',
+                            style: AppTextStyles.ESC_Medium_bodyMedium.copyWith(
+                              color: AppColors.primaryParamedico,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
