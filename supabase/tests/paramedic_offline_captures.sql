@@ -132,7 +132,16 @@ begin
   exception when insufficient_privilege then null; end;
   perform set_config('request.jwt.claim.sub',a::text,true);
   other_photo := i::text||'/a0830000-0000-0000-0000-000000000004.jpg';
-  perform public.paramedico_update_incident_photo_path(i,other_photo,false);
+  insert into storage.objects(bucket_id,name,owner_id)
+    values('incident_photos',other_photo,a::text);
+  perform public.link_paramedic_capture_photo(a,'incident',i,other_photo);
+  -- Un cliente leyó solo la primera foto y quiere quitarla después del vínculo.
+  begin
+    update public.incidents set photo_local_paths = '{}' where id = i;
+    raise exception 'Se esperaba rechazar el reemplazo con una lista desactualizada';
+  exception when insufficient_privilege then null; end;
+  assert (select photo_local_paths = array[photo, other_photo]
+    from public.incidents where id=i), 'La lista anterior quitó una foto recién vinculada';
   perform public.paramedico_update_incident_photo_path(i,photo,true);
   begin
     perform public.link_paramedic_capture_photo(a,'incident',i,photo);
@@ -147,17 +156,18 @@ begin
   exception when sqlstate 'P0802' then null; end;
   assert (select photo_local_paths = array[other_photo] from public.incidents where id=i),
     'Un reintento restauró una foto retirada';
-  update public.incidents set photo_local_paths = array[photo, other_photo, '/local/foto.jpg']
-    where id = i;
+  perform public.paramedico_update_incident_photo_path(i,photo,false);
+  perform public.paramedico_update_incident_photo_path(i,'/local/foto.jpg',false);
   assert (select photo_local_paths = array[other_photo, '/local/foto.jpg'] from public.incidents where id=i),
-    'Una lista anterior restauró una foto retirada o alteró las demás rutas';
+    'Un alta restauró una foto retirada o alteró las demás rutas';
   -- Simula la publicación final por el servicio de Storage tras el retiro.
   reset role;
+  assert not exists (select 1 from public.paramedic_removed_incident_photos
+    where incident_id=i and path=other_photo), 'Se marcó como retirada la foto recién vinculada';
   begin
     insert into storage.objects(bucket_id,name,owner_id) values('incident_photos',photo,a::text);
     raise exception 'Se esperaba rechazar la publicación tardía de la foto retirada';
   exception when sqlstate 'P0802' then null; end;
-  insert into storage.objects(bucket_id,name,owner_id) values('incident_photos',other_photo,a::text);
   begin
     update storage.objects set name = photo where bucket_id = 'incident_photos' and name = other_photo;
     raise exception 'Se esperaba rechazar el cambio de nombre a una ruta retirada';

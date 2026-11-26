@@ -48,6 +48,11 @@ corregir algo se crea una nueva.
 | 26 | `20261125130000_paramedic_capture_photo_integrity.sql` | Vigencia de códigos de Paramédico y protección del vínculo y retiro de fotos |
 | 27 | `20261125140000_offline_retry_and_photo_access.sql` | Validación de fotos por paciente y aviso de adjuntos retirados durante un reintento |
 | 28 | `20261125150000_offline_incident_photo_and_account_guards.sql` | Impide restaurar fotos retiradas con una carga tardía o una lista anterior y verifica el perfil al reanudar la captura |
+| 29 | `20261125160000_incident_photo_path_updates.sql` | Cambia las fotos de incidentes por ruta y bloquea el reemplazo directo de la lista desde la API |
+
+La #29 requiere la app que usa la RPC por ruta al agregar fotos en la creación
+en línea de incidentes. Las versiones que reemplazan la lista recibirán un error
+hasta que se actualicen.
 
 Antes de aplicar #26 en una instalación con capturas pendientes, comprueba si
 hay reintentos de fotos de incidentes. Si alguna ruta ya se retiró, concilia el

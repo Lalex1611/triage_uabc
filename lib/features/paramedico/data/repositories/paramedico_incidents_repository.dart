@@ -909,16 +909,6 @@ class ParamedicoIncidentsRepository {
     await _c.storage.from(_incidentPhotosBucket).remove([path]);
   }
 
-  Future<void> updateIncidentPhotoPaths({
-    required String incidentId,
-    required List<String> photoPaths,
-  }) async {
-    await _c
-        .from('incidents')
-        .update({'photo_local_paths': photoPaths})
-        .eq('id', incidentId);
-  }
-
   Future<void> changeIncidentPhotoPath({
     required String incidentId,
     required String path,

@@ -383,16 +383,17 @@ class CreateIncidentController extends ChangeNotifier {
       final photosToUpload = List<String>.of(photos);
       if (photosToUpload.isNotEmpty) {
         try {
-          await _repo.updateIncidentPhotoPaths(
-            incidentId: id,
-            photoPaths: [
-              for (final photo in photosToUpload)
-                await _repo.uploadIncidentPhoto(
-                  incidentId: id,
-                  localPath: photo,
-                ),
-            ],
-          );
+          for (final photo in photosToUpload) {
+            final path = await _repo.uploadIncidentPhoto(
+              incidentId: id,
+              localPath: photo,
+            );
+            await _repo.changeIncidentPhotoPath(
+              incidentId: id,
+              path: path,
+              remove: false,
+            );
+          }
         } catch (e) {
           debugPrint('No se pudieron subir las fotos del incidente: $e');
           photosUploaded = false;

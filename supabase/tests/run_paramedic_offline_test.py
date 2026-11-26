@@ -158,10 +158,11 @@ for combined, patient_id in [(True, 'a0820000-0000-0000-0000-000000000010'),
     print('PASS Reintentos concurrentes:', 'incidente y paciente' if combined else 'solo paciente')
 
 photo = 'a0810000-0000-0000-0000-000000000010/aaaaaaaa-0000-0000-0000-000000000010.jpg'
-sql(f"""update public.incidents set photo_local_paths=array['{photo}']
-  where id='a0810000-0000-0000-0000-000000000010';""")
+sql(session + f"""select public.paramedico_update_incident_photo_path(
+  'a0810000-0000-0000-0000-000000000010', '{photo}', false);""")
 run_contended(
-    "update public.incidents set photo_local_paths='{}' where id='a0810000-0000-0000-0000-000000000010';",
+    session + f"""select public.paramedico_update_incident_photo_path(
+      'a0810000-0000-0000-0000-000000000010', '{photo}', true);""",
     f"""do $$ begin
       insert into storage.objects(bucket_id,name,owner_id)
         values ('incident_photos','{photo}','a0800000-0000-0000-0000-000000000010');
