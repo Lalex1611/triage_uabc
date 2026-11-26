@@ -450,13 +450,20 @@ class ParamedicoIncidentsRepository {
         AuthGate.instance.sessionGeneration == cacheGeneration;
 
     if (cacheOwner != null) {
-      final capture = await offline.local(incidentId);
-      final local = await offline.incident(incidentId);
-      if (local != null &&
-          sameLocalSession() &&
-          (offline.offline ||
-              capture != null && capture['state'] != 'synced')) {
-        return ParamedicoIncidentSummary.fromJson(local);
+      try {
+        final capture = await offline.local(incidentId);
+        if (!sameLocalSession()) return null;
+        final local = await offline.incident(incidentId);
+        if (!sameLocalSession()) return null;
+        if (local != null &&
+            (offline.offline ||
+                capture != null && capture['state'] != 'synced')) {
+          return ParamedicoIncidentSummary.fromJson(local);
+        }
+      } catch (_) {
+        if (!sameLocalSession()) return null;
+        if (offline.offline) rethrow;
+        // Una copia ilegible no debe impedir la consulta al servidor.
       }
     }
     final Map<String, dynamic>? row;
@@ -466,9 +473,13 @@ class ParamedicoIncidentsRepository {
       if ((error is TimeoutException || error is SocketException) &&
           offline.canCapture &&
           sameLocalSession()) {
-        final fallback = await offline.incident(incidentId);
-        if (fallback != null && sameLocalSession()) {
-          return ParamedicoIncidentSummary.fromJson(fallback);
+        try {
+          final fallback = await offline.incident(incidentId);
+          if (fallback != null && sameLocalSession()) {
+            return ParamedicoIncidentSummary.fromJson(fallback);
+          }
+        } catch (_) {
+          // Conserva el error remoto cuando tampoco se puede leer la copia.
         }
       }
       rethrow;

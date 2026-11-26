@@ -181,4 +181,61 @@ void main() {
       expect(await db.query('outbox'), isEmpty);
     },
   );
+
+  test(
+    'una copia ilegible se recupera del servidor al volver la conexión',
+    () async {
+      final db = await databaseFactoryFfi.openDatabase(inMemoryDatabasePath);
+      final previous = paramedico.store;
+      final key = await AesGcm.with256bits().newSecretKey();
+      paramedico.store = OfflineCaptureStore(db, (_) async => key);
+      addTearDown(() async {
+        paramedico.store = previous;
+        await db.close();
+      });
+      await OfflineCaptureStore.createSchema(
+        db,
+        OfflineCaptureStore.schemaVersion,
+      );
+      await db.insert('incident_cache', {
+        'account': account,
+        'id': incident,
+        'body': Uint8List(32),
+        'expires_at': DateTime.now()
+            .add(const Duration(hours: 1))
+            .millisecondsSinceEpoch,
+      });
+      role = 'paramedico';
+      await AuthGate.instance.syncFromSession();
+      final requestsBefore = incidentRequests;
+      final repository = ParamedicoIncidentsRepository();
+      final connectivity = AppConnectivityNotifier.instance;
+
+      messenger.setMockMethodCallHandler(network, (_) async => ['none']);
+      await connectivity.refresh();
+      await expectLater(
+        repository.getIncident(incident),
+        throwsA(isA<SecretBoxAuthenticationError>()),
+      );
+      expect(incidentRequests, requestsBefore);
+
+      messenger.setMockMethodCallHandler(network, (_) async => ['wifi']);
+      await http.runWithClient(
+        connectivity.refresh,
+        () => MockClient((_) async => http.Response('', 200)),
+      );
+      await paramedico.synchronize();
+      final detail = await repository.getIncident(incident);
+      expect(detail?.generatedTitle, 'Incidente de prueba');
+      expect(incidentRequests, requestsBefore + 1);
+
+      messenger.setMockMethodCallHandler(network, (_) async => ['none']);
+      await connectivity.refresh();
+      expect(
+        (await repository.getIncident(incident))?.generatedTitle,
+        detail?.generatedTitle,
+      );
+      expect(incidentRequests, requestsBefore + 1);
+    },
+  );
 }
