@@ -175,8 +175,7 @@ class OfflineSyncService extends ChangeNotifier {
         (storageScope == null || storageScope!(account) == scope);
     try {
       storageError = null;
-      final (rows: captures, :unreadableIds) = await store.list(scope);
-      final unreadable = unreadableIds.toSet();
+      final captures = (await store.list(scope, queuedOnly: true)).rows;
       captures.sort(
         (a, b) => (a['kind'] == 'incident' ? 0 : 1).compareTo(
           b['kind'] == 'incident' ? 0 : 1,
@@ -190,10 +189,11 @@ class OfflineSyncService extends ChangeNotifier {
         final payload = Capture.from(c['payload'] as Map);
         final parentId = c['parent_id'] as String?;
         if (parentId != null && c['remote_id'] == null) {
-          if (unreadable.contains(parentId)) continue;
           // Tras el borrado local, incident_id sigue identificando el incidente
           // en el servidor porque la RPC lo crea con el UUID de la captura.
-          final parent = await store.get(scope, parentId);
+          final parentResult = await store.list(scope, id: parentId);
+          if (parentResult.unreadableIds.isNotEmpty) continue;
+          final parent = parentResult.rows.firstOrNull;
           if (parent != null) {
             if (parent['remote_id'] == null) {
               c['message'] = parent['state'] == 'attention'
@@ -238,20 +238,32 @@ class OfflineSyncService extends ChangeNotifier {
             if (photo['linked'] == true || photo['removed'] == true) continue;
             for (var attempt = 0; attempt < 2; attempt++) {
               if (!authorized()) return;
+              (StorageException, StackTrace)? uploadFailure;
               if (photo['uploaded'] != true) {
                 final bytes = await store.attachment(
                   scope,
                   photo['id'] as String,
                 );
                 if (!authorized()) return;
-                await remote.upload(
-                  c['kind'] as String,
-                  c['remote_id'] as String,
-                  photo,
-                  bytes,
-                );
-                photo['uploaded'] = true;
-                await store.save(scope, c);
+                try {
+                  await remote.upload(
+                    c['kind'] as String,
+                    c['remote_id'] as String,
+                    photo,
+                    bytes,
+                  );
+                } on StorageException catch (error, trace) {
+                  if (c['kind'] != 'incident' || error.statusCode == '401') {
+                    rethrow;
+                  }
+                  // Storage puede ocultar el motivo del rechazo. La RPC
+                  // distingue una foto retirada de un archivo ausente.
+                  uploadFailure = (error, trace);
+                }
+                if (uploadFailure == null) {
+                  photo['uploaded'] = true;
+                  await store.save(scope, c);
+                }
               }
               if (!authorized()) return;
               try {
@@ -274,12 +286,16 @@ class OfflineSyncService extends ChangeNotifier {
                   break;
                 }
                 if (error.code != 'P0801') rethrow;
+                if (uploadFailure != null) {
+                  Error.throwWithStackTrace(uploadFailure.$1, uploadFailure.$2);
+                }
                 // Conserva el archivo y vuelve a subirlo si Storage lo perdió.
                 photo['uploaded'] = false;
                 await store.save(scope, c);
                 if (attempt == 1) rethrow;
                 continue;
               }
+              photo['uploaded'] = true;
               photo['linked'] = true;
               await store.save(scope, c);
               break;

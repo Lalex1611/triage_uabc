@@ -11,6 +11,7 @@ se ejecutan tal como están.
 from pathlib import Path
 import subprocess
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import contextmanager
 import time
 
 CONTAINER = 'triage-a08-test'
@@ -55,6 +56,46 @@ def wait_for_condition(query, failure, timeout=10):
         time.sleep(0.1)
     raise RuntimeError(failure)
 
+@contextmanager
+def holding_transaction(statement):
+    with subprocess.Popen(psql(DATABASE), stdin=subprocess.PIPE,
+                          stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
+                          encoding='utf-8') as first:
+        first.stdin.write("set application_name = 'offline-first';\nbegin;\n" + statement
+                          + "\nselect 1 /* lista */;\n")
+        first.stdin.flush()
+        try:
+            wait_for_condition("""
+                select exists (select 1 from pg_stat_activity
+                  where application_name = 'offline-first' and state = 'idle in transaction'
+                  and query = 'select 1 /* lista */;');
+            """, 'La primera transacción no llegó al punto de espera.')
+            yield
+            first.stdin.write("commit;\n")
+        finally:
+            # Cerrar la entrada sin COMMIT revierte la transacción si falla la prueba.
+            _, error = first.communicate(timeout=10)
+            if first.returncode:
+                raise RuntimeError(error)
+
+def run_contended(first, second, *, advisory=True, callers=1, while_blocked=None):
+    with ThreadPoolExecutor(max_workers=callers) as pool:
+        with holding_transaction(first):
+            calls = [pool.submit(sql, "set application_name = 'offline-second';\n" + second)
+                     for _ in range(callers)]
+            lock_filter = "and waiter.wait_event = 'advisory'" if advisory else ""
+            wait_for_condition(f"""
+                select exists (select 1 from pg_stat_activity waiter
+                  join pg_stat_activity holder on holder.pid = any(pg_blocking_pids(waiter.pid))
+                  where waiter.application_name = 'offline-second'
+                    and holder.application_name = 'offline-first'
+                    and waiter.wait_event_type = 'Lock' {lock_filter});
+            """, 'La segunda transacción no llegó al bloqueo esperado.')
+            if while_blocked:
+                sql(while_blocked)
+        for call in calls:
+            call.result()
+
 wait_for_postgres()
 sql('create database ' + DATABASE + ';', 'postgres')
 sql("""
@@ -77,7 +118,13 @@ alter default privileges in schema public grant select,insert,update,delete on t
 create publication supabase_realtime;
 """)
 for migration in sorted((ROOT/'migrations').glob('*.sql')):
-    sql(migration.read_text(encoding='utf-8'))
+    migration_sql = migration.read_text(encoding='utf-8')
+    if migration.name == '20261125140000_offline_retry_and_photo_access.sql':
+        fixture = (ROOT/'tests'/'offline_patient_photo_cleanup.sql').read_text(encoding='utf-8')
+        sql('begin;\n' + fixture + '\n' + migration_sql
+            + '\nselect pg_temp.verificar_limpieza();\nrollback;')
+        print('PASS Limpieza: referencias del paciente, orden y objetos de Storage')
+    sql(migration_sql)
     print('Applied',migration.name)
 sql((ROOT/'tests'/'paramedic_offline_captures.sql').read_text(encoding='utf-8'))
 print('PASS Paramédico: idempotencia, adjuntos, reversión y RLS')
@@ -87,51 +134,56 @@ sql("""
 insert into auth.users(id,email) values('a0800000-0000-0000-0000-000000000010','concurrency@example.test');
 update public.profiles set role='paramedico' where id='a0800000-0000-0000-0000-000000000010';
 """)
-request = """
+session = """
 set role authenticated;
 select set_config('request.jwt.claim.sub','a0800000-0000-0000-0000-000000000010',false);
+"""
+incident = """
 select public.sync_paramedic_capture('a0800000-0000-0000-0000-000000000010','incident',
 'a0810000-0000-0000-0000-000000000010','{"title":"Concurrent test","emergency_type":"otro","lat":32.5,"lng":-117}');
-select public.sync_paramedic_capture('a0800000-0000-0000-0000-000000000010','patient',
-'a0820000-0000-0000-0000-000000000010','{"incident_id":"a0810000-0000-0000-0000-000000000010","triage_color":"verde","demographics":{},"lat":32.5,"lng":-117}');
 """
-with ThreadPoolExecutor(max_workers=5) as pool:
-    with subprocess.Popen(psql(DATABASE), stdin=subprocess.PIPE,
-                          stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
-                          encoding='utf-8') as first:
-        first.stdin.write("set application_name = 'offline-replay-first';\nbegin;\n" + request)
-        first.stdin.flush()
-        try:
-            wait_for_condition("""
-                select exists (
-                  select 1 from pg_stat_activity where application_name = 'offline-replay-first'
-                  and state = 'idle in transaction'
-                );
-            """, 'La primera solicitud no quedó abierta después de registrar la captura.')
-            retries = [
-                pool.submit(sql, "set application_name = 'offline-replay-retry';\n" + request)
-                for _ in range(5)
-            ]
-            wait_for_condition("""
-                select exists (
-                  select 1 from pg_stat_activity retry
-                  join pg_stat_activity first on first.pid = any(pg_blocking_pids(retry.pid))
-                  where retry.application_name = 'offline-replay-retry'
-                  and retry.wait_event_type = 'Lock' and retry.wait_event = 'advisory'
-                  and first.application_name = 'offline-replay-first'
-                );
-            """, 'Ningún reintento llegó al bloqueo de la primera transacción.')
-            first.stdin.write("commit;\n")
-        finally:
-            # Si falla la espera, cerrar la entrada revierte la transacción abierta.
-            _, error = first.communicate(timeout=10)
-            if first.returncode:
-                raise RuntimeError(error)
-    for retry in retries:
-        retry.result()
-sql("""do $$ begin
-assert (select count(*)=1 from public.incidents where sync_client_id='a0810000-0000-0000-0000-000000000010');
-assert (select count(*)=1 from public.patients where sync_client_id='a0820000-0000-0000-0000-000000000010');
-assert (select count(*)=1 from public.consultation_codes where patient_id='a0820000-0000-0000-0000-000000000010');
+for combined, patient_id in [(True, 'a0820000-0000-0000-0000-000000000010'),
+                             (False, 'a0820000-0000-0000-0000-000000000011')]:
+    patient = f"""
+        select public.sync_paramedic_capture('a0800000-0000-0000-0000-000000000010','patient',
+          '{patient_id}','{{"incident_id":"a0810000-0000-0000-0000-000000000010","triage_color":"verde","demographics":{{}},"lat":32.5,"lng":-117}}');
+    """
+    request = session + (incident if combined else '') + patient
+    run_contended(request, request, callers=5)
+    sql(f"""do $$ begin
+      assert (select count(*)=1 from public.incidents where sync_client_id='a0810000-0000-0000-0000-000000000010');
+      assert (select count(*)=1 from public.patients where sync_client_id='{patient_id}');
+      assert (select count(*)=1 from public.consultation_codes where patient_id='{patient_id}');
+    end; $$;""")
+    print('PASS Reintentos concurrentes:', 'incidente y paciente' if combined else 'solo paciente')
+
+photo = 'a0810000-0000-0000-0000-000000000010/aaaaaaaa-0000-0000-0000-000000000010.jpg'
+sql(f"""update public.incidents set photo_local_paths=array['{photo}']
+  where id='a0810000-0000-0000-0000-000000000010';""")
+run_contended(
+    "update public.incidents set photo_local_paths='{}' where id='a0810000-0000-0000-0000-000000000010';",
+    f"""do $$ begin
+      insert into storage.objects(bucket_id,name,owner_id)
+        values ('incident_photos','{photo}','a0800000-0000-0000-0000-000000000010');
+      raise exception 'Se publicó una foto retirada';
+    exception when sqlstate 'P0802' then null; end; $$;""",
+    advisory=False)
+sql(f"""do $$ begin assert not exists(select 1 from storage.objects
+  where bucket_id='incident_photos' and name='{photo}'); end; $$;""")
+print('PASS Una subida en curso respeta el retiro confirmado')
+
+capture_id = 'a0810000-0000-0000-0000-000000000012'
+run_contended(
+    f"select pg_advisory_xact_lock(hashtextextended('{capture_id}',0));",
+    session + f"""do $$ begin
+      perform public.sync_paramedic_capture('a0800000-0000-0000-0000-000000000010','incident',
+        '{capture_id}','{{"title":"Espera","emergency_type":"otro","lat":32.5,"lng":-117}}');
+      raise exception 'Una cuenta desactivada pudo sincronizar';
+    exception when insufficient_privilege then null; end; $$;""",
+    while_blocked="""update public.profiles set is_active=false
+      where id='a0800000-0000-0000-0000-000000000010';""")
+sql(f"""do $$ begin
+  assert not exists(select 1 from public.incidents where id='{capture_id}');
+  assert not exists(select 1 from public.paramedic_capture_receipts where sync_client_id='{capture_id}');
 end; $$;""")
-print('PASS: seis solicitudes sobre la misma clave crean un incidente, un paciente y un código')
+print('PASS Una cuenta desactivada durante la espera no deja incidente ni comprobante')

@@ -6,6 +6,10 @@ import 'package:sistema_triage/features/paramedico/data/repositories/paramedico_
 class FakeIntakeRepository extends ParamedicoIncidentsRepository {
   FakeIntakeRepository({this.existing = 5, this.hasLocation = true});
 
+  // Este doble de prueba confirma el registro en línea y devuelve el código.
+  @override
+  bool get usesLocalCaptures => false;
+
   final int existing;
   final bool hasLocation;
   final registered = <Map<String, Object?>>[];

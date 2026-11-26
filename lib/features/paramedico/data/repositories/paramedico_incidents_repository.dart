@@ -459,17 +459,9 @@ class ParamedicoIncidentsRepository {
         return ParamedicoIncidentSummary.fromJson(local);
       }
     }
+    final Map<String, dynamic>? row;
     try {
-      final row = await fetchIncidentForCapture(incidentId);
-      if (row == null) return null;
-      if (cacheOwner != null) {
-        await offline.cacheIncident(
-          Map<String, dynamic>.from(row),
-          owner: cacheOwner,
-          generation: cacheGeneration,
-        );
-      }
-      return ParamedicoIncidentSummary.fromJson(Map<String, dynamic>.from(row));
+      row = await fetchIncidentForCapture(incidentId);
     } catch (error) {
       if ((error is TimeoutException || error is SocketException) &&
           offline.canCapture &&
@@ -481,6 +473,21 @@ class ParamedicoIncidentsRepository {
       }
       rethrow;
     }
+    if (row == null) return null;
+    if (cacheOwner != null) {
+      if (!sameLocalSession()) return null;
+      try {
+        await offline.cacheIncident(
+          row,
+          owner: cacheOwner,
+          generation: cacheGeneration,
+        );
+      } catch (_) {
+        // El detalle remoto sigue disponible aunque falle su copia local.
+      }
+      if (!sameLocalSession()) return null;
+    }
+    return ParamedicoIncidentSummary.fromJson(row);
   }
 
   Future<Map<String, dynamic>?> fetchIncidentForCapture(String incidentId) => _c

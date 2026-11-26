@@ -18,8 +18,9 @@ class ParamedicoOfflineRuntime extends ChangeNotifier
   String? error;
   Timer? _timer;
   bool _active = true;
+  Future<void>? _starting;
   Future<void>? _running;
-  bool get supported => Platform.isAndroid || Platform.isIOS;
+  bool get supported => OfflineCaptureStore.isSupported;
   String? get account => AuthGate.instance.offlineAccount;
   bool get canCapture => supported && store != null && account != null;
   bool get syncing => _running != null;
@@ -27,18 +28,16 @@ class ParamedicoOfflineRuntime extends ChangeNotifier
   void refreshView() => notifyListeners();
   Future<void> retryReviewedCapture(String id) async {
     final owner = account;
-    final row = await local(id);
-    if (owner == null ||
-        owner != account ||
-        row == null ||
-        row['state'] != 'attention') {
-      return;
-    }
-    row['state'] = 'pending';
-    row['attempts'] = 0;
-    row.remove('next_attempt');
-    row.remove('message');
-    await store!.save(owner, row);
+    final captureStore = store;
+    if (owner == null || captureStore == null) return;
+    final generation = AuthGate.instance.sessionGeneration;
+    final changed = await captureStore.retryReviewedCapture(
+      owner,
+      id,
+      authorized: () =>
+          account == owner && AuthGate.instance.sessionGeneration == generation,
+    );
+    if (!changed) return;
     notifyListeners();
     await retryNow();
   }
@@ -67,16 +66,22 @@ class ParamedicoOfflineRuntime extends ChangeNotifier
     return bytes;
   }
 
-  Future<void> start() async {
-    if (!supported || store != null) return;
+  Future<void> start() {
+    if (!supported || store != null) return Future.value();
+    return _starting ??= _open().whenComplete(() => _starting = null);
+  }
+
+  Future<void> _open() async {
     try {
-      store = await OfflineCaptureStore.open();
+      final captureStore = await OfflineCaptureStore.open();
       syncService = ParamedicoSyncService(
-        store: store!,
+        store: captureStore,
         remote: SupabaseCaptureRemote(Supabase.instance.client),
         currentAccount: () => _active ? account : null,
         sessionGeneration: () => AuthGate.instance.sessionGeneration,
       );
+      store = captureStore;
+      error = null;
       syncService!.addListener(notifyListeners);
       WidgetsBinding.instance.addObserver(this);
       AuthGate.instance.addListener(_changed);
@@ -89,7 +94,7 @@ class ParamedicoOfflineRuntime extends ChangeNotifier
       _changed();
     } catch (_) {
       error =
-          'No se pudo abrir el almacenamiento protegido. Comprueba el espacio y vuelve a abrir la app.';
+          'No se pudo abrir el almacenamiento protegido. Comprueba el espacio y vuelve a intentarlo.';
     }
     notifyListeners();
   }
@@ -129,6 +134,7 @@ class ParamedicoOfflineRuntime extends ChangeNotifier
   }
 
   Future<void> retryNow() async {
+    if (store == null) await start();
     await AppConnectivityNotifier.instance.refresh();
     // La comprobación de conexión puede haber iniciado un lote automático.
     // Espera a que termine antes de forzar el reintento de lo pendiente.

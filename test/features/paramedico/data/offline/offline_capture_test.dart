@@ -19,6 +19,7 @@ class FakeRemote implements CaptureRemote {
   bool loseUploadResponse = false;
   bool failLink = false;
   Object? linkFailure;
+  StorageException? uploadFailure;
   Object? failure;
   bool incompleteConfirmation = false;
   bool codeExpired = false;
@@ -62,6 +63,7 @@ class FakeRemote implements CaptureRemote {
     Capture photo,
     Uint8List bytes,
   ) async {
+    if (uploadFailure != null) throw uploadFailure!;
     objects.add('$id/${photo['id']}');
     uploadStarted?.complete();
     await holdUpload?.future;
@@ -370,6 +372,15 @@ void main() {
     expect(await db.query('incident_cache'), isEmpty);
   });
 
+  test('una captura vencida aún sin purgar no renueva la caché', () async {
+    await enqueue([draft('i')]);
+    await engine().sync(force: true);
+    now = now.add(const Duration(hours: 24));
+    expect(await db.query('captures'), hasLength(1));
+    expect(await store.cacheIncident('alice', {'id': 'i'}), isFalse);
+    expect(await db.query('incident_cache'), isEmpty);
+  });
+
   test('un guardado en curso no revive la copia local vencida', () async {
     await enqueue([draft('i')]);
     await engine().sync(force: true);
@@ -445,6 +456,39 @@ void main() {
     expect(identical(a, b), isTrue);
     remote.hold!.complete();
     await Future.wait([a, b]);
+    expect(remote.calls, ['i']);
+  });
+  test('un reintento atrasado no restaura la captura ya enviada', () async {
+    final file = await File('${directory.path}/foto.jpg').writeAsBytes([1]);
+    await enqueue(
+      [draft('i')..['state'] = 'attention'],
+      files: {
+        'i': [file.path],
+      },
+    );
+    final reading = Completer<void>();
+    final delayedKey = Completer<SecretKey>();
+    final delayed = OfflineCaptureStore(db, (_) {
+      if (!reading.isCompleted) reading.complete();
+      return delayedKey.future;
+    }, now: () => now);
+    final stale = delayed.retryReviewedCapture(
+      'alice',
+      'i',
+      authorized: () => true,
+    );
+    await reading.future;
+    expect(
+      await store.retryReviewedCapture('alice', 'i', authorized: () => true),
+      isTrue,
+    );
+    await engine().sync();
+    delayedKey.complete(key);
+
+    expect(await stale, isFalse);
+    expect((await store.get('alice', 'i'))?['state'], 'synced');
+    expect(await db.query('outbox'), isEmpty);
+    expect(await db.query('attachments'), isEmpty);
     expect(remote.calls, ['i']);
   });
   test('el reintento manual espera un único lote forzado', () async {
@@ -563,6 +607,47 @@ void main() {
     expect(capture['state'], 'synced');
     expect(await db.query('attachments'), isEmpty);
   });
+
+  for (final outcome in ['retirada', 'existente', 'ausente']) {
+    test(
+      'comprueba una foto $outcome cuando Storage rechaza la subida',
+      () async {
+        final file = await File('${directory.path}/foto.jpg').writeAsBytes([1]);
+        await enqueue(
+          [draft('i')],
+          files: {
+            'i': [file.path],
+          },
+        );
+        remote.uploadFailure = const StorageException(
+          'Rechazada',
+          statusCode: '403',
+        );
+        final pending = (await store.get('alice', 'i'))!;
+        if (outcome == 'retirada') {
+          remote.linkFailure = const PostgrestException(
+            message: 'Retirada',
+            code: 'P0802',
+          );
+        } else if (outcome == 'existente') {
+          remote.objects.add('remote-i/${pending['photos'][0]['id']}');
+        }
+
+        await engine().sync();
+        final capture = (await store.get('alice', 'i'))!;
+        final photo = capture['photos'][0] as Capture;
+        expect(remote.linkAttempts, 1);
+        expect(capture['state'], outcome == 'ausente' ? 'attention' : 'synced');
+        expect(photo['removed'] == true, outcome == 'retirada');
+        expect(photo['linked'], outcome == 'existente');
+        expect(await store.hasPending('alice'), outcome == 'ausente');
+        expect(
+          await db.query('attachments'),
+          hasLength(outcome == 'ausente' ? 1 : 0),
+        );
+      },
+    );
+  }
 
   test(
     'el paciente confirmado envía su foto si el incidente es ilegible',
@@ -721,6 +806,42 @@ void main() {
     final result = await store.list('bob');
     expect(result.rows, isEmpty);
     expect(result.unreadableIds, ['i']);
+  });
+  test(
+    'una cola vacía no descifra las capturas visibles del historial',
+    () async {
+      await enqueue([draft('historial')]);
+      await engine().sync();
+      var reads = 0;
+      store = OfflineCaptureStore(db, (_) async {
+        reads++;
+        return key;
+      }, now: () => now);
+      await engine().sync();
+      expect(reads, 0);
+      expect((await store.list('alice')).rows.single['id'], 'historial');
+    },
+  );
+  test('omite al hijo de un incidente ilegible fuera de la cola', () async {
+    await enqueue([draft('i')]);
+    await engine().sync();
+    await db.update(
+      'captures',
+      {'body': Uint8List(40)},
+      where: 'id = ?',
+      whereArgs: ['i'],
+    );
+    await enqueue([
+      draft('p', kind: 'patient', parent: 'i'),
+      draft('otro', kind: 'patient'),
+    ]);
+
+    await engine().sync();
+    expect(remote.calls, ['i', 'otro']);
+    expect((await store.get('alice', 'p'))?['state'], 'pending');
+    expect(await db.query('outbox', columns: ['id']), [
+      {'id': 'p'},
+    ]);
   });
   test(
     'conserva una captura ilegible y sincroniza las independientes',

@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:cryptography/cryptography.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -28,6 +29,10 @@ class OfflineCaptureStore {
        _pickerDirectory = pickerDirectory;
 
   static const schemaVersion = 3;
+  static bool get isSupported =>
+      !kIsWeb &&
+      (defaultTargetPlatform == TargetPlatform.android ||
+          defaultTargetPlatform == TargetPlatform.iOS);
   static const _retention = Duration(hours: 24);
   static const _unexpired = '(expires_at IS NULL OR expires_at > ?)';
 
@@ -311,11 +316,24 @@ class OfflineCaptureStore {
     }
   }
 
-  Future<CaptureReadResult> list(String account) async {
+  Future<CaptureReadResult> list(
+    String account, {
+    bool queuedOnly = false,
+    String? id,
+  }) async {
     final rows = await db.query(
       'captures',
-      where: 'account = ? AND $_unexpired',
-      whereArgs: [account, _now().millisecondsSinceEpoch],
+      where: [
+        'account = ? AND $_unexpired',
+        if (id != null) 'id = ?',
+        if (queuedOnly) 'id IN (SELECT id FROM outbox WHERE account = ?)',
+      ].join(' AND '),
+      whereArgs: [
+        account,
+        _now().millisecondsSinceEpoch,
+        ?id,
+        if (queuedOnly) account,
+      ],
     );
     final entries = await Future.wait(
       rows.map((row) async {
@@ -381,6 +399,44 @@ class OfflineCaptureStore {
     jsonDecode(utf8.decode(await _unseal(account, id, body))) as Map,
   );
 
+  Future<bool> retryReviewedCapture(
+    String account,
+    String id, {
+    required bool Function() authorized,
+  }) async {
+    final rows = await db.query(
+      'captures',
+      columns: ['body'],
+      where: 'account = ? AND id = ? AND expires_at IS NULL',
+      whereArgs: [account, id],
+    );
+    if (rows.isEmpty || !authorized()) return false;
+    final previousBody = rows.single['body']!;
+    final capture = await _decodeCapture(account, id, previousBody);
+    if (capture['state'] != 'attention') return false;
+    capture['state'] = 'pending';
+    capture['attempts'] = 0;
+    capture.remove('next_attempt');
+    capture.remove('message');
+    final body = await _seal(account, id, utf8.encode(jsonEncode(capture)));
+    return db.transaction((tx) async {
+      if (!authorized()) return false;
+      // Otro reintento pudo haber enviado la captura durante el cifrado.
+      final changed = await tx.update(
+        'captures',
+        {'body': body},
+        where:
+            'account = ? AND id = ? AND body = ? AND expires_at IS NULL '
+            'AND id IN (SELECT id FROM outbox WHERE account = ?)',
+        whereArgs: [account, id, previousBody, account],
+      );
+      if (changed != 0 && !authorized()) {
+        throw StateError('La sesión cambió al reintentar la captura.');
+      }
+      return changed == 1;
+    });
+  }
+
   Future<void> save(String account, Capture capture) async {
     final id = capture['id'] as String;
     final body = await _seal(account, id, utf8.encode(jsonEncode(capture)));
@@ -442,11 +498,10 @@ class OfflineCaptureStore {
     final original = await _incidentCaptureExpiry(db, account, id);
     final originalDeadline = original?.expiresAt;
     var deadline = started.add(_retention).millisecondsSinceEpoch;
-    if (originalDeadline != null &&
-        originalDeadline > started.millisecondsSinceEpoch &&
-        originalDeadline < deadline) {
+    if (originalDeadline != null && originalDeadline < deadline) {
       deadline = originalDeadline;
     }
+    if (deadline <= started.millisecondsSinceEpoch) return false;
     final body = await _seal(
       account,
       'cache/$id',
@@ -459,9 +514,7 @@ class OfflineCaptureStore {
       if (original != null && capture == null) return false;
       final captureDeadline = capture?.expiresAt;
       final currentTime = _now().millisecondsSinceEpoch;
-      if (captureDeadline != null &&
-          captureDeadline > started.millisecondsSinceEpoch &&
-          captureDeadline < deadline) {
+      if (captureDeadline != null && captureDeadline < deadline) {
         deadline = captureDeadline;
       }
       if (deadline <= currentTime || authorized?.call() == false) return false;

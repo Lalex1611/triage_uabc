@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:io' show SocketException;
 
 import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
 import 'package:sistema_triage/core/config/supabase_env.dart';
 import 'package:sistema_triage/features/auth/domain/user_role.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -67,14 +69,21 @@ class AuthGate extends ChangeNotifier {
       return;
     }
 
-    _sub ??= Supabase.instance.client.auth.onAuthStateChange.listen((event) {
-      if (event.event == AuthChangeEvent.signedIn ||
-          event.event == AuthChangeEvent.tokenRefreshed ||
-          event.event == AuthChangeEvent.signedOut) {
-        sessionGeneration++;
-      }
-      syncFromSession();
-    });
+    _sub ??= Supabase.instance.client.auth.onAuthStateChange.listen(
+      (event) {
+        if (event.event == AuthChangeEvent.signedIn ||
+            event.event == AuthChangeEvent.tokenRefreshed ||
+            event.event == AuthChangeEvent.signedOut) {
+          sessionGeneration++;
+        }
+        unawaited(syncFromSession());
+      },
+      onError: (Object error) {
+        // Una renovación sin red no cambia la sesión. Para otros errores
+        // consultamos el perfil de la cuenta que sigue activa.
+        if (!_isTemporaryFailure(error)) unawaited(syncFromSession());
+      },
+    );
 
     await syncFromSession();
   }
@@ -150,21 +159,37 @@ class AuthGate extends ChangeNotifier {
       _fullName = (fn != null && fn.trim().isNotEmpty)
           ? fn.trim()
           : session.user.email;
-    } catch (_) {
+    } catch (error) {
       if (!isCurrentRequest()) return;
-      // La autorización sin conexión se mantiene solo en memoria. Una sesión
-      // verificada y vigente puede seguir capturando si se pierde la conexión.
-      if (offlineAccount == session.user.id ||
-          medicoOfflineSession?.account == session.user.id) {
+      if (_isTemporaryFailure(error) &&
+          (offlineAccount == session.user.id ||
+              medicoOfflineSession?.account == session.user.id)) {
         notifyListeners();
         return;
       }
+      if (_verifiedAccount != null || role != null) sessionGeneration++;
       _verifiedAccount = null;
       role = null;
       _hospitalId = null;
       _fullName = null;
     }
     notifyListeners();
+  }
+
+  static bool _isTemporaryFailure(Object error) {
+    if (error is TimeoutException ||
+        error is SocketException ||
+        error is http.ClientException ||
+        error is AuthRetryableFetchException) {
+      return true;
+    }
+    if (error is! PostgrestException) return false;
+    final code = error.code;
+    final status = int.tryParse(code ?? '') ?? 0;
+    return status == 408 ||
+        status == 429 ||
+        (status >= 500 && status < 600) ||
+        const {'PGRST000', 'PGRST001', 'PGRST002', 'PGRST003'}.contains(code);
   }
 
   Future<void> signOut() async {

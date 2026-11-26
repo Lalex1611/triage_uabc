@@ -65,6 +65,39 @@ void main() {
     },
   );
 
+  testWidgets(
+    'la comprobación manual respeta el resultado automático más reciente',
+    (tester) async {
+      final connectivity = AppConnectivityNotifier.instance;
+      final oldResult = Completer<List<String>>();
+      var checks = 0;
+      final messenger = tester.binding.defaultBinaryMessenger;
+      messenger.setMockMethodCallHandler(connectivityChannel, (_) async {
+        if (++checks == 1) return oldResult.future;
+        return ['none'];
+      });
+      messenger.setMockStreamHandler(
+        const EventChannel('dev.fluttercommunity.plus/connectivity_status'),
+        MockStreamHandler.inline(onListen: (_, _) {}),
+      );
+
+      final manual = connectivity.refresh();
+      final joined = connectivity.refresh();
+      await tester.pump();
+      expect(checks, 1);
+      await connectivity.start();
+      expect(connectivity.isConnected, isFalse);
+      oldResult.complete(['wifi']);
+      await Future.wait([manual, joined]);
+      expect(connectivity.isConnected, isFalse);
+      expect(connectivity.isRefreshing, isFalse);
+
+      await tester.pump(const Duration(milliseconds: 600));
+      await tester.pump(const Duration(seconds: 2));
+      connectivity.disposeForTest();
+    },
+  );
+
   testWidgets('el aviso vuelve al cerrar Sin conexión sin cambiar de red', (
     tester,
   ) async {

@@ -25,7 +25,7 @@ class _TestStorage extends GotrueAsyncStorage {
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   final gate = AuthGate.instance;
-  final profiles = <FutureOr<Map<String, Object?>> Function()>[];
+  final profiles = <FutureOr<Object> Function()>[];
   const account = 'f0000000-0000-0000-0000-000000000001';
 
   Map<String, Object?> profile(
@@ -69,7 +69,8 @@ void main() {
         case '/auth/v1/logout':
           return http.Response('', 204, request: request);
         case '/rest/v1/profiles':
-          return respond([await profiles.removeAt(0)()]);
+          final result = await profiles.removeAt(0)();
+          return result is http.Response ? result : respond([result]);
       }
       fail('Solicitud inesperada en la prueba: ${request.url.path}');
     });
@@ -114,6 +115,62 @@ void main() {
 
     expect(gate.sessionGeneration, generation);
     expect(gate.fullName, 'Reciente');
+  });
+
+  http.Response rejectedToken() => http.Response(
+    jsonEncode({'code': 'PGRST301', 'message': 'Token rechazado'}),
+    401,
+    headers: {'content-type': 'application/json'},
+  );
+
+  testWidgets(
+    'un timeout conserva el acceso médico y un JWT rechazado lo revoca',
+    (tester) async {
+      profiles.add(
+        () => {...profile('Médico', role: 'medico'), 'hospital_id': 'hospital'},
+      );
+      await gate.syncFromSession();
+      final generation = gate.sessionGeneration;
+      expect(gate.medicoOfflineSession, (
+        account: account,
+        hospitalId: 'hospital',
+      ));
+
+      final delayed = Completer<Object>();
+      profiles.add(() => delayed.future);
+      final waiting = gate.syncFromSession();
+      await tester.pump(const Duration(seconds: 8));
+      await waiting;
+      expect(gate.sessionGeneration, generation);
+      expect(gate.medicoOfflineSession?.account, account);
+      expect(gate.lastVerificationSucceeded, isFalse);
+      delayed.complete(profile('Respuesta tardía'));
+      await tester.pump();
+
+      profiles.add(rejectedToken);
+      await gate.syncFromSession();
+      expect(gate.sessionGeneration, greaterThan(generation));
+      expect(gate.medicoOfflineSession, isNull);
+      expect(gate.offlineAccount, isNull);
+      expect(gate.hospitalId, isNull);
+      expect(gate.fullName, isNull);
+      expect(gate.role, isNull);
+      expect(gate.lastVerificationSucceeded, isFalse);
+    },
+  );
+
+  test('un rechazo atrasado no revoca un perfil que ya se verificó', () async {
+    final oldResponse = Completer<Object>();
+    profiles.addAll([() => oldResponse.future, () => profile('Vigente')]);
+    final first = gate.syncFromSession();
+    await gate.syncFromSession();
+    final generation = gate.sessionGeneration;
+    oldResponse.complete(rejectedToken());
+    await first;
+    expect(gate.offlineAccount, account);
+    expect(gate.fullName, 'Vigente');
+    expect(gate.sessionGeneration, generation);
+    expect(gate.lastVerificationSucceeded, isTrue);
   });
 
   test(

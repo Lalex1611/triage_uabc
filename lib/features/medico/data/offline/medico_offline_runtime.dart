@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io';
 
 import 'package:flutter/widgets.dart';
 import 'package:sistema_triage/core/connectivity/app_connectivity_notifier.dart';
@@ -22,11 +21,12 @@ class MedicoOfflineRuntime extends ChangeNotifier with WidgetsBindingObserver {
   OfflineCaptureStore? _store;
   OfflineSyncService? _syncService;
   Timer? _timer;
+  Future<void>? _starting;
   Future<void>? _batch;
   bool _active = true;
   String? _openError;
 
-  bool get supported => Platform.isAndroid || Platform.isIOS;
+  bool get supported => OfflineCaptureStore.isSupported;
   MedicoOfflineSession? get session => _auth.medicoOfflineSession;
   bool get canCapture => _store != null && session != null;
   bool get connected => _connectivity.isConnected;
@@ -37,11 +37,14 @@ class MedicoOfflineRuntime extends ChangeNotifier with WidgetsBindingObserver {
   static String storageScope(MedicoOfflineSession session) =>
       'medico_${session.account}_${session.hospitalId}';
 
-  Future<void> start() async {
-    if (!supported || _store != null) return;
+  Future<void> start() {
+    if (!supported || _store != null) return Future.value();
+    return _starting ??= _open().whenComplete(() => _starting = null);
+  }
+
+  Future<void> _open() async {
     try {
       final store = await OfflineCaptureStore.open();
-      _store = store;
       _syncService = OfflineSyncService(
         store: store,
         remote: _MedicoCaptureRemote(Supabase.instance.client),
@@ -54,6 +57,8 @@ class MedicoOfflineRuntime extends ChangeNotifier with WidgetsBindingObserver {
         },
         sessionGeneration: () => _auth.sessionGeneration,
       )..addListener(notifyListeners);
+      _store = store;
+      _openError = null;
       WidgetsBinding.instance.addObserver(this);
       _auth.addListener(_changed);
       _connectivity.addListener(_changed);
@@ -109,6 +114,7 @@ class MedicoOfflineRuntime extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   Future<void> retryNow() async {
+    if (_store == null) await start();
     await _connectivity.refresh();
     if (connected && session == null) await _auth.syncFromSession();
     await _batch;
@@ -170,24 +176,15 @@ class MedicoOfflineRuntime extends ChangeNotifier with WidgetsBindingObserver {
     final owner = session;
     final store = _store;
     if (owner == null || store == null || syncing) return;
-    final scope = storageScope(owner);
-    _batch =
-        Future<void>(() async {
-          final row = await store.get(scope, id);
-          if (session != owner || row == null || row['state'] != 'attention') {
-            return;
-          }
-          row['state'] = 'pending';
-          row['attempts'] = 0;
-          row.remove('next_attempt');
-          row.remove('message');
-          await store.save(scope, row);
-        }).whenComplete(() {
-          _batch = null;
-          notifyListeners();
-        });
+    final generation = _auth.sessionGeneration;
+    final changed = await store.retryReviewedCapture(
+      storageScope(owner),
+      id,
+      authorized: () =>
+          session == owner && _auth.sessionGeneration == generation,
+    );
+    if (!changed) return;
     notifyListeners();
-    await _batch;
     await retryNow();
   }
 

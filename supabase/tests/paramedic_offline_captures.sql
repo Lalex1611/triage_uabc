@@ -147,6 +147,26 @@ begin
   exception when sqlstate 'P0802' then null; end;
   assert (select photo_local_paths = array[other_photo] from public.incidents where id=i),
     'Un reintento restauró una foto retirada';
+  update public.incidents set photo_local_paths = array[photo, other_photo, '/local/foto.jpg']
+    where id = i;
+  assert (select photo_local_paths = array[other_photo, '/local/foto.jpg'] from public.incidents where id=i),
+    'Una lista anterior restauró una foto retirada o alteró las demás rutas';
+  -- Simula la publicación final por el servicio de Storage tras el retiro.
+  reset role;
+  begin
+    insert into storage.objects(bucket_id,name,owner_id) values('incident_photos',photo,a::text);
+    raise exception 'Se esperaba rechazar la publicación tardía de la foto retirada';
+  exception when sqlstate 'P0802' then null; end;
+  insert into storage.objects(bucket_id,name,owner_id) values('incident_photos',other_photo,a::text);
+  begin
+    update storage.objects set name = photo where bucket_id = 'incident_photos' and name = other_photo;
+    raise exception 'Se esperaba rechazar el cambio de nombre a una ruta retirada';
+  exception when sqlstate 'P0802' then null; end;
+  assert not exists (select 1 from storage.objects where bucket_id='incident_photos' and name=photo),
+    'La carga tardía dejó la ruta retirada en el bucket';
+  assert exists (select 1 from storage.objects where bucket_id='incident_photos' and name=other_photo),
+    'La protección de la ruta retirada afectó a otra foto';
+  set local role authenticated;
   begin
     perform public.link_paramedic_capture_photo(a,'incident',i,
       i::text||'/a0830000-0000-0000-0000-000000000009.jpg');

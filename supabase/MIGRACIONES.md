@@ -47,6 +47,7 @@ corregir algo se crea una nueva.
 | 25 | `20261125120000_offline_consultation_codes_and_photos.sql` | Vigencia de códigos en reintentos y actualizaciones seguras de fotos |
 | 26 | `20261125130000_paramedic_capture_photo_integrity.sql` | Vigencia de códigos de Paramédico y protección del vínculo y retiro de fotos |
 | 27 | `20261125140000_offline_retry_and_photo_access.sql` | Validación de fotos por paciente y aviso de adjuntos retirados durante un reintento |
+| 28 | `20261125150000_offline_incident_photo_and_account_guards.sql` | Impide restaurar fotos retiradas con una carga tardía o una lista anterior y verifica el perfil al reanudar la captura |
 
 Antes de aplicar #26 en una instalación con capturas pendientes, comprueba si
 hay reintentos de fotos de incidentes. Si alguna ruta ya se retiró, concilia el
