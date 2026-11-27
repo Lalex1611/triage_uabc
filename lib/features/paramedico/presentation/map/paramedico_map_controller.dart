@@ -93,6 +93,8 @@ class ParamedicoMapController extends ChangeNotifier {
   String? forceShowPatientsIncidentId;
   bool _mapReady = false;
   final _pendingWhenMapReady = <VoidCallback>[];
+  // Cada movimiento de cámara empieza uno nuevo: un reintento viejo no lo pisa
+  int _cameraGeneration = 0;
 
   /// El incidente elegido se cerró en otro dispositivo: la pantalla avisa
   VoidCallback? onSelectedIncidentClosed;
@@ -251,16 +253,18 @@ class ParamedicoMapController extends ChangeNotifier {
   }
 
   /// Si la cámara falla (p. ej. el mapa aún sin tamaño), se reintenta una vez
-  /// en el siguiente fotograma. El mapa sigue «listo»: onMapReady no vuelve a
-  /// llegar, y esperarlo dejaba el mapa sin cámara para siempre
+  /// en el siguiente fotograma, salvo que entretanto haya empezado otro
+  /// movimiento. El mapa sigue «listo»: onMapReady no vuelve a llegar, y
+  /// esperarlo dejaba el mapa sin cámara para siempre
   void _safeMapOp(void Function() op) {
     _runWhenMapReady(() {
+      final generation = ++_cameraGeneration;
       try {
         op();
       } catch (_) {
         WidgetsBinding.instance
           ..addPostFrameCallback((_) {
-            if (_disposed) return;
+            if (_disposed || generation != _cameraGeneration) return;
             try {
               op();
             } catch (e) {
@@ -372,10 +376,18 @@ class ParamedicoMapController extends ChangeNotifier {
   Future<void> _runInitialCamera(BuildContext context) async {
     if (pendingFocusId != null) {
       await applyPendingFocus(context);
-    } else {
+    } else if (_cameraStillAt(_openingCamera)) {
+      // Si mientras cargaba el usuario movió el mapa (gesto, «Objetivo»,
+      // búsqueda), se respeta dónde lo dejó
       goToRegionOverview();
     }
   }
+
+  /// Cámara con la que abre el mapa ([MapOptions] de la pantalla)
+  static const _openingCamera = (
+    center: MapOperationalRegion.overviewCenter,
+    zoom: MapOperationalRegion.overviewZoom,
+  );
 
   List<ParamedicoIncidentSummary> get visibleIncidents {
     // La sesión solo hace falta para "Mis incidentes"

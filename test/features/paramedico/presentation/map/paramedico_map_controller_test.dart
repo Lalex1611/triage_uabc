@@ -10,6 +10,7 @@ import 'package:sistema_triage/features/paramedico/presentation/map/paramedico_m
 import 'package:sistema_triage/features/paramedico/data/repositories/paramedico_incidents_repository.dart';
 import 'package:sistema_triage/features/paramedico/domain/entities/map/map_patient_pin.dart';
 import 'package:sistema_triage/features/paramedico/presentation/map/services/map_geocoding_service.dart';
+import 'package:sistema_triage/features/paramedico/presentation/map/services/map_operational_region.dart';
 import 'package:sistema_triage/features/paramedico/presentation/shared/paramedico_incidents_store.dart';
 
 /// Geocodificador que responde cuando el test lo decide
@@ -412,6 +413,51 @@ void main() {
     // Antes el mapa quedaba «no listo» para siempre y esto no llegaba
     c.goToRegionOverview();
     expect(map.calls, [#rotate, #move, #rotate, #move]);
+  });
+
+  testWidgets('el reintento de un movimiento viejo no pisa uno más nuevo', (
+    tester,
+  ) async {
+    final map = _FakeMap()..failures = 1;
+    final c = ParamedicoMapController(
+      store: ParamedicoIncidentsStore(),
+      mapController: map,
+    )..markMapReady();
+    addTearDown(c.dispose);
+    final context = await _pumpContext(tester);
+    c.userPosition = const LatLng(32.5, -117);
+
+    c.goToRegionOverview(); // Falla y queda pendiente de reintento
+    await c.setFilter(context, MapIncidentFilter.nearby);
+    await tester.pump();
+    expect(map.calls, [#rotate, #fitCamera], reason: 'solo «Cerca de mí»');
+  });
+
+  group('encuadre inicial al terminar de cargar', () {
+    Future<_FakeMap> load(WidgetTester tester, LatLng cameraAt) async {
+      final map = _FakeMap()
+        ..center = cameraAt
+        ..zoom = MapOperationalRegion.overviewZoom;
+      final c = ParamedicoMapController(
+        store: ParamedicoIncidentsStore(),
+        mapController: map,
+      )..markMapReady();
+      addTearDown(c.dispose);
+      await c.onLoadComplete(await _pumpContext(tester));
+      return map;
+    }
+
+    testWidgets('con el mapa sin tocar, encuadra la región', (tester) async {
+      final map = await load(tester, MapOperationalRegion.overviewCenter);
+      expect(map.calls, contains(#move));
+    });
+
+    testWidgets('si el usuario lo movió mientras cargaba, lo respeta', (
+      tester,
+    ) async {
+      final map = await load(tester, const LatLng(32.6, -117.1));
+      expect(map.calls, isEmpty);
+    });
   });
 
   group('botón «Objetivo»', () {
