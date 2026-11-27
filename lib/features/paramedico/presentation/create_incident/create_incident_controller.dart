@@ -4,11 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:sistema_triage/core/config/supabase_env.dart';
+import 'package:sistema_triage/core/geo/nominatim_reverse_geocode.dart';
 import 'package:sistema_triage/core/session/auth_gate.dart';
 import 'package:sistema_triage/core/ui/app_snackbar.dart';
 import 'package:sistema_triage/features/paramedico/data/repositories/paramedico_incidents_repository.dart';
 import 'package:sistema_triage/features/paramedico/domain/constants/emergency_catalog.dart';
-import 'package:sistema_triage/features/paramedico/domain/services/incident_title_formatter.dart';
 import 'package:sistema_triage/features/paramedico/presentation/create_incident/services/incident_location_service.dart';
 import 'package:sistema_triage/features/paramedico/presentation/create_incident/widgets/incident_location_map_dialog_widget.dart';
 
@@ -17,13 +17,17 @@ class CreateIncidentController extends ChangeNotifier {
     ParamedicoIncidentsRepository? repository,
     TextEditingController? descriptionController,
     ImagePicker? picker,
+    Future<String?> Function(double lat, double lng)? placeLookup,
   }) : _repo = repository ?? ParamedicoIncidentsRepository(),
        descriptionController = descriptionController ?? TextEditingController(),
-       _picker = picker ?? ImagePicker();
+       _picker = picker ?? ImagePicker(),
+       _placeLookup = placeLookup ?? NominatimReverseGeocode.shortPlaceLabel;
 
   final ParamedicoIncidentsRepository _repo;
   final TextEditingController descriptionController;
   final ImagePicker _picker;
+  final Future<String?> Function(double lat, double lng) _placeLookup;
+  int _placeRequest = 0;
 
   late final String draftIdLabel = _buildDraftIdLabel();
 
@@ -33,14 +37,16 @@ class CreateIncidentController extends ChangeNotifier {
   DateTime capturedAt = DateTime.now();
   bool submitting = false;
   bool refreshingGps = false;
-  String previewTitle = 'Generando título…';
-  String? customTitle;
-  bool refreshingTitle = false;
+
+  /// Dirección corta del punto elegido; null si no se encontró
+  String? placeLabel;
+  bool refreshingPlace = false;
   bool locationConfirmed = false;
   String? locationError;
   final List<String> photos = [];
 
-  String get displayTitle => customTitle ?? previewTitle;
+  /// El incidente se titula con su categoría
+  String get title => EmergencyCatalog.nameFor(mapEmergencyForRpc());
   bool get canSubmit => locationConfirmed && !submitting;
 
   String _buildDraftIdLabel() {
@@ -51,30 +57,22 @@ class CreateIncidentController extends ChangeNotifier {
 
   @override
   void dispose() {
+    _placeRequest++; // la búsqueda pendiente ya no avisa a nadie
     descriptionController.dispose();
     super.dispose();
   }
 
-  Future<void> refreshPreviewTitle() async {
-    if (refreshingTitle) return;
-    refreshingTitle = true;
+  /// Busca la dirección del punto actual. Cada punto elegido lanza su propia
+  /// búsqueda y solo se aplica la del último
+  Future<void> refreshPlace() async {
+    final request = ++_placeRequest;
+    refreshingPlace = true;
     notifyListeners();
-    try {
-      previewTitle = await IncidentTitleFormatter.resolveTitle(
-        customTitle: null,
-        atLocal: capturedAt,
-        lat: lat,
-        lng: lng,
-      );
-    } catch (_) {
-      previewTitle = IncidentTitleFormatter.formatAuto(
-        atLocal: capturedAt,
-        locationKey: '${lat.toStringAsFixed(4)}, ${lng.toStringAsFixed(4)}',
-      );
-    } finally {
-      refreshingTitle = false;
-      notifyListeners();
-    }
+    final label = await _placeLookup(lat, lng);
+    if (request != _placeRequest) return;
+    placeLabel = label;
+    refreshingPlace = false;
+    notifyListeners();
   }
 
   String mapEmergencyForRpc() {
@@ -106,9 +104,7 @@ class CreateIncidentController extends ChangeNotifier {
         locationConfirmed = true;
         locationError = null;
         capturedAt = DateTime.now();
-        if (customTitle == null) {
-          unawaited(refreshPreviewTitle());
-        }
+        unawaited(refreshPlace());
       } else {
         // Si ya confirmó una ubicación manualmente, no se pisa con el error
         if (!locationConfirmed) {
@@ -147,11 +143,7 @@ class CreateIncidentController extends ChangeNotifier {
     locationConfirmed = true;
     locationError = null;
     capturedAt = DateTime.now();
-    if (customTitle == null) {
-      await refreshPreviewTitle();
-    } else {
-      notifyListeners();
-    }
+    await refreshPlace();
   }
 
   Future<void> pickImage(ImageSource source) async {
@@ -229,13 +221,7 @@ class CreateIncidentController extends ChangeNotifier {
       final type = mapEmergencyForRpc();
       if (_repo.usesLocalCaptures) {
         final id = await _repo.captureIncident(
-          title:
-              customTitle ??
-              IncidentTitleFormatter.formatAuto(
-                atLocal: capturedAt,
-                locationKey:
-                    '${lat.toStringAsFixed(4)}, ${lng.toStringAsFixed(4)}',
-              ),
+          title: title,
           emergencyType: type,
           lat: lat,
           lng: lng,
@@ -247,12 +233,6 @@ class CreateIncidentController extends ChangeNotifier {
         }
         return id;
       }
-      final title = await IncidentTitleFormatter.resolveTitle(
-        customTitle: customTitle,
-        atLocal: capturedAt,
-        lat: lat,
-        lng: lng,
-      );
       final id = await _repo.createIncident(
         title: title,
         emergencyType: type,

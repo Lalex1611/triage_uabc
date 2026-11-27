@@ -62,11 +62,8 @@ class _CreateIncidentBodyState extends State<_CreateIncidentBody> {
     super.initState();
     _controller = CreateIncidentController();
     _controller.addListener(_onController);
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      await _controller.refreshGpsFromDevice(context, silent: true);
-      if (mounted && _controller.locationConfirmed) {
-        await _controller.refreshPreviewTitle();
-      }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _controller.refreshGpsFromDevice(context, silent: true);
     });
   }
 
@@ -194,13 +191,11 @@ class _CreateIncidentBodyState extends State<_CreateIncidentBody> {
   // ---------------------------------------------------------------------------
 
   Widget _locationSection(CreateIncidentController c) {
-    final searching = c.refreshingGps || c.refreshingTitle;
+    final searching = c.refreshingGps || c.refreshingPlace;
     final confirmed = c.locationConfirmed;
     final failed = !confirmed && !c.refreshingGps && c.locationError != null;
 
-    final place = (confirmed && !searching)
-        ? _placeFromTitle(c.previewTitle)
-        : null;
+    final place = (confirmed && !searching) ? c.placeLabel : null;
     final address = !confirmed
         ? (failed ? c.locationError! : 'Obteniendo ubicación…')
         : (searching
@@ -324,16 +319,6 @@ class _CreateIncidentBodyState extends State<_CreateIncidentBody> {
 
   /// La dirección sale del título automático ("18-marzo-2026 14:32-Blvd. X");
   /// si solo hay coordenadas, devuelve null
-  static String? _placeFromTitle(String title) {
-    final match = RegExp(
-      r'^\d{1,2}-[^-]+-\d{4} \d{2}:\d{2}-(.+)$',
-    ).firstMatch(title);
-    final place = match?.group(1)?.trim();
-    if (place == null || place.isEmpty) return null;
-    if (RegExp(r'^-?\d+\.\d+, -?\d+\.\d+$').hasMatch(place)) return null;
-    return place;
-  }
-
   // ---------------------------------------------------------------------------
   // 3 · Detalles (opcional)
   // ---------------------------------------------------------------------------
