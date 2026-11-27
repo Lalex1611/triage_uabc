@@ -1,6 +1,6 @@
 // Sandbox visual de tarjetas y datos (TriagePatientCard, TriageIncidentCard,
 // TriageMetric, TriageLevelCount, TriageLevelPill, TriagePatientBanner,
-// TriagePatientStrip, TriageIncomingCard, TriageNotificationCard):
+// TriagePatientStrip, TriageNotificationCard):
 // flutter run -t test/shared/widgets/triage_cards_visual_test.dart
 import 'package:flutter/material.dart';
 import 'package:sistema_triage/shared/widgets/triage_ui.dart';
@@ -228,16 +228,6 @@ class _CardsSandboxState extends State<_CardsSandbox> {
                 level: TriageLevel.red,
                 name: 'Bruce Cervantes · PAC-2031',
                 detail: 'Rojo · inmediato · hemorragia en muslo',
-              ),
-              const _Label('Tarjeta de entrante (C01)'),
-              TriageIncomingCard(
-                level: TriageLevel.red,
-                name: 'Alberto Pérez',
-                detail: 'PAC-2031 · INC-729 · Carlos Huerta',
-                arrival: 'Unidad A-12 · llega en 6 min',
-                onOpen: () {},
-                onReject: () {},
-                onAccept: () {},
               ),
               const _Label('Notificación (C12: sin leer y leída)'),
               TriageNotificationCard(

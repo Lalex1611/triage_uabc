@@ -16,7 +16,7 @@ import 'package:sistema_triage/shared/widgets/triage_ui.dart';
 | Pestañas | `TriageTabs` |
 | Buscador | `TriageSearchBar` |
 | Insignia de estado | `TriageStatusBadge`, `.patient(status)`, `.rejected()`, `.registered()`, `.deceased()`, `.active()`, `.closed()` |
-| Encabezado de inicio / de detalle | `TriageHomeHeader` / `TriageDetailHeader` |
+| Encabezado de detalle | `TriageDetailHeader` |
 | Tarjeta de paciente (B07) / de sala (C05) | `TriagePatientCard` / `TriagePatientCard.room` |
 | Tarjeta de incidente | `TriageIncidentCard` |
 | Métrica | `TriageMetric`, `.level(level)`, `.role()` |
@@ -26,7 +26,6 @@ import 'package:sistema_triage/shared/widgets/triage_ui.dart';
 | Punto de color | Un `Container` con `level.color` |
 | Banner del paciente (B13, C02, C06) | `TriagePatientBanner` |
 | Franja del paciente en curso (B14 a B16) | `TriagePatientStrip` |
-| Tarjeta de entrante (C01) | `TriageIncomingCard` |
 | Notificación (C12) | `TriageNotificationCard` |
 | Fila de dato | `TriageDataRow` |
 | Campo (texto, área, selección) | `TriageField`, `TriageField.area`, `TriageSelectField` |
@@ -42,7 +41,7 @@ import 'package:sistema_triage/shared/widgets/triage_ui.dart';
 | Selección única (C04, B14) | `TriageRadioOption` |
 | Fila de opción en hojas | `TriageOptionRow`, `.check`, `.toggle` |
 | Botón de color | `TriageLevelButton.start`, `.hospital` o con textos propios |
-| Marcadores de mapa | `TriageIncidentMarker`, `TriagePatientMarker`, `TriageHospitalMarker`, `TriageUnitMarker`, `TriageUserMarker` |
+| Marcadores de mapa | `TriageIncidentMarker`, `TriagePatientMarker`, `TriageHospitalMarker`, `TriageUserMarker` |
 | Fondo de mapa en gris claro | `TriageMapTiles` |
 | Diálogo | `showTriageConfirm`; `showDialog` con `TriageDialog` para más opciones |
 | Mensaje de resultado a pantalla completa | `TriageResultMessage` |
@@ -96,8 +95,8 @@ pantalla.
 - **Contraste.** Texto ≥ 4.5:1 e íconos ≥ 3:1. Por eso algunos colores difieren
   de Figma (`textSecondary` en vez de `textTertiary` para texto pequeño,
   `successText`/`warningText` para texto de señal).
-- **Encabezados en el cuerpo.** `TriageHomeHeader`/`TriageDetailHeader` van
-  como primer hijo del `body`, no en `Scaffold.appBar`.
+- **Encabezados en el cuerpo.** `TriageDetailHeader` va como primer hijo del
+  `body`, no en `Scaffold.appBar`.
 
 ## Cómo migrar una pantalla
 
@@ -108,9 +107,9 @@ pantalla.
    carpeta de la pantalla se usa en un solo sitio, puede quedarse como
    adaptador de pocas líneas (p. ej. `PatientCardData` → `TriagePatientCard`)
    o borrarse.
-3. **No modifiques widgets antiguos compartidos** (`AppHeader`,
-   `PatientLifecycleStatusBadge`, …) mientras otras pantallas los usen: se
-   reemplazan cuando todas las que los usan estén migradas.
+3. **No modifiques piezas antiguas compartidas** (`AppTextStyles`,
+   `AppColors`, …) mientras otras pantallas las usen: se reemplazan cuando
+   todas las que las usan estén migradas.
 4. Los enums antiguos (`PatientStatus`, `TriageCategory`…) se convierten a
    `PatientLifecycleStatus` y `TriageLevel` en la pantalla o con una extensión;
    no hace falta tocar los controladores.

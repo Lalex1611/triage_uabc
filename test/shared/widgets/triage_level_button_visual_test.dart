@@ -1,6 +1,5 @@
 // Sandbox visual del botón de color y los marcadores de mapa (TriageLevelButton,
-// TriageIncidentMarker, TriagePatientMarker, TriageHospitalMarker,
-// TriageUnitMarker, TriageUserMarker):
+// TriageIncidentMarker, TriagePatientMarker, TriageHospitalMarker, TriageUserMarker):
 // flutter run -t test/shared/widgets/triage_level_button_visual_test.dart
 import 'package:flutter/material.dart';
 import 'package:sistema_triage/shared/widgets/triage_ui.dart';
@@ -98,14 +97,10 @@ class _LevelSandboxState extends State<_LevelSandbox> {
                   ),
                 ],
               ),
-              const _Label('Hospital, unidad y usuario'),
+              const _Label('Hospital y usuario'),
               const Wrap(
                 spacing: TriageSpacing.md,
-                children: [
-                  TriageHospitalMarker(),
-                  TriageUnitMarker(),
-                  TriageUserMarker(),
-                ],
+                children: [TriageHospitalMarker(), TriageUserMarker()],
               ),
             ],
           ),

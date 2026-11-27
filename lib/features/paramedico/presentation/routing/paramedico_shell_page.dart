@@ -40,11 +40,6 @@ class ParamedicoShellPage extends StatefulWidget {
 }
 
 class _ParamedicoShellPageState extends State<ParamedicoShellPage> {
-  // La barra solo muestra las ramas mapa (0) e incidentes (1). Las ramas
-  // home (2) y paciente (3) siguen existiendo en el router pero ya no están
-  // en la barra, así que en ellas no se marca ninguna pestaña.
-  static const int _navBranchCount = 2;
-
   /// La hoja de Incidentes activos está abierta: su pestaña se marca y el "+"
   /// se oculta, como en Figma (B02)
   bool _incidentsOpen = false;
@@ -82,13 +77,11 @@ class _ParamedicoShellPageState extends State<ParamedicoShellPage> {
 
   StatefulNavigationShell get _shell => widget.navigationShell;
 
-  int get _branchIndex =>
-      _shell.currentIndex < _navBranchCount ? _shell.currentIndex : -1;
-
+  // El mapa es la única rama; incidentes, guía y perfil son hojas encima
   int get _navIndex {
     if (_incidentsOpen) return ParamedicoNavbar.incidentsTab;
     if (_guideOpen) return ParamedicoNavbar.guideTab;
-    return _branchIndex;
+    return ParamedicoNavbar.mapTab;
   }
 
   /// Navegador de la rama actual. Lo que se abre en él queda dentro del cuerpo
@@ -139,8 +132,7 @@ class _ParamedicoShellPageState extends State<ParamedicoShellPage> {
 
   @override
   Widget build(BuildContext context) {
-    final onMapBranch = _branchIndex == ParamedicoNavbar.mapTab;
-    final hideNavbar = onMapBranch && _navbarHidden.value;
+    final hideNavbar = _navbarHidden.value;
 
     return Scaffold(
       backgroundColor: TriageColors.surface,
@@ -149,7 +141,7 @@ class _ParamedicoShellPageState extends State<ParamedicoShellPage> {
       // el padding inferior de MediaQuery. shortcut: las ramas antiguas
       // (incidentes, home, paciente) tienen listas con padding fijo que
       // quedarían tapadas; flotar también ahí cuando se migren.
-      extendBody: onMapBranch,
+      extendBody: true,
       body: ParamedicoNavbarVisibility(hidden: _navbarHidden, child: _shell),
       bottomNavigationBar: hideNavbar
           ? null

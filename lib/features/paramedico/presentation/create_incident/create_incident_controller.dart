@@ -7,27 +7,21 @@ import 'package:sistema_triage/core/config/supabase_env.dart';
 import 'package:sistema_triage/core/session/auth_gate.dart';
 import 'package:sistema_triage/core/ui/app_snackbar.dart';
 import 'package:sistema_triage/features/paramedico/data/repositories/paramedico_incidents_repository.dart';
-import 'package:sistema_triage/features/paramedico/data/repositories/paramedic_notifications_repository.dart';
 import 'package:sistema_triage/features/paramedico/domain/constants/emergency_catalog.dart';
 import 'package:sistema_triage/features/paramedico/domain/services/incident_title_formatter.dart';
 import 'package:sistema_triage/features/paramedico/presentation/create_incident/services/incident_location_service.dart';
 import 'package:sistema_triage/features/paramedico/presentation/create_incident/widgets/incident_location_map_dialog_widget.dart';
-import 'package:sistema_triage/features/paramedico/presentation/shared/paramedico_notifications_action.dart';
 
 class CreateIncidentController extends ChangeNotifier {
   CreateIncidentController({
     ParamedicoIncidentsRepository? repository,
-    ParamedicNotificationsRepository? notificationsRepository,
     TextEditingController? descriptionController,
     ImagePicker? picker,
   }) : _repo = repository ?? ParamedicoIncidentsRepository(),
-       _notificationsRepo =
-           notificationsRepository ?? ParamedicNotificationsRepository(),
        descriptionController = descriptionController ?? TextEditingController(),
        _picker = picker ?? ImagePicker();
 
   final ParamedicoIncidentsRepository _repo;
-  final ParamedicNotificationsRepository _notificationsRepo;
   final TextEditingController descriptionController;
   final ImagePicker _picker;
 
@@ -45,7 +39,6 @@ class CreateIncidentController extends ChangeNotifier {
   bool locationConfirmed = false;
   String? locationError;
   final List<String> photos = [];
-  int unreadNotifications = 0;
 
   String get displayTitle => customTitle ?? previewTitle;
   bool get canSubmit => locationConfirmed && !submitting;
@@ -80,55 +73,6 @@ class CreateIncidentController extends ChangeNotifier {
       );
     } finally {
       refreshingTitle = false;
-      notifyListeners();
-    }
-  }
-
-  Future<void> refreshNotifications() async {
-    unreadNotifications = await ParamedicoNotificationsAction.unreadCount(
-      _notificationsRepo,
-    );
-    notifyListeners();
-  }
-
-  Future<void> editTitle(BuildContext context) async {
-    final controller = TextEditingController(text: displayTitle);
-    final newTitle = await showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: Colors.white,
-        title: Text(
-          'Editar título del incidente',
-          style: Theme.of(ctx).textTheme.titleMedium,
-        ),
-        content: TextField(
-          controller: controller,
-          decoration: const InputDecoration(hintText: 'Nuevo título…'),
-          maxLines: 2,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancelar'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, controller.text),
-            child: const Text(
-              'Guardar',
-              style: TextStyle(color: Color(0xFFCE1125)),
-            ),
-          ),
-        ],
-      ),
-    );
-    controller.dispose();
-    if (newTitle == null) return;
-    final trimmed = newTitle.trim();
-    if (trimmed.isEmpty) {
-      customTitle = null;
-      await refreshPreviewTitle();
-    } else {
-      customTitle = trimmed;
       notifyListeners();
     }
   }
@@ -208,62 +152,6 @@ class CreateIncidentController extends ChangeNotifier {
     } else {
       notifyListeners();
     }
-  }
-
-  Future<void> openManualCoords(BuildContext context) async {
-    final latCtrl = TextEditingController(text: lat.toString());
-    final lngCtrl = TextEditingController(text: lng.toString());
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Coordenadas'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: latCtrl,
-              decoration: const InputDecoration(labelText: 'Latitud'),
-              keyboardType: const TextInputType.numberWithOptions(
-                decimal: true,
-              ),
-            ),
-            TextField(
-              controller: lngCtrl,
-              decoration: const InputDecoration(labelText: 'Longitud'),
-              keyboardType: const TextInputType.numberWithOptions(
-                decimal: true,
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Guardar'),
-          ),
-        ],
-      ),
-    );
-    if (ok == true) {
-      final la = double.tryParse(latCtrl.text.replaceAll(',', '.'));
-      final ln = double.tryParse(lngCtrl.text.replaceAll(',', '.'));
-      if (la != null && ln != null) {
-        lat = la;
-        lng = ln;
-        capturedAt = DateTime.now();
-        if (customTitle == null) {
-          unawaited(refreshPreviewTitle());
-        } else {
-          notifyListeners();
-        }
-      }
-    }
-    latCtrl.dispose();
-    lngCtrl.dispose();
   }
 
   Future<void> pickImage(ImageSource source) async {
@@ -441,16 +329,5 @@ class CreateIncidentController extends ChangeNotifier {
       await AuthGate.instance.signOut();
       if (context.mounted) context.go('/auth');
     }
-  }
-
-  Future<void> openNotifications(BuildContext context) async {
-    await ParamedicoNotificationsAction.open(
-      context,
-      repository: _notificationsRepo,
-      onUnreadChanged: (count) {
-        unreadNotifications = count;
-        notifyListeners();
-      },
-    );
   }
 }

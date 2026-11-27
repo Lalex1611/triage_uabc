@@ -14,7 +14,6 @@ import 'package:sistema_triage/features/paramedico/domain/constants/triage_catal
 import 'package:sistema_triage/features/paramedico/domain/services/incident_presentation_formatters.dart';
 import 'package:sistema_triage/features/paramedico/domain/services/paramedico_catalog_mappers.dart';
 import 'package:sistema_triage/features/paramedico/domain/services/patient_demographics_mapper.dart';
-import 'package:sistema_triage/features/paramedico/presentation/create_incident/widgets/incident_location_map_dialog_widget.dart';
 import 'package:sistema_triage/features/paramedico/presentation/patient_details/widgets/transfer_flow/assign_transfer_sheet_widget.dart';
 import 'package:sistema_triage/features/paramedico/presentation/shared/patient_location_actions.dart';
 import 'package:sistema_triage/shared/patient/consultation_code_qr_dialog.dart';
@@ -336,22 +335,6 @@ class PatientDetailsController extends ChangeNotifier {
         assignedHospital: assignedHospital,
       );
 
-  Future<void> openMapPreview(BuildContext context) async {
-    final d = detail;
-    if (d == null) return;
-    final coords = patientMapCoords(d);
-    if (!canShowMap(d)) {
-      showAppSnackBar(context, 'Sin coordenadas para mostrar.', isError: true);
-      return;
-    }
-    await IncidentLocationMapDialog.showPreview(
-      context,
-      lat: coords.$1,
-      lng: coords.$2,
-      title: 'Ubicación del paciente',
-    );
-  }
-
   Future<void> pickEditImage(ImageSource source) async {
     try {
       final image = await _picker.pickImage(source: source, imageQuality: 80);
@@ -506,25 +489,6 @@ class PatientDetailsController extends ChangeNotifier {
     } catch (e) {
       if (context.mounted) showAppSnackBar(context, '$e', isError: true);
     }
-  }
-
-  Future<void> openEditLocation(BuildContext context) async {
-    final d = detail;
-    if (d == null) return;
-    final editSession = isEditing ? _editSession : null;
-    final coords = patientMapCoords(d);
-    final r = await PatientLocationActions.pickInAppMap(
-      context,
-      lat: coords.$1,
-      lng: coords.$2,
-    );
-    if (r == null || !context.mounted) return;
-    await _applyPickedCoords(
-      context,
-      r.latitude,
-      r.longitude,
-      editSession: editSession,
-    );
   }
 
   Future<void> exportRoute(BuildContext context) async {
@@ -783,7 +747,7 @@ class PatientDetailsController extends ChangeNotifier {
       if (d.incidentId.isNotEmpty) {
         context.go('/paramedico/incident/${d.incidentId}');
       } else {
-        context.go('/paramedico/paciente');
+        context.go('/paramedico/mapa');
       }
     } catch (e) {
       if (!context.mounted) return;

@@ -74,8 +74,6 @@ class IncidentDetailsController extends ChangeNotifier {
     return IncidentDetailsShellMode.ready;
   }
 
-  String get routeBase => '/paramedico/incident/$incidentId';
-
   List<ImageProvider> get incidentPhotos =>
       IncidentDetailsViewMapper.photoImages(
         paths: incident?.photoPaths ?? const [],
@@ -290,25 +288,6 @@ class IncidentDetailsController extends ChangeNotifier {
       incidentId: incidentId,
       subtitle: '${header.id} · ${header.title}',
       onPatientsChanged: () => unawaited(load(showLoader: false)),
-    );
-  }
-
-  Future<void> openIncidentOnMap(BuildContext context) async {
-    final inc = incident;
-    if (inc == null) return;
-    if (!IncidentPresentationFormatters.hasIncidentLocation(inc)) {
-      showAppSnackBar(
-        context,
-        'Este incidente no tiene coordenadas. Use Editar para registrarlas.',
-        isError: true,
-      );
-      return;
-    }
-    await IncidentLocationMapDialog.showPreview(
-      context,
-      lat: inc.latitude!,
-      lng: inc.longitude!,
-      title: 'Ubicación del incidente',
     );
   }
 

@@ -17,17 +17,6 @@ enum AppUserRole {
     }
   }
 
-  String get dbValue {
-    switch (this) {
-      case AppUserRole.paramedico:
-        return 'paramedico';
-      case AppUserRole.medico:
-        return 'medico';
-      case AppUserRole.consultaExterna:
-        return 'consulta_externa';
-    }
-  }
-
   /// Ruta principal tras login de personal. [consultaExterna] no usa sesión con correo
   /// (la consulta por código es pública en `/consulta-externa` sin `auth`)
   String get homePath {

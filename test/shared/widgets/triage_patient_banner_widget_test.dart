@@ -43,22 +43,6 @@ TriagePatientBanner _banner({
   onEdit: onEdit,
 );
 
-TriageIncomingCard _incoming({
-  VoidCallback? onOpen,
-  VoidCallback? onReject,
-  VoidCallback? onAccept,
-  String name = 'Alberto Pérez',
-  TriageLevel level = TriageLevel.red,
-}) => TriageIncomingCard(
-  level: level,
-  name: name,
-  detail: 'PAC-2031 · INC-729 · Carlos Huerta',
-  arrival: 'Unidad A-12 · llega en 6 min',
-  onOpen: onOpen ?? () {},
-  onReject: onReject ?? () {},
-  onAccept: onAccept ?? () {},
-);
-
 void main() {
   group('TriagePatientBanner', () {
     for (final level in TriageLevel.values) {
@@ -202,99 +186,6 @@ void main() {
     testWidgets('texto al 200 % en 280: sin desbordes', (tester) async {
       await tester.pumpWidget(strip(TriageLevel.red, scale: 2, width: 280));
       expect(tester.takeException(), isNull);
-    });
-  });
-
-  group('TriageIncomingCard', () {
-    testWidgets('muestra datos, pastilla, llegada y acciones', (tester) async {
-      await tester.pumpWidget(_wrap(_incoming()));
-      expect(find.text('Alberto Pérez'), findsOneWidget);
-      expect(find.text('ROJO'), findsOneWidget);
-      expect(find.text('Unidad A-12 · llega en 6 min'), findsOneWidget);
-      expect(find.text('Rechazar'), findsOneWidget);
-      expect(find.text('Revisar y aceptar'), findsOneWidget);
-    });
-
-    testWidgets('cada zona llama a su acción', (tester) async {
-      final calls = <String>[];
-      await tester.pumpWidget(
-        _wrap(
-          _incoming(
-            onOpen: () => calls.add('abrir'),
-            onReject: () => calls.add('rechazar'),
-            onAccept: () => calls.add('aceptar'),
-          ),
-        ),
-      );
-      await tester.tap(find.text('Alberto Pérez'));
-      await tester.tap(find.text('Rechazar'));
-      await tester.tap(find.text('Revisar y aceptar'));
-      expect(calls, ['abrir', 'rechazar', 'aceptar']);
-    });
-
-    testWidgets('los botones se anuncian aparte de la tarjeta', (tester) async {
-      await tester.pumpWidget(_wrap(_incoming()));
-      final card = tester
-          .getSemantics(find.byType(TriageTapCard))
-          .getSemanticsData()
-          .label;
-      expect(card, contains('Alberto Pérez'));
-      expect(card, isNot(contains('Rechazar')));
-      expect(
-        tester.getSemantics(find.text('Rechazar')),
-        isSemantics(label: 'Rechazar', isButton: true),
-      );
-    });
-
-    testWidgets('el nivel se anuncia una sola vez', (tester) async {
-      await tester.pumpWidget(_wrap(_incoming()));
-      final card = tester
-          .getSemantics(find.byType(TriageTapCard))
-          .getSemanticsData()
-          .label;
-      expect('Triage Rojo'.allMatches(card), hasLength(1));
-    });
-
-    for (final role in [TriageRoleTheme.paramedic, TriageRoleTheme.hospital]) {
-      testWidgets('la llegada usa el rol y llega a 4.5:1', (tester) async {
-        await tester.pumpWidget(_wrap(_incoming(), role: role));
-        expect(
-          tester
-              .widget<Text>(find.text('Unidad A-12 · llega en 6 min'))
-              .style!
-              .color,
-          role.accent,
-        );
-        expect(_contrast(role.accent, role.soft), greaterThanOrEqualTo(4.5));
-      });
-    }
-
-    testWidgets('la barra mide lo mismo que su fila', (tester) async {
-      await tester.pumpWidget(_wrap(_incoming()));
-      expect(
-        tester.getSize(find.byType(TriageLevelBar)).height,
-        greaterThanOrEqualTo(40),
-      );
-    });
-
-    testWidgets('botones iguales en alto y sin desbordes al 200 % en 280', (
-      tester,
-    ) async {
-      await tester.pumpWidget(
-        _wrap(
-          _incoming(
-            name: 'Paciente sin identificar con nombre largo',
-            level: TriageLevel.yellow,
-          ),
-          width: 280,
-          textScale: 2,
-        ),
-      );
-      expect(tester.takeException(), isNull);
-      expect(
-        tester.getSize(find.byType(TriageButton).first).height,
-        tester.getSize(find.byType(TriageButton).last).height,
-      );
     });
   });
 }

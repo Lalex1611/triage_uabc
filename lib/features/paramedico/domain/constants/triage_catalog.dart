@@ -20,15 +20,3 @@ enum TriageCategory {
 extension TriageCategorySql on TriageCategory {
   String get sqlValue => name;
 }
-
-/// Opciones de triage para altas en BD (excluye filtro virtual `todos`)
-final Iterable<TriageCategory> triageCategoriesForPatientInsert =
-    TriageCategory.values.where((c) => c != TriageCategory.todos);
-
-/// Color de cabecera cuando aún no hay triage START elegido (rojo home paramédico)
-Color paramedicoHeaderColor(TriageCategory? category) {
-  if (category == null || category == TriageCategory.todos) {
-    return AppColors.primaryParamedico;
-  }
-  return category.color;
-}

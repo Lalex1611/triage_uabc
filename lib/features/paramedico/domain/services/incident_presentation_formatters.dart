@@ -6,21 +6,6 @@ class IncidentPresentationFormatters {
 
   static const _defaultLat = 32.5027;
   static const _defaultLng = -117.00371;
-  static const _monthNames = <int, String>{
-    1: 'enero',
-    2: 'febrero',
-    3: 'marzo',
-    4: 'abril',
-    5: 'mayo',
-    6: 'junio',
-    7: 'julio',
-    8: 'agosto',
-    9: 'septiembre',
-    10: 'octubre',
-    11: 'noviembre',
-    12: 'diciembre',
-  };
-
   static String shortIncidentId(String id) {
     final short = id.length >= 6
         ? id.substring(0, 6).toUpperCase()
@@ -52,32 +37,12 @@ class IncidentPresentationFormatters {
     return '${inc.latitude!.toStringAsFixed(5)}, ${inc.longitude!.toStringAsFixed(5)}';
   }
 
-  static String formatDateTime(DateTime? d) {
-    if (d == null) return '—';
-    final x = d.toLocal();
-    final mm = x.month.toString().padLeft(2, '0');
-    final dd = x.day.toString().padLeft(2, '0');
-    final hh = x.hour.toString().padLeft(2, '0');
-    final mi = x.minute.toString().padLeft(2, '0');
-    final ss = x.second.toString().padLeft(2, '0');
-    return '$dd/$mm/${x.year} $hh:$mi:$ss';
-  }
-
   static String formatTime(DateTime? d) {
     if (d == null) return '—';
     final x = d.toLocal();
     final hh = x.hour.toString().padLeft(2, '0');
     final mi = x.minute.toString().padLeft(2, '0');
     return '$hh:$mi';
-  }
-
-  static String formatIncidentExactDate(DateTime? d) {
-    if (d == null) return '-';
-    final x = d.toLocal();
-    final month = _monthNames[x.month] ?? x.month.toString().padLeft(2, '0');
-    final hh = x.hour.toString().padLeft(2, '0');
-    final mi = x.minute.toString().padLeft(2, '0');
-    return '${x.day}-$month-${x.year} $hh:$mi';
   }
 
   static String relativeCreated(DateTime? at) {

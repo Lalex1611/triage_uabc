@@ -13,16 +13,9 @@ import 'package:sistema_triage/features/medico/presentation/routing/medico_home_
 import 'package:sistema_triage/features/medico/presentation/routing/medico_patient_details_flow_page.dart';
 import 'package:sistema_triage/features/medico/presentation/register_patient/medico_offline_page.dart';
 import 'package:sistema_triage/features/paramedico/presentation/routing/incident_details_flow_page.dart';
-import 'package:sistema_triage/features/paramedico/presentation/routing/paramedico_home_tab_page.dart';
-import 'package:sistema_triage/features/paramedico/presentation/routing/paramedico_incidents_tab_page.dart';
 import 'package:sistema_triage/features/paramedico/presentation/routing/paramedico_map_tab_page.dart';
-import 'package:sistema_triage/features/paramedico/presentation/routing/paramedico_patients_tab_page.dart';
 import 'package:sistema_triage/features/paramedico/presentation/routing/paramedico_shell_page.dart';
 import 'package:sistema_triage/features/paramedico/presentation/routing/patient_details_flow_page.dart';
-import 'package:sistema_triage/features/paramedico/presentation/routing/patient_registration_flow_page.dart';
-import 'package:sistema_triage/features/paramedico/presentation/routing/patient_registration_route_seed.dart';
-import 'package:sistema_triage/features/paramedico/domain/constants/start_triage_tab_options.dart';
-import 'package:sistema_triage/features/paramedico/presentation/routing/start_triage_flow_page.dart';
 import 'package:sistema_triage/core/router/router_keys.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -79,59 +72,7 @@ final GoRouter appRouter = GoRouter(
                 ),
               ],
             ),
-            StatefulShellBranch(
-              routes: [
-                GoRoute(
-                  path: 'incidentes',
-                  builder: (context, state) =>
-                      const ParamedicoIncidentsTabPage(),
-                ),
-              ],
-            ),
-            StatefulShellBranch(
-              routes: [
-                GoRoute(
-                  path: 'home',
-                  builder: (context, state) => const ParamedicoHomeTabPage(),
-                ),
-              ],
-            ),
-            StatefulShellBranch(
-              routes: [
-                GoRoute(
-                  path: 'paciente',
-                  builder: (context, state) =>
-                      const ParamedicoPatientsTabPage(),
-                ),
-              ],
-            ),
           ],
-        ),
-        GoRoute(
-          parentNavigatorKey: rootNavigatorKey,
-          path: 'registro-rapido/registrar',
-          builder: (context, state) {
-            final seed = state.extra is PatientRegistrationRouteSeed
-                ? state.extra! as PatientRegistrationRouteSeed
-                : null;
-            return PatientRegistrationFlowPage(
-              seedLatitude: seed?.latitude,
-              seedLongitude: seed?.longitude,
-            );
-          },
-        ),
-        GoRoute(
-          parentNavigatorKey: rootNavigatorKey,
-          path: 'registro-rapido/triage',
-          builder: (context, state) {
-            final q = state.uri.queryParameters;
-            final openGuided = q['quick'] == '1' || q['tab'] == 'protocolo';
-            return StartTriageFlowPage(
-              initialTab: openGuided
-                  ? StartTriageTabOption.protocoloGuiado
-                  : StartTriageTabOption.asignacionRapida,
-            );
-          },
         ),
         GoRoute(
           parentNavigatorKey: rootNavigatorKey,
@@ -140,38 +81,6 @@ final GoRouter appRouter = GoRouter(
             final id = state.pathParameters['incidentId']!;
             return IncidentDetailsFlowPage(incidentId: id);
           },
-          routes: [
-            GoRoute(
-              parentNavigatorKey: rootNavigatorKey,
-              path: 'triage',
-              builder: (context, state) {
-                final id = state.pathParameters['incidentId']!;
-                final q = state.uri.queryParameters;
-                final openGuided = q['quick'] == '1' || q['tab'] == 'protocolo';
-                return StartTriageFlowPage(
-                  incidentId: id,
-                  initialTab: openGuided
-                      ? StartTriageTabOption.protocoloGuiado
-                      : StartTriageTabOption.asignacionRapida,
-                );
-              },
-            ),
-            GoRoute(
-              parentNavigatorKey: rootNavigatorKey,
-              path: 'register',
-              builder: (context, state) {
-                final id = state.pathParameters['incidentId']!;
-                final seed = state.extra is PatientRegistrationRouteSeed
-                    ? state.extra! as PatientRegistrationRouteSeed
-                    : null;
-                return PatientRegistrationFlowPage(
-                  incidentId: id,
-                  seedLatitude: seed?.latitude,
-                  seedLongitude: seed?.longitude,
-                );
-              },
-            ),
-          ],
         ),
         GoRoute(
           parentNavigatorKey: rootNavigatorKey,
