@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:sistema_triage/core/ui/app_snackbar.dart';
 import 'package:sistema_triage/features/paramedico/presentation/map/paramedico_map_controller.dart';
 import 'package:sistema_triage/features/paramedico/presentation/map/paramedico_map_page.dart';
 import 'package:sistema_triage/features/paramedico/presentation/map/widgets/map_layers_sheet.dart';
@@ -22,15 +23,23 @@ class _ParamedicoMapTabPageState extends State<ParamedicoMapTabPage> {
   bool _loadHandled = false;
   ValueNotifier<bool>? _navbarHidden;
   final _panelKey = GlobalKey();
+  late final AppLifecycleListener _lifecycle;
+  bool _tabVisible = false;
 
   @override
   void initState() {
     super.initState();
-    _controller = ParamedicoMapController(
-      initialFocusIncidentId: widget.initialFocusIncidentId,
-    )..panelHeight = () => _panelKey.currentContext?.size?.height ?? 0;
+    _controller =
+        ParamedicoMapController(
+            initialFocusIncidentId: widget.initialFocusIncidentId,
+          )
+          ..panelHeight = (() => _panelKey.currentContext?.size?.height ?? 0)
+          ..onSelectedIncidentClosed = () {
+            if (mounted) showAppSnackBar(context, 'Este incidente se cerró.');
+          };
     _controller.addListener(_onController);
     _controller.init();
+    _lifecycle = AppLifecycleListener(onStateChange: (_) => _syncLive());
   }
 
   @override
@@ -38,10 +47,25 @@ class _ParamedicoMapTabPageState extends State<ParamedicoMapTabPage> {
     super.didChangeDependencies();
     _navbarHidden = ParamedicoNavbarVisibility.maybeOf(context);
     _controller.onDependenciesChanged(context);
+    // Otra pestaña o una pantalla encima apagan los tickers del mapa
+    _tabVisible = TickerMode.valuesOf(context).enabled;
+    _syncLive();
+  }
+
+  /// GPS en vivo solo con el mapa a la vista y la app en primer plano
+  void _syncLive() {
+    final state = WidgetsBinding.instance.lifecycleState;
+    final background = const {
+      AppLifecycleState.hidden,
+      AppLifecycleState.paused,
+      AppLifecycleState.detached,
+    }.contains(state);
+    _controller.setLiveLocation(_tabVisible && !background);
   }
 
   @override
   void dispose() {
+    _lifecycle.dispose();
     _navbarHidden?.value = false;
     _controller.removeListener(_onController);
     _controller.dispose();
@@ -83,7 +107,6 @@ class _ParamedicoMapTabPageState extends State<ParamedicoMapTabPage> {
         userPosition: c.userPosition,
         selectedCard: selected != null ? c.toCard(selected, uid) : null,
         onMapBackgroundTap: c.onMapBackgroundTap,
-        onMapPositionChanged: c.onMapPositionChanged,
         onPinTap: c.onPinTap,
         onClearSelection: c.clearSelection,
         onDirections: () => unawaited(c.openDirections(context)),
@@ -104,15 +127,13 @@ class _ParamedicoMapTabPageState extends State<ParamedicoMapTabPage> {
         showHospitals: c.showHospitals,
         unreadNotifications: c.unreadNotifications,
         onOpenNotifications: () => unawaited(c.openNotifications(context)),
-        coverageRings: c
-            .visibleCoverageRings()
-            .map((r) => (center: r.center, radiusMeters: r.radiusMeters))
-            .toList(),
-        patientPins: c.visiblePatientPins(),
+        coverageRingsFor: c.visibleCoverageRings,
+        patientPinsFor: c.visiblePatientPins,
         highlightedPatientId: c.highlightedPatientId,
         onPatientPinTap: (pin) => c.openPatientDetail(context, pin.id),
         onMapReady: c.markMapReady,
         panelKey: _panelKey,
+        isLocating: c.locating,
       ),
     );
   }

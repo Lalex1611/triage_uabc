@@ -150,6 +150,35 @@ class IncidentLocationService {
     }
   }
 
+  /// Última posición que guardó el sistema: llega al instante, pero puede ser
+  /// antigua o no existir. No pide permiso: sin él devuelve `null`
+  static Future<({double lat, double lng})?> lastKnownPosition() async {
+    try {
+      final permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        return null;
+      }
+      final pos = await Geolocator.getLastKnownPosition();
+      return pos == null ? null : (lat: pos.latitude, lng: pos.longitude);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Posición en vivo ahorrando batería: precisión media y un aviso cada
+  /// [distanceFilter] metros. No pide permiso: sin él el flujo da error
+  static Stream<({double lat, double lng})> positionUpdates({
+    int distanceFilter = 25,
+  }) {
+    return Geolocator.getPositionStream(
+      locationSettings: LocationSettings(
+        accuracy: LocationAccuracy.medium,
+        distanceFilter: distanceFilter,
+      ),
+    ).map((p) => (lat: p.latitude, lng: p.longitude));
+  }
+
   static String? errorMessageForNullResult() {
     return 'No se pudo obtener la ubicación. Activa el GPS y concede permiso a la app.';
   }
@@ -477,7 +506,7 @@ class _GpsPermissionsSheetState extends State<_GpsPermissionsSheet>
                       ),
                       const SizedBox(height: TriageSpacing.md),
                       Text(
-                        'La ubicación se consulta únicamente al crear incidentes, capturar pacientes, iniciar un traslado hospitalario o al pulsar «Probar señal GPS» para obtener y mostrar las coordenadas.',
+                        'La ubicación se consulta únicamente al crear incidentes, capturar pacientes, iniciar un traslado hospitalario, mientras tienes el mapa abierto o al pulsar «Probar señal GPS» para obtener y mostrar las coordenadas.',
                         style: TriageTextStyles.bodySmall.copyWith(
                           color: TriageColors.textSecondary,
                           height: 1.4,

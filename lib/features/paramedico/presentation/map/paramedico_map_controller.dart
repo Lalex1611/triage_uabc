@@ -91,9 +91,13 @@ class ParamedicoMapController extends ChangeNotifier {
   String? _lastRouteUri;
   String? highlightedPatientId;
   String? forceShowPatientsIncidentId;
-  int? _visibilityEpoch;
   bool _mapReady = false;
-  VoidCallback? _pendingWhenMapReady;
+  final _pendingWhenMapReady = <VoidCallback>[];
+  // Cada movimiento de cámara empieza uno nuevo: un reintento viejo no lo pisa
+  int _cameraGeneration = 0;
+
+  /// El incidente elegido se cerró en otro dispositivo: la pantalla avisa
+  VoidCallback? onSelectedIncidentClosed;
   int _focusGeneration = 0;
   // Solo cuenta la última elección de filtro o búsqueda: una respuesta lenta
   // (GPS, geocodificador) no pisa lo que el usuario eligió después
@@ -110,6 +114,7 @@ class ParamedicoMapController extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    _stopLive();
     _store.removeListener(_onStoreChanged);
     searchController.dispose();
     mapController.dispose();
@@ -140,11 +145,8 @@ class ParamedicoMapController extends ChangeNotifier {
       _dropSelection();
     }
     notifyListeners();
-    if (value == MapIncidentFilter.nearby) {
-      _fitNearbyArea();
-    } else {
-      goToRegionOverview();
-    }
+    // Solo «Cerca de mí» encuadra (su círculo); los demás respetan el mapa
+    if (value == MapIncidentFilter.nearby) _fitNearbyArea();
   }
 
   /// Encuadra el círculo de "Cerca de mí" alrededor del usuario
@@ -234,27 +236,43 @@ class ParamedicoMapController extends ChangeNotifier {
   void markMapReady() {
     if (_mapReady) return;
     _mapReady = true;
-    final pending = _pendingWhenMapReady;
-    _pendingWhenMapReady = null;
-    pending?.call();
+    final pending = List.of(_pendingWhenMapReady);
+    _pendingWhenMapReady.clear();
+    for (final action in pending) {
+      action();
+    }
   }
 
+  // Hasta onMapReady se guardan todas, en orden: ninguna pisa a la anterior
   void _runWhenMapReady(void Function() action) {
     if (_mapReady) {
       action();
     } else {
-      _pendingWhenMapReady = action;
+      _pendingWhenMapReady.add(action);
     }
   }
 
+  /// Si la cámara falla (p. ej. el mapa aún sin tamaño), se reintenta una vez
+  /// en el siguiente fotograma, salvo que entretanto haya empezado otro
+  /// movimiento. El mapa sigue «listo»: onMapReady no vuelve a llegar, y
+  /// esperarlo dejaba el mapa sin cámara para siempre
   void _safeMapOp(void Function() op) {
     _runWhenMapReady(() {
+      final generation = ++_cameraGeneration;
       try {
         op();
       } catch (_) {
-        // El mapa aún no está listo; reintentar tras onMapReady
-        _mapReady = false;
-        _runWhenMapReady(op);
+        WidgetsBinding.instance
+          ..addPostFrameCallback((_) {
+            if (_disposed || generation != _cameraGeneration) return;
+            try {
+              op();
+            } catch (e) {
+              debugPrint('Movimiento de cámara descartado: $e');
+            }
+          })
+          // Sin esto, el reintento espera a que algo más pida un fotograma
+          ..ensureVisualUpdate();
       }
     });
   }
@@ -270,11 +288,15 @@ class ParamedicoMapController extends ChangeNotifier {
   }
 
   /// Si el incidente elegido se cerró o borró (aquí o en otro dispositivo),
-  /// se suelta en vez de seguir mostrándolo
+  /// se suelta en vez de seguir mostrándolo. Si fue en otro dispositivo se
+  /// avisa; quien lo cerró aquí ya vio «Incidente cerrado»
   void _onStoreChanged() {
     final selected = selectedIncidentId;
     if (selected != null && _store.byId(selected) == null) {
       clearSelection();
+      if (!_store.closedHere.contains(selected)) {
+        onSelectedIncidentClosed?.call();
+      }
     } else {
       notifyListeners();
     }
@@ -309,6 +331,40 @@ class ParamedicoMapController extends ChangeNotifier {
     if (pos == null) return;
     userPosition = LatLng(pos.lat, pos.lng);
     notifyListeners();
+    // El flujo pudo arrancar antes de conceder el permiso y pararse
+    _syncLive();
+  }
+
+  StreamSubscription<({double lat, double lng})>? _liveSub;
+  bool _liveWanted = false;
+
+  /// Posición en vivo solo con el mapa a la vista y la app en primer plano.
+  /// Mueve el punto del usuario, nunca la cámara
+  void setLiveLocation(bool on) {
+    _liveWanted = on;
+    _syncLive();
+  }
+
+  void _syncLive() {
+    if (_disposed || !_liveWanted) {
+      _stopLive();
+      return;
+    }
+    _liveSub ??= IncidentLocationService.positionUpdates().listen(
+      (p) {
+        userPosition = LatLng(p.lat, p.lng);
+        notifyListeners();
+      },
+      // Sin permiso o con el GPS apagado se para; se reintenta al volver
+      // al mapa o a la app
+      onError: (_) => _stopLive(),
+      onDone: _stopLive,
+    );
+  }
+
+  void _stopLive() {
+    unawaited(_liveSub?.cancel());
+    _liveSub = null;
   }
 
   Future<void> onLoadComplete(BuildContext context) async {
@@ -320,13 +376,22 @@ class ParamedicoMapController extends ChangeNotifier {
   Future<void> _runInitialCamera(BuildContext context) async {
     if (pendingFocusId != null) {
       await applyPendingFocus(context);
-    } else {
+    } else if (_cameraStillAt(_openingCamera)) {
+      // Si mientras cargaba el usuario movió el mapa (gesto, «Objetivo»,
+      // búsqueda), se respeta dónde lo dejó
       goToRegionOverview();
     }
   }
 
+  /// Cámara con la que abre el mapa ([MapOptions] de la pantalla)
+  static const _openingCamera = (
+    center: MapOperationalRegion.overviewCenter,
+    zoom: MapOperationalRegion.overviewZoom,
+  );
+
   List<ParamedicoIncidentSummary> get visibleIncidents {
-    final uid = currentUserId;
+    // La sesión solo hace falta para "Mis incidentes"
+    final uid = filter == MapIncidentFilter.mine ? currentUserId : '';
     final user = userPosition;
     return switch (filter) {
       MapIncidentFilter.mine when uid.isNotEmpty =>
@@ -536,9 +601,9 @@ class ParamedicoMapController extends ChangeNotifier {
     return points;
   }
 
-  List<MapPatientPin> visiblePatientPins() {
-    if (!_mapReady) return const [];
-    final camera = mapController.camera;
+  /// Pacientes a la vista con [camera]. Lo llama el propio mapa en cada
+  /// movimiento: moverlo no reconstruye la pantalla
+  List<MapPatientPin> visiblePatientPins(MapCamera camera) {
     final center = camera.center;
     final zoom = camera.zoom;
     final visible = <MapPatientPin>[];
@@ -563,11 +628,12 @@ class ParamedicoMapController extends ChangeNotifier {
     return visible;
   }
 
-  List<({String incidentId, LatLng center, double radiusMeters})>
-  visibleCoverageRings() {
-    if (!_mapReady) return const [];
-    final zoom = mapController.camera.zoom;
-    final rings = <({String incidentId, LatLng center, double radiusMeters})>[];
+  /// Radios de incidente a la vista con [camera], como [visiblePatientPins]
+  List<({LatLng center, double radiusMeters})> visibleCoverageRings(
+    MapCamera camera,
+  ) {
+    final zoom = camera.zoom;
+    final rings = <({LatLng center, double radiusMeters})>[];
     for (final inc in mappableIncidents) {
       if (inc.latitude == null || inc.longitude == null) continue;
       if (!MapIncidentCoverageService.shouldShowCoverageRing(
@@ -578,7 +644,6 @@ class ParamedicoMapController extends ChangeNotifier {
         continue;
       }
       rings.add((
-        incidentId: inc.id,
         center: LatLng(inc.latitude!, inc.longitude!),
         radiusMeters:
             radiusMetersByIncident[inc.id] ??
@@ -632,11 +697,11 @@ class ParamedicoMapController extends ChangeNotifier {
     }
   }
 
+  /// Suelta el incidente sin mover la cámara: el usuario sigue donde estaba
   void clearSelection() {
     if (selectedIncidentId == null) return;
     _dropSelection();
     notifyListeners();
-    goToRegionOverview();
   }
 
   void _dropSelection() {
@@ -651,33 +716,87 @@ class ParamedicoMapController extends ChangeNotifier {
     if (selectedIncidentId != null) clearSelection();
   }
 
-  void onMapPositionChanged(MapCamera camera, bool hasGesture) {
-    final epoch =
-        (camera.zoom * 4).floor() +
-        (camera.center.latitude * 1000).floor() +
-        (camera.center.longitude * 1000).floor();
-    if (_visibilityEpoch != epoch) {
-      _visibilityEpoch = epoch;
+  /// Zoom al centrar en el usuario
+  static const double userZoom = 15;
+
+  /// Sin ninguna posición conocida, el botón «Objetivo» espera al GPS
+  bool locating = false;
+  bool _locateInFlight = false;
+
+  /// Objetivo: centra al instante en la mejor posición conocida (la del mapa o
+  /// la última del sistema) y la afina con una lectura nueva del GPS, que
+  /// tarda. Solo se recentra si nadie movió el mapa entretanto
+  Future<void> centerOnUser(BuildContext context) async {
+    if (_locateInFlight) return;
+    _locateInFlight = true;
+    try {
+      var known = userPosition;
+      if (known == null) {
+        final last = await IncidentLocationService.lastKnownPosition();
+        if (_disposed) return;
+        if (last != null) known = LatLng(last.lat, last.lng);
+      }
+      // Dónde queda la cámara: si sigue ahí al llegar el GPS, nadie la movió
+      ({LatLng center, double zoom})? left;
+      if (known != null) {
+        final target = known;
+        // Solo la cámara: una posición guardada no vale para «Cerca de mí»
+        _safeMapOp(() => mapController.move(target, userZoom));
+        left = (center: target, zoom: userZoom);
+      } else {
+        locating = true;
+        notifyListeners();
+        left = _cameraNow();
+      }
+
+      final pos = await IncidentLocationService.getCurrentPosition();
+      if (_disposed) return;
+      if (pos == null) {
+        // Ya se centró en una posición conocida: no hace falta el error
+        if (known == null && context.mounted) {
+          showAppSnackBar(
+            context,
+            IncidentLocationService.errorMessageForNullResult() ??
+                'No se pudo obtener GPS.',
+            isError: true,
+          );
+        }
+        return;
+      }
+      final fresh = LatLng(pos.lat, pos.lng);
+      _syncLive(); // Por si el permiso se acaba de conceder
+      userPosition = fresh;
       notifyListeners();
+      if (left == null || _cameraStillAt(left)) {
+        _safeMapOp(() => mapController.move(fresh, userZoom));
+      }
+    } finally {
+      _locateInFlight = false;
+      if (locating && !_disposed) {
+        locating = false;
+        notifyListeners();
+      }
     }
   }
 
-  Future<void> centerOnUser(BuildContext context) async {
-    final pos = await IncidentLocationService.getCurrentPosition();
-    if (!context.mounted) return;
-    if (pos == null) {
-      showAppSnackBar(
-        context,
-        IncidentLocationService.errorMessageForNullResult() ??
-            'No se pudo obtener GPS.',
-        isError: true,
-      );
-      return;
+  /// Cámara actual, o null si el mapa aún no la tiene
+  ({LatLng center, double zoom})? _cameraNow() {
+    if (!_mapReady) return null;
+    try {
+      final camera = mapController.camera;
+      return (center: camera.center, zoom: camera.zoom);
+    } catch (_) {
+      return null;
     }
-    final p = LatLng(pos.lat, pos.lng);
-    userPosition = p;
-    notifyListeners();
-    _safeMapOp(() => mapController.move(p, 15));
+  }
+
+  /// La cámara sigue en [left]: el usuario no la movió
+  bool _cameraStillAt(({LatLng center, double zoom}) left) {
+    if (!_mapReady) return true;
+    final now = _cameraNow();
+    return now != null &&
+        now.zoom == left.zoom &&
+        const Distance().as(LengthUnit.Meter, now.center, left.center) < 1;
   }
 
   void openIncidentDetail(BuildContext context, String incidentId) {

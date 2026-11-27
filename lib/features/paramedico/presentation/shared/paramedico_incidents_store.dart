@@ -36,6 +36,10 @@ class ParamedicoIncidentsStore extends ChangeNotifier {
   /// Solo si nunca se pudo cargar: con datos, un fallo posterior los conserva
   String? error;
 
+  /// Incidentes cerrados desde este dispositivo: el mapa no avisa de su cierre,
+  /// quien lo cerró ya lo sabe
+  final closedHere = <String>{};
+
   Future<void> Function()? _unwatch;
   bool _listening = false;
   // Cambia en cada desuscripción: lo que pidió una sesión anterior no se publica
@@ -105,6 +109,7 @@ class ParamedicoIncidentsStore extends ChangeNotifier {
     counts = const {};
     patientsByIncident = const {};
     radiusMetersByIncident = const {};
+    closedHere.clear();
     loaded = false;
     error = null;
   }

@@ -263,14 +263,20 @@ class IncidentDetailsController extends ChangeNotifier {
 
     if (!confirmed || !context.mounted) return;
 
+    // Antes de cerrar: el tiempo real puede avisar al mapa antes de que
+    // vuelva la llamada, y no debe mostrar «Este incidente se cerró»
+    final store = ParamedicoIncidentsStore.instance;
+    store.closedHere.add(incidentId);
     try {
       await _repo.closeIncident(incidentId);
       // Sin esperar al aviso del tiempo real: el mapa debe dejar de mostrarlo ya
-      unawaited(ParamedicoIncidentsStore.instance.refresh());
+      unawaited(store.refresh());
       if (!context.mounted) return;
       showAppSnackBar(context, 'Incidente cerrado.');
       context.go('/paramedico/mapa');
     } catch (e) {
+      // No se cerró: si luego lo cierra otro dispositivo, sí debe avisarse
+      store.closedHere.remove(incidentId);
       if (!context.mounted) return;
       showAppSnackBar(context, '$e', isError: true);
     }
