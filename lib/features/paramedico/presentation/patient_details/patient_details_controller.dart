@@ -783,7 +783,7 @@ class PatientDetailsController extends ChangeNotifier {
       if (d.incidentId.isNotEmpty) {
         context.go('/paramedico/incident/${d.incidentId}');
       } else {
-        context.go('/paramedico/paciente');
+        context.go('/paramedico/mapa');
       }
     } catch (e) {
       if (!context.mounted) return;
