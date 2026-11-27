@@ -4,11 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:sistema_triage/core/config/supabase_env.dart';
+import 'package:sistema_triage/core/geo/nominatim_reverse_geocode.dart';
 import 'package:sistema_triage/core/session/auth_gate.dart';
 import 'package:sistema_triage/core/ui/app_snackbar.dart';
 import 'package:sistema_triage/features/paramedico/data/repositories/paramedico_incidents_repository.dart';
 import 'package:sistema_triage/features/paramedico/domain/constants/emergency_catalog.dart';
-import 'package:sistema_triage/features/paramedico/domain/services/incident_title_formatter.dart';
 import 'package:sistema_triage/features/paramedico/presentation/create_incident/services/incident_location_service.dart';
 import 'package:sistema_triage/features/paramedico/presentation/create_incident/widgets/incident_location_map_dialog_widget.dart';
 
@@ -33,14 +33,16 @@ class CreateIncidentController extends ChangeNotifier {
   DateTime capturedAt = DateTime.now();
   bool submitting = false;
   bool refreshingGps = false;
-  String previewTitle = 'Generando título…';
-  String? customTitle;
-  bool refreshingTitle = false;
+
+  /// Dirección corta del punto elegido; null si no se encontró
+  String? placeLabel;
+  bool refreshingPlace = false;
   bool locationConfirmed = false;
   String? locationError;
   final List<String> photos = [];
 
-  String get displayTitle => customTitle ?? previewTitle;
+  /// El incidente se titula con su categoría
+  String get title => EmergencyCatalog.nameFor(mapEmergencyForRpc());
   bool get canSubmit => locationConfirmed && !submitting;
 
   String _buildDraftIdLabel() {
@@ -55,26 +57,13 @@ class CreateIncidentController extends ChangeNotifier {
     super.dispose();
   }
 
-  Future<void> refreshPreviewTitle() async {
-    if (refreshingTitle) return;
-    refreshingTitle = true;
+  Future<void> refreshPlace() async {
+    if (refreshingPlace) return;
+    refreshingPlace = true;
     notifyListeners();
-    try {
-      previewTitle = await IncidentTitleFormatter.resolveTitle(
-        customTitle: null,
-        atLocal: capturedAt,
-        lat: lat,
-        lng: lng,
-      );
-    } catch (_) {
-      previewTitle = IncidentTitleFormatter.formatAuto(
-        atLocal: capturedAt,
-        locationKey: '${lat.toStringAsFixed(4)}, ${lng.toStringAsFixed(4)}',
-      );
-    } finally {
-      refreshingTitle = false;
-      notifyListeners();
-    }
+    placeLabel = await NominatimReverseGeocode.shortPlaceLabel(lat, lng);
+    refreshingPlace = false;
+    notifyListeners();
   }
 
   String mapEmergencyForRpc() {
@@ -106,9 +95,7 @@ class CreateIncidentController extends ChangeNotifier {
         locationConfirmed = true;
         locationError = null;
         capturedAt = DateTime.now();
-        if (customTitle == null) {
-          unawaited(refreshPreviewTitle());
-        }
+        unawaited(refreshPlace());
       } else {
         // Si ya confirmó una ubicación manualmente, no se pisa con el error
         if (!locationConfirmed) {
@@ -147,11 +134,7 @@ class CreateIncidentController extends ChangeNotifier {
     locationConfirmed = true;
     locationError = null;
     capturedAt = DateTime.now();
-    if (customTitle == null) {
-      await refreshPreviewTitle();
-    } else {
-      notifyListeners();
-    }
+    await refreshPlace();
   }
 
   Future<void> pickImage(ImageSource source) async {
@@ -229,13 +212,7 @@ class CreateIncidentController extends ChangeNotifier {
       final type = mapEmergencyForRpc();
       if (_repo.usesLocalCaptures) {
         final id = await _repo.captureIncident(
-          title:
-              customTitle ??
-              IncidentTitleFormatter.formatAuto(
-                atLocal: capturedAt,
-                locationKey:
-                    '${lat.toStringAsFixed(4)}, ${lng.toStringAsFixed(4)}',
-              ),
+          title: title,
           emergencyType: type,
           lat: lat,
           lng: lng,
@@ -247,12 +224,6 @@ class CreateIncidentController extends ChangeNotifier {
         }
         return id;
       }
-      final title = await IncidentTitleFormatter.resolveTitle(
-        customTitle: customTitle,
-        atLocal: capturedAt,
-        lat: lat,
-        lng: lng,
-      );
       final id = await _repo.createIncident(
         title: title,
         emergencyType: type,
