@@ -89,8 +89,9 @@ class _IncidentLocationMapDialogState extends State<IncidentLocationMapDialog> {
   static const double _panelMaxFactor = 0.5;
   static const double _headerMaxFactor = 0.3;
 
-  /// Espera tras soltar el mapa antes de buscar la dirección: Nominatim pide
-  /// como mucho una consulta por segundo
+  /// Espera tras soltar el mapa antes de buscar la dirección: no se busca
+  /// mientras se mueve. El segundo entre peticiones lo asegura
+  /// [NominatimReverseGeocode]
   static const Duration _lookupDelay = Duration(milliseconds: 700);
 
   /// «Centrar», a la altura de Figma: algo por debajo del pin
