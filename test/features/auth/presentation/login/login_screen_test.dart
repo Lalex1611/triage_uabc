@@ -134,6 +134,50 @@ void main() {
     );
   });
 
+  testWidgets('permite mostrar y ocultar la contraseña sin cambiar el texto', (
+    tester,
+  ) async {
+    final semantics = tester.ensureSemantics();
+    await pumpLogin(tester, const Size(390, 844));
+    final fields = find.byType(TextField);
+    final password = fields.last;
+    final controller = tester.widget<TextField>(password).controller!;
+    expect(
+      tester.widget<TextField>(fields.first).decoration!.suffixIcon,
+      isNull,
+    );
+    expect(tester.widget<TextField>(password).obscureText, isTrue);
+    expect(
+      tester.getSemantics(find.byTooltip('Mostrar contraseña')),
+      matchesSemantics(
+        tooltip: 'Mostrar contraseña',
+        isButton: true,
+        hasEnabledState: true,
+        isEnabled: true,
+        isFocusable: true,
+        hasTapAction: true,
+        hasFocusAction: true,
+      ),
+    );
+    semantics.dispose();
+
+    await tester.enterText(password, 'clave-de-prueba');
+    controller.selection = const TextSelection.collapsed(offset: 5);
+    final value = controller.value;
+    await tester.tap(find.byTooltip('Mostrar contraseña'));
+    await tester.pumpAndSettle();
+    expect(tester.widget<TextField>(password).obscureText, isFalse);
+    expect(controller.value, value);
+    expect(find.byTooltip('Ocultar contraseña'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Ocultar contraseña'));
+    await tester.pumpAndSettle();
+    expect(tester.widget<TextField>(password).obscureText, isTrue);
+    expect(controller.value, value);
+    expect(find.byTooltip('Mostrar contraseña'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('consultar conserva la ruta de consulta externa', (tester) async {
     final router = GoRouter(
       initialLocation: '/auth',
