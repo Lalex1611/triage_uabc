@@ -32,6 +32,10 @@ Future<void> showCreateIncidentSheet(BuildContext context) async {
   }
 }
 
+/// Mini-mapa de la sección «¿Dónde ocurrió?»; tocarlo abre el ajuste
+@visibleForTesting
+const miniMapKey = ValueKey('create-incident-mini-map');
+
 class _CreateIncidentBody extends StatefulWidget {
   const _CreateIncidentBody();
 
@@ -224,49 +228,58 @@ class _CreateIncidentBodyState extends State<_CreateIncidentBody> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             spacing: TriageSpacing.md,
             children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(TriageRadii.lg),
-                child: AspectRatio(
-                  aspectRatio: _mapAspectRatio,
-                  child: confirmed
-                      // Solo vista previa: no captura los gestos del scroll
-                      ? IgnorePointer(
-                          child: FlutterMap(
-                            // Se reconstruye al cambiar la posición
-                            key: ValueKey((c.lat, c.lng)),
-                            options: MapOptions(
-                              initialCenter: LatLng(c.lat, c.lng),
-                              initialZoom: _mapZoom,
-                              interactionOptions: const InteractionOptions(
-                                flags: InteractiveFlag.none,
-                              ),
-                            ),
-                            children: [
-                              const TriageMapTiles(),
-                              MarkerLayer(
-                                markers: [
-                                  Marker(
-                                    point: LatLng(c.lat, c.lng),
-                                    width: TriageSizes.touchTarget,
-                                    height: TriageSizes.touchTarget,
-                                    child: const TriageUserMarker(),
+              // Atajo táctil de «Ajustar» / «Elegir en el mapa»; el lector de
+              // pantalla ya tiene ese botón justo debajo y no lo oye dos veces
+              ExcludeSemantics(
+                child: GestureDetector(
+                  key: miniMapKey,
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () => unawaited(c.openLocationMap(context)),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(TriageRadii.lg),
+                    child: AspectRatio(
+                      aspectRatio: _mapAspectRatio,
+                      child: confirmed
+                          // Solo vista previa: no captura los gestos del scroll
+                          ? IgnorePointer(
+                              child: FlutterMap(
+                                // Se reconstruye al cambiar la posición
+                                key: ValueKey((c.lat, c.lng)),
+                                options: MapOptions(
+                                  initialCenter: LatLng(c.lat, c.lng),
+                                  initialZoom: _mapZoom,
+                                  interactionOptions: const InteractionOptions(
+                                    flags: InteractiveFlag.none,
+                                  ),
+                                ),
+                                children: [
+                                  const TriageMapTiles(),
+                                  MarkerLayer(
+                                    markers: [
+                                      Marker(
+                                        point: LatLng(c.lat, c.lng),
+                                        width: TriageSizes.touchTarget,
+                                        height: TriageSizes.touchTarget,
+                                        child: const TriageUserMarker(),
+                                      ),
+                                    ],
                                   ),
                                 ],
                               ),
-                            ],
-                          ),
-                        )
-                      // Sin ubicación confirmada no se muestra un punto falso
-                      : const ColoredBox(
-                          color: TriageColors.surface,
-                          child: Center(
-                            child: TriageIcon(
-                              TriageIcons.location,
-                              size: TriageSizes.icon,
-                              color: TriageColors.textSecondary,
+                            )
+                          // Sin ubicación confirmada no se muestra un punto falso
+                          : const ColoredBox(
+                              color: TriageColors.surface,
+                              child: Center(
+                                child: TriageIcon(
+                                  TriageIcons.location,
+                                  size: TriageSizes.icon,
+                                  color: TriageColors.textSecondary,
+                                ),
+                              ),
                             ),
-                          ),
-                        ),
+                    ),
+                  ),
                 ),
               ),
               Row(
@@ -317,8 +330,6 @@ class _CreateIncidentBodyState extends State<_CreateIncidentBody> {
     );
   }
 
-  /// La dirección sale del título automático ("18-marzo-2026 14:32-Blvd. X");
-  /// si solo hay coordenadas, devuelve null
   // ---------------------------------------------------------------------------
   // 3 · Detalles (opcional)
   // ---------------------------------------------------------------------------

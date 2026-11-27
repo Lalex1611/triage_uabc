@@ -307,7 +307,6 @@ class IncidentDetailsController extends ChangeNotifier {
       context,
       lat: coords.$1,
       lng: coords.$2,
-      title: 'Ubicación del incidente',
     );
     if (r == null) return;
     try {

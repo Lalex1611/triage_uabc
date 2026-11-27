@@ -1,32 +1,54 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:sistema_triage/core/geo/nominatim_reverse_geocode.dart';
+import 'package:sistema_triage/core/ui/app_snackbar.dart';
 import 'package:sistema_triage/features/paramedico/presentation/create_incident/services/incident_location_service.dart';
+import 'package:sistema_triage/shared/widgets/triage_ui.dart';
 
-// Dialogo de mapa OSM para seleccionar o revisar la ubicacion del incidente
+typedef PlaceLookup = Future<String?> Function(double lat, double lng);
+
+/// Modal flotante para elegir o revisar la ubicación del incidente
+/// (B06 · Ajustar ubicación). El pin queda fijo en el centro del mapa: el punto
+/// elegido es el centro, y el panel inferior muestra su dirección
 class IncidentLocationMapDialog extends StatefulWidget {
   const IncidentLocationMapDialog({
     super.key,
     required this.initial,
     this.readOnly = false,
     this.title = 'Ubicación del incidente',
+    this.placeLabel,
+    this.placeLookup,
   });
 
   final LatLng initial;
+
+  /// Solo ver: mapa fijo, sin «Centrar» ni botón de confirmar
   final bool readOnly;
+
+  /// Encabezado en modo solo ver
   final String title;
+
+  /// Dirección ya conocida de [initial]; si falta, se busca al abrir
+  final String? placeLabel;
+
+  /// Búsqueda de dirección; por defecto Nominatim
+  final PlaceLookup? placeLookup;
 
   static Future<LatLng?> show(
     BuildContext context, {
     required double lat,
     required double lng,
-    String title = 'Ubicación del incidente',
+    String? placeLabel,
   }) {
     return showDialog<LatLng>(
       context: context,
-      barrierDismissible: true,
-      builder: (ctx) =>
-          IncidentLocationMapDialog(initial: LatLng(lat, lng), title: title),
+      builder: (ctx) => IncidentLocationMapDialog(
+        initial: LatLng(lat, lng),
+        placeLabel: placeLabel,
+      ),
     );
   }
 
@@ -39,7 +61,6 @@ class IncidentLocationMapDialog extends StatefulWidget {
   }) {
     return showDialog<void>(
       context: context,
-      barrierDismissible: true,
       builder: (ctx) => IncidentLocationMapDialog(
         initial: LatLng(lat, lng),
         readOnly: true,
@@ -54,61 +75,93 @@ class IncidentLocationMapDialog extends StatefulWidget {
 }
 
 class _IncidentLocationMapDialogState extends State<IncidentLocationMapDialog> {
-  /// Zoom al abrir el mapa o con coordenadas ya conocidas
+  /// Zoom al abrir el mapa
   static const double _zoomDefault = 16;
 
-  /// Zoom al pulsar «Mi ubicación (GPS)»: más cercano para reconocer calles y referencias
+  /// Zoom al pulsar «Centrar»: más cercano para reconocer calles y referencias
   static const double _zoomGps = 19;
 
-  late LatLng _picked;
+  /// Alto del modal respecto a la pantalla
+  static const double _heightFactor = 0.82;
+
+  /// Con texto grande el panel y la tarjeta de arriba tienen tope (y se
+  /// desplazan por dentro): el mapa sigue usable
+  static const double _panelMaxFactor = 0.5;
+  static const double _headerMaxFactor = 0.3;
+
+  /// Espera tras soltar el mapa antes de buscar la dirección: no se busca
+  /// mientras se mueve. El segundo entre peticiones lo asegura
+  /// [NominatimReverseGeocode]
+  static const Duration _lookupDelay = Duration(milliseconds: 700);
+
+  /// «Centrar», a la altura de Figma: algo por debajo del pin
+  static const _centerButtonAlignment = AlignmentDirectional(1, 0.45);
+
+  late LatLng _picked = widget.initial;
+  late String? _place = widget.placeLabel;
+  late bool _searchingPlace = widget.placeLabel == null;
+  late final PlaceLookup _lookup =
+      widget.placeLookup ?? NominatimReverseGeocode.shortPlaceLabel;
   final MapController _mapController = MapController();
   bool _loadingGps = false;
+  Timer? _lookupTimer;
+  int _lookupRequest = 0;
 
   @override
   void initState() {
     super.initState();
-    _picked = widget.initial;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        _mapController.move(_picked, _zoomDefault);
-      }
-    });
+    if (_searchingPlace) unawaited(_lookupPlace());
   }
 
   @override
   void dispose() {
+    _lookupTimer?.cancel();
+    _lookupRequest++; // la búsqueda pendiente ya no aplica
     _mapController.dispose();
     super.dispose();
   }
 
   void _onPositionChanged(MapCamera camera, bool hasGesture) {
-    if (widget.readOnly) return;
-    final s = camera.nonRotatedSize;
-    if (s.width == 0 || s.height == 0) return;
-    // Punto del mapa bajo la punta del pin (icono centrado y desplazado hacia arriba)
-    final tipScreen = Offset(s.width / 2, s.height / 2 + 4);
-    final c = camera.screenOffsetToLatLng(tipScreen);
-    if ((_picked.latitude - c.latitude).abs() < 1e-9 &&
-        (_picked.longitude - c.longitude).abs() < 1e-9) {
+    final c = camera.center;
+    // Un centro no válido nunca debe poder confirmarse ni guardarse
+    if (!c.latitude.isFinite || !c.longitude.isFinite) return;
+    // Menos de ~1 cm: redondeo de la cámara, no un punto nuevo
+    if ((_picked.latitude - c.latitude).abs() < 1e-7 &&
+        (_picked.longitude - c.longitude).abs() < 1e-7) {
       return;
     }
-    setState(() => _picked = c);
+    _lookupTimer?.cancel();
+    _lookupRequest++;
+    setState(() {
+      _picked = c;
+      _searchingPlace = true;
+    });
+    _lookupTimer = Timer(_lookupDelay, () => unawaited(_lookupPlace()));
   }
 
-  Future<void> _centerOnDevice() async {
+  /// Solo se aplica la respuesta del último punto
+  Future<void> _lookupPlace() async {
+    final request = ++_lookupRequest;
+    final label = await _lookup(_picked.latitude, _picked.longitude);
+    if (!mounted || request != _lookupRequest) return;
+    setState(() {
+      _place = label;
+      _searchingPlace = false;
+    });
+  }
+
+  Future<void> _centerOnDevice(BuildContext context) async {
     setState(() => _loadingGps = true);
     try {
       final p = await IncidentLocationService.getCurrentPosition();
       if (!mounted) return;
       if (p != null) {
-        final ll = LatLng(p.lat, p.lng);
-        setState(() => _picked = ll);
-        _mapController.move(ll, _zoomGps);
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(IncidentLocationService.errorMessageForNullResult()!),
-          ),
+        _mapController.move(LatLng(p.lat, p.lng), _zoomGps);
+      } else if (context.mounted) {
+        showAppSnackBar(
+          context,
+          IncidentLocationService.errorMessageForNullResult()!,
+          isError: true,
         );
       }
     } finally {
@@ -118,167 +171,292 @@ class _IncidentLocationMapDialogState extends State<IncidentLocationMapDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.sizeOf(context);
+    final readOnly = widget.readOnly;
     return Dialog(
-      insetPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 24),
+      insetPadding: const EdgeInsets.symmetric(
+        horizontal: TriageSpacing.md,
+        vertical: TriageSpacing.xxl,
+      ),
       clipBehavior: Clip.antiAlias,
+      backgroundColor: TriageColors.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(TriageRadii.xxl),
+      ),
       child: SizedBox(
-        width: size.width,
-        height: size.height * 0.82,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Material(
-              color: const Color(0xFFCE1125),
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
-                child: Row(
+        width: double.infinity,
+        height: MediaQuery.sizeOf(context).height * _heightFactor,
+        // Su propio aviso: el de la pantalla de debajo queda tapado por el modal
+        child: ScaffoldMessenger(
+          child: Scaffold(
+            backgroundColor: TriageColors.surface,
+            body: LayoutBuilder(
+              builder: (context, constraints) => Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        FlutterMap(
+                          mapController: _mapController,
+                          options: MapOptions(
+                            initialCenter: _picked,
+                            initialZoom: _zoomDefault,
+                            onPositionChanged: readOnly
+                                ? null
+                                : _onPositionChanged,
+                            interactionOptions: InteractionOptions(
+                              flags: readOnly
+                                  ? InteractiveFlag.none
+                                  : InteractiveFlag.all &
+                                        ~InteractiveFlag.rotate,
+                            ),
+                          ),
+                          children: const [TriageMapTiles()],
+                        ),
+                        IgnorePointer(
+                          child: Center(
+                            child: readOnly
+                                ? TriagePlacePin(semanticLabel: widget.title)
+                                : const TriagePlacePin(),
+                          ),
+                        ),
+                        Align(
+                          alignment: Alignment.topCenter,
+                          child: Padding(
+                            padding: const EdgeInsets.all(TriageSpacing.lg),
+                            child: _HeaderCard(
+                              maxHeight:
+                                  constraints.maxHeight * _headerMaxFactor,
+                              title: readOnly
+                                  ? widget.title
+                                  : 'Mueve el mapa para ajustar',
+                              subtitle: readOnly
+                                  ? null
+                                  : 'El pin marca el punto del incidente',
+                            ),
+                          ),
+                        ),
+                        if (!readOnly)
+                          Align(
+                            alignment: _centerButtonAlignment,
+                            child: Padding(
+                              padding: const EdgeInsetsDirectional.only(
+                                end: TriageSpacing.lg,
+                              ),
+                              child: _loadingGps
+                                  ? const _CenterLoading()
+                                  : TriageIconButton(
+                                      icon: TriageIcons.target,
+                                      tooltip: 'Centrar en mi ubicación',
+                                      onPressed: () =>
+                                          unawaited(_centerOnDevice(context)),
+                                      variant: TriageIconButtonVariant.surface,
+                                      diameter: TriageSizes.touchTarget,
+                                    ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  _ConfirmPanel(
+                    maxHeight: constraints.maxHeight * _panelMaxFactor,
+                    address: _searchingPlace
+                        ? 'Buscando dirección…'
+                        : _place ?? 'Ubicación seleccionada',
+                    coordinates:
+                        '${_picked.latitude.toStringAsFixed(4)}, '
+                        '${_picked.longitude.toStringAsFixed(4)}',
+                    onConfirm: readOnly
+                        ? null
+                        : () => Navigator.pop(context, _picked),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Tarjeta flotante de arriba: volver, y qué hacer en el mapa
+class _HeaderCard extends StatelessWidget {
+  const _HeaderCard({
+    required this.maxHeight,
+    required this.title,
+    this.subtitle,
+  });
+
+  /// Si el texto no cabe, se desplaza dentro de la tarjeta
+  final double maxHeight;
+  final String title;
+  final String? subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: TriageColors.surface,
+        borderRadius: BorderRadius.circular(TriageRadii.xxl),
+        boxShadow: TriageShadows.floating,
+      ),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxHeight: maxHeight),
+        child: SingleChildScrollView(
+          padding: const EdgeInsetsDirectional.fromSTEB(
+            TriageSpacing.sm,
+            TriageSpacing.sm,
+            TriageSpacing.lg,
+            TriageSpacing.sm,
+          ),
+          child: Row(
+            spacing: TriageSpacing.sm,
+            children: [
+              TriageIconButton(
+                icon: TriageIcons.arrowLeft,
+                tooltip: 'Volver',
+                onPressed: () => Navigator.pop(context),
+                diameter: TriageSizes.touchTargetCompact,
+              ),
+              Expanded(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    IconButton(
-                      onPressed: () => Navigator.pop(context),
-                      icon: const Icon(Icons.close, color: Colors.white),
+                    Text(
+                      title,
+                      style: TriageTextStyles.labelMedium.copyWith(
+                        color: TriageColors.textPrimary,
+                      ),
+                    ),
+                    if (subtitle != null)
+                      Text(
+                        subtitle!,
+                        style: TriageTextStyles.bodySmall.copyWith(
+                          color: TriageColors.textSecondary,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// «Centrar» mientras se lee el GPS: mismo círculo, con indicador de carga
+class _CenterLoading extends StatelessWidget {
+  const _CenterLoading();
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      label: 'Buscando tu ubicación',
+      child: SizedBox.square(
+        dimension: TriageSizes.touchTarget,
+        child: DecoratedBox(
+          decoration: const BoxDecoration(
+            color: TriageColors.surface,
+            shape: BoxShape.circle,
+            boxShadow: TriageShadows.base,
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(TriageSpacing.md),
+            child: CircularProgressIndicator(
+              strokeWidth: TriageSizes.strokeStrong,
+              color: context.triageRole.accent,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Panel inferior: dirección y coordenadas del punto y, si se puede elegir,
+/// el botón de confirmar
+class _ConfirmPanel extends StatelessWidget {
+  const _ConfirmPanel({
+    required this.maxHeight,
+    required this.address,
+    required this.coordinates,
+    required this.onConfirm,
+  });
+
+  /// Si el contenido no cabe, se desplaza dentro del panel
+  final double maxHeight;
+  final String address;
+  final String coordinates;
+  final VoidCallback? onConfirm;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: const BoxDecoration(
+        color: TriageColors.surface,
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(TriageRadii.xxl),
+        ),
+        boxShadow: TriageShadows.sheet,
+      ),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxHeight: maxHeight),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(
+            TriageSpacing.xl,
+            TriageSpacing.lg,
+            TriageSpacing.xl,
+            TriageSpacing.xl,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            spacing: TriageSpacing.md,
+            children: [
+              Semantics(
+                liveRegion: true,
+                child: Row(
+                  spacing: TriageSpacing.sm,
+                  children: [
+                    TriageIcon(
+                      TriageIcons.location,
+                      size: TriageSizes.icon,
+                      color: context.triageRole.accent,
                     ),
                     Expanded(
-                      child: Text(
-                        widget.title,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w600,
-                          fontSize: 16,
-                        ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            address,
+                            style: TriageTextStyles.labelLarge.copyWith(
+                              color: TriageColors.textPrimary,
+                            ),
+                          ),
+                          Text(
+                            coordinates,
+                            style: TriageTextStyles.bodySmall.copyWith(
+                              color: TriageColors.textSecondary,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
                 ),
               ),
-            ),
-            if (!widget.readOnly)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
-                child: Text(
-                  'El pin indica el punto. Arrastra el mapa para colocarlo; puedes acercar con gestos.',
-                  style: Theme.of(context).textTheme.bodySmall,
+              if (onConfirm != null)
+                TriageButton(
+                  label: 'Confirmar esta ubicación',
+                  onPressed: onConfirm,
                 ),
-              ),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      FlutterMap(
-                        mapController: _mapController,
-                        options: MapOptions(
-                          initialCenter: _picked,
-                          initialZoom: _zoomDefault,
-                          onPositionChanged: widget.readOnly
-                              ? null
-                              : _onPositionChanged,
-                          interactionOptions: widget.readOnly
-                              ? const InteractionOptions(
-                                  flags: InteractiveFlag.none,
-                                )
-                              : const InteractionOptions(),
-                        ),
-                        children: [
-                          TileLayer(
-                            urlTemplate:
-                                'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                            userAgentPackageName: 'sistema_triage',
-                          ),
-                        ],
-                      ),
-                      IgnorePointer(
-                        child: Align(
-                          alignment: Alignment.center,
-                          child: Transform.translate(
-                            offset: const Offset(0, -22),
-                            child: Icon(
-                              Icons.location_pin,
-                              size: 52,
-                              color: const Color(0xFFCE1125),
-                              shadows: const [
-                                Shadow(
-                                  blurRadius: 4,
-                                  color: Color(0x66000000),
-                                  offset: Offset(0, 1),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 4, 12, 4),
-              child: Text(
-                '${_picked.latitude.toStringAsFixed(6)}, ${_picked.longitude.toStringAsFixed(6)}',
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodyMedium,
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
-              child: widget.readOnly
-                  ? SizedBox(
-                      width: double.infinity,
-                      child: FilledButton(
-                        style: FilledButton.styleFrom(
-                          backgroundColor: const Color(0xFFCE1125),
-                        ),
-                        onPressed: () => Navigator.pop(context),
-                        child: const Text('Cerrar'),
-                      ),
-                    )
-                  : Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed: _loadingGps ? null : _centerOnDevice,
-                            child: _loadingGps
-                                ? const SizedBox(
-                                    width: 20,
-                                    height: 20,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                    ),
-                                  )
-                                : const Text('Mi ubicación (GPS)'),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: FilledButton(
-                            style: FilledButton.styleFrom(
-                              backgroundColor: const Color(0xFFCE1125),
-                            ),
-                            onPressed: () => Navigator.pop(
-                              context,
-                              LatLng(_picked.latitude, _picked.longitude),
-                            ),
-                            child: const Text('Usar esta ubicación'),
-                          ),
-                        ),
-                      ],
-                    ),
-            ),
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Text(
-                'Mapa © OpenStreetMap contributors',
-                textAlign: TextAlign.center,
-                style: Theme.of(
-                  context,
-                ).textTheme.labelSmall?.copyWith(color: Colors.black54),
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

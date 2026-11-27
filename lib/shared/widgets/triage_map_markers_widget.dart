@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:sistema_triage/core/constants/triage_icons.dart';
+import 'package:sistema_triage/core/layout/app_responsive.dart';
 import 'package:sistema_triage/core/theme/triage_level_style.dart';
 import 'package:sistema_triage/core/theme/triage_role_theme.dart';
 import 'package:sistema_triage/core/theme/triage_tokens.dart';
@@ -140,6 +141,58 @@ class TriageUserMarker extends StatelessWidget {
               ),
               child: marker,
             ),
+    );
+  }
+}
+
+/// Pin del punto que se está eligiendo (B06 · Ajustar ubicación): círculo del
+/// color del rol con el ícono de alerta y un halo translúcido. Va fijo en el
+/// centro del mapa; el punto elegido es el centro del círculo
+class TriagePlacePin extends StatelessWidget {
+  const TriagePlacePin({super.key, this.semanticLabel = 'Punto del incidente'});
+
+  final String semanticLabel;
+
+  // Medidas que solo tiene esta pieza
+  static const double _size = 52;
+  static const double _ring = 4;
+  static const double _halo = 96;
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = context.triageRole.accent;
+    final halo = context.rDim(_halo);
+    final size = context.rDim(_size);
+    return _MarkerTarget(
+      label: semanticLabel,
+      onTap: null,
+      child: Container(
+        width: halo,
+        height: halo,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: accent.withValues(alpha: TriageOpacity.pressed),
+          shape: BoxShape.circle,
+        ),
+        child: SizedBox.square(
+          dimension: size,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: accent,
+              shape: BoxShape.circle,
+              border: Border.all(color: TriageColors.surface, width: _ring),
+              boxShadow: TriageShadows.marker,
+            ),
+            child: const Center(
+              child: TriageIcon(
+                TriageIcons.alert,
+                size: TriageSizes.iconLarge,
+                color: TriageColors.textInverse,
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

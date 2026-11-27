@@ -170,6 +170,65 @@ void main() {
     });
   });
 
+  group('TriagePlacePin', () {
+    testWidgets('círculo de 52 del color del rol, aro blanco de 4, alerta en '
+        'blanco y halo de 96', (tester) async {
+      for (final role in [
+        TriageRoleTheme.paramedic,
+        TriageRoleTheme.hospital,
+      ]) {
+        await tester.pumpWidget(_wrap(const TriagePlacePin(), role: role));
+        await tester.pumpAndSettle(); // MaterialApp anima el cambio de tema
+
+        final halo =
+            tester
+                    .widget<Container>(
+                      find.descendant(
+                        of: find.byType(TriagePlacePin),
+                        matching: find.byType(Container),
+                      ),
+                    )
+                    .decoration!
+                as BoxDecoration;
+        expect(
+          halo.color,
+          role.accent.withValues(alpha: TriageOpacity.pressed),
+        );
+        expect(halo.shape, BoxShape.circle);
+
+        final circle = _decorationAt(tester, 1);
+        expect(circle.color, role.accent);
+        expect(circle.shape, BoxShape.circle);
+        expect(circle.boxShadow, TriageShadows.marker);
+        final ring = (circle.border! as Border).top;
+        expect(ring.color, TriageColors.surface);
+        expect(ring.width, 4);
+        expect(
+          tester.getSize(find.byType(DecoratedBox).at(1)),
+          const Size(52, 52),
+        );
+        expect(
+          tester.getSize(find.byType(DecoratedBox).first),
+          const Size(96, 96),
+        );
+
+        final icon = tester.widget<TriageIcon>(find.byType(TriageIcon));
+        expect(icon.asset, TriageIcons.alert);
+        expect(icon.color, TriageColors.textInverse);
+      }
+    });
+
+    testWidgets('se anuncia como el punto del incidente, sin ser botón', (
+      tester,
+    ) async {
+      await tester.pumpWidget(_wrap(const TriagePlacePin()));
+      expect(
+        tester.getSemantics(find.byType(TriagePlacePin)),
+        isSemantics(label: 'Punto del incidente', isButton: false),
+      );
+    });
+  });
+
   test('íconos con contraste ≥ 3 sobre su fondo', () {
     expect(
       _contrast(TriageColors.hospitalAccent, TriageColors.surface),
