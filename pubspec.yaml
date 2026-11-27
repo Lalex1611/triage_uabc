@@ -41,7 +41,7 @@ dependencies:
   http: ^1.6.0
   postgrest: ^2.7.0
   geolocator: ^14.0.2
-  flutter_map: ^8.3.0
+  flutter_map: ^8.3.2
   latlong2: ^0.9.1
   qr_flutter: ^4.1.0
   url_launcher: ^6.3.1
