@@ -143,11 +143,8 @@ class ParamedicoMapController extends ChangeNotifier {
       _dropSelection();
     }
     notifyListeners();
-    if (value == MapIncidentFilter.nearby) {
-      _fitNearbyArea();
-    } else {
-      goToRegionOverview();
-    }
+    // Solo «Cerca de mí» encuadra (su círculo); los demás respetan el mapa
+    if (value == MapIncidentFilter.nearby) _fitNearbyArea();
   }
 
   /// Encuadra el círculo de "Cerca de mí" alrededor del usuario
@@ -261,14 +258,17 @@ class ParamedicoMapController extends ChangeNotifier {
       try {
         op();
       } catch (_) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (_disposed) return;
-          try {
-            op();
-          } catch (e) {
-            debugPrint('Movimiento de cámara descartado: $e');
-          }
-        });
+        WidgetsBinding.instance
+          ..addPostFrameCallback((_) {
+            if (_disposed) return;
+            try {
+              op();
+            } catch (e) {
+              debugPrint('Movimiento de cámara descartado: $e');
+            }
+          })
+          // Sin esto, el reintento espera a que algo más pida un fotograma
+          ..ensureVisualUpdate();
       }
     });
   }
@@ -685,11 +685,11 @@ class ParamedicoMapController extends ChangeNotifier {
     }
   }
 
+  /// Suelta el incidente sin mover la cámara: el usuario sigue donde estaba
   void clearSelection() {
     if (selectedIncidentId == null) return;
     _dropSelection();
     notifyListeners();
-    goToRegionOverview();
   }
 
   void _dropSelection() {
@@ -724,11 +724,17 @@ class ParamedicoMapController extends ChangeNotifier {
         if (_disposed) return;
         if (last != null) known = LatLng(last.lat, last.lng);
       }
+      // Dónde queda la cámara: si sigue ahí al llegar el GPS, nadie la movió
+      ({LatLng center, double zoom})? left;
       if (known != null) {
-        _moveToUser(known);
+        final target = known;
+        // Solo la cámara: una posición guardada no vale para «Cerca de mí»
+        _safeMapOp(() => mapController.move(target, userZoom));
+        left = (center: target, zoom: userZoom);
       } else {
         locating = true;
         notifyListeners();
+        left = _cameraNow();
       }
 
       final pos = await IncidentLocationService.getCurrentPosition();
@@ -747,11 +753,10 @@ class ParamedicoMapController extends ChangeNotifier {
       }
       final fresh = LatLng(pos.lat, pos.lng);
       _syncLive(); // Por si el permiso se acaba de conceder
-      if (known == null || _cameraStillAt(known)) {
-        _moveToUser(fresh);
-      } else {
-        userPosition = fresh;
-        notifyListeners();
+      userPosition = fresh;
+      notifyListeners();
+      if (left == null || _cameraStillAt(left)) {
+        _safeMapOp(() => mapController.move(fresh, userZoom));
       }
     } finally {
       _locateInFlight = false;
@@ -762,22 +767,24 @@ class ParamedicoMapController extends ChangeNotifier {
     }
   }
 
-  void _moveToUser(LatLng p) {
-    userPosition = p;
-    notifyListeners();
-    _safeMapOp(() => mapController.move(p, userZoom));
-  }
-
-  /// La cámara sigue donde la dejó [_moveToUser]: el usuario no la movió
-  bool _cameraStillAt(LatLng p) {
-    if (!_mapReady) return true;
+  /// Cámara actual, o null si el mapa aún no la tiene
+  ({LatLng center, double zoom})? _cameraNow() {
+    if (!_mapReady) return null;
     try {
       final camera = mapController.camera;
-      return camera.zoom == userZoom &&
-          const Distance().as(LengthUnit.Meter, camera.center, p) < 1;
+      return (center: camera.center, zoom: camera.zoom);
     } catch (_) {
-      return false;
+      return null;
     }
+  }
+
+  /// La cámara sigue en [left]: el usuario no la movió
+  bool _cameraStillAt(({LatLng center, double zoom}) left) {
+    if (!_mapReady) return true;
+    final now = _cameraNow();
+    return now != null &&
+        now.zoom == left.zoom &&
+        const Distance().as(LengthUnit.Meter, now.center, left.center) < 1;
   }
 
   void openIncidentDetail(BuildContext context, String incidentId) {

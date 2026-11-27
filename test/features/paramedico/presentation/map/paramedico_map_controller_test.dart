@@ -269,6 +269,28 @@ void main() {
     expect(c.selectedIncidentId, isNull);
   });
 
+  testWidgets('soltar el incidente o volver a «Todos» no mueve el mapa', (
+    tester,
+  ) async {
+    final map = _FakeMap();
+    final c = ParamedicoMapController(
+      store: ParamedicoIncidentsStore()..incidents = [_incident('a')],
+      mapController: map,
+    )..markMapReady();
+    addTearDown(c.dispose);
+    final context = await _pumpContext(tester);
+    c.userPosition = const LatLng(32.51, -117.01);
+
+    c.onPinTap(_incident('a'));
+    c.onMapBackgroundTap();
+    expect(map.calls, isEmpty, reason: 'el usuario sigue donde estaba');
+
+    await c.setFilter(context, MapIncidentFilter.nearby);
+    map.calls.clear(); // «Cerca de mí» sí encuadra su círculo
+    await c.setFilter(context, MapIncidentFilter.all);
+    expect(map.calls, isEmpty);
+  });
+
   testWidgets('desde la ficha de un paciente se puede volver a ella', (
     tester,
   ) async {
@@ -454,9 +476,31 @@ void main() {
       expect(map.moves, [known]);
       expect(c.locating, isFalse);
 
-      gps.current.complete(fresh);
+      gps.current.complete(null); // El GPS no responde
       await done;
+      expect(
+        c.userPosition,
+        isNull,
+        reason: 'una posición guardada no vale para «Cerca de mí»',
+      );
     });
+
+    testWidgets(
+      'sin nada conocido, si el usuario mueve el mapa, el GPS no lo arrastra',
+      (tester) async {
+        final gps = _Gps();
+        final (c, map, context) = await setUpMap(tester);
+
+        final done = c.centerOnUser(context);
+        await tester.pump();
+        map.center = const LatLng(32.6, -117.1); // Lo arrastró mientras tanto
+        gps.current.complete(fresh);
+        await done;
+
+        expect(map.moves, isEmpty);
+        expect(c.userPosition, fresh);
+      },
+    );
 
     testWidgets('sin nada conocido espera al GPS y no repite la búsqueda', (
       tester,
