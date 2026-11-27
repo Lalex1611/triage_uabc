@@ -90,16 +90,12 @@ void main() {
     });
   });
 
-  group('TriageHospitalMarker y TriageUnitMarker', () {
-    testWidgets('recuadro de 38 con el ícono de cada uno', (tester) async {
+  group('TriageHospitalMarker', () {
+    testWidgets('recuadro de 38 con el ícono de hospital', (tester) async {
       final markers = {
         const TriageHospitalMarker(): (
           TriageIcons.hospital,
           TriageColors.hospitalAccent,
-        ),
-        const TriageUnitMarker(): (
-          TriageIcons.ambulance,
-          TriageColors.textPrimary,
         ),
       };
       for (final MapEntry(key: marker, value: expected) in markers.entries) {
@@ -140,10 +136,10 @@ void main() {
     });
 
     testWidgets('sin toque no se anuncia como botón', (tester) async {
-      await tester.pumpWidget(_wrap(const TriageUnitMarker()));
+      await tester.pumpWidget(_wrap(const TriageHospitalMarker()));
       expect(
-        tester.getSemantics(find.byType(TriageUnitMarker)),
-        isSemantics(label: 'Unidad de ambulancia', isButton: false),
+        tester.getSemantics(find.byType(TriageHospitalMarker)),
+        isSemantics(label: 'Hospital', isButton: false),
       );
     });
   });

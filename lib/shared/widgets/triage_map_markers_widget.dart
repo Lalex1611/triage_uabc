@@ -91,26 +91,6 @@ class TriageHospitalMarker extends StatelessWidget {
   );
 }
 
-/// Marcador de unidad de ambulancia
-class TriageUnitMarker extends StatelessWidget {
-  const TriageUnitMarker({
-    super.key,
-    this.onTap,
-    this.semanticLabel = 'Unidad de ambulancia',
-  });
-
-  final VoidCallback? onTap;
-  final String semanticLabel;
-
-  @override
-  Widget build(BuildContext context) => _PlaceMarker(
-    icon: TriageIcons.ambulance,
-    iconColor: TriageColors.textPrimary,
-    label: semanticLabel,
-    onTap: onTap,
-  );
-}
-
 /// Marcador de la posición del usuario. Azul en los dos roles, como en Figma
 ///
 /// [showHalo] añade el círculo translúcido del mapa en vivo (B01); entonces el
