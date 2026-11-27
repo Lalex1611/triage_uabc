@@ -3,7 +3,7 @@ import 'package:sistema_triage/features/auth/domain/constants/auth_role_type.dar
 import 'package:sistema_triage/shared/widgets/triage_ui.dart';
 
 /// Campo de acceso: conserva el límite de 60 caracteres del formulario actual.
-class AuthTextField extends StatelessWidget {
+class AuthTextField extends StatefulWidget {
   final String label;
   final String hint;
   final AuthRoleType roleType;
@@ -26,6 +26,13 @@ class AuthTextField extends StatelessWidget {
   });
 
   @override
+  State<AuthTextField> createState() => _AuthTextFieldState();
+}
+
+class _AuthTextFieldState extends State<AuthTextField> {
+  bool _passwordVisible = false;
+
+  @override
   Widget build(BuildContext context) {
     OutlineInputBorder border(
       Color color, [
@@ -39,28 +46,46 @@ class AuthTextField extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
       children: [
-        MergeSemantics(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                label,
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            ExcludeSemantics(
+              child: Text(
+                widget.label,
                 style: TriageTextStyles.labelMedium.copyWith(
                   color: TriageColors.textSecondary,
                 ),
               ),
-              const SizedBox(height: TriageSpacing.sm),
-              TextField(
-                controller: controller,
-                obscureText: isPassword,
+            ),
+            const SizedBox(height: TriageSpacing.sm),
+            Semantics(
+              label: widget.label,
+              child: TextField(
+                controller: widget.controller,
+                obscureText: widget.isPassword && !_passwordVisible,
                 maxLength: 60,
-                onChanged: onChanged,
+                onChanged: widget.onChanged,
                 style: TriageTextStyles.bodyMedium.copyWith(
                   color: TriageColors.textPrimary,
                 ),
                 decoration: InputDecoration(
                   counterText: '',
-                  hintText: hint,
+                  hintText: widget.hint,
+                  suffixIcon: widget.isPassword
+                      ? TriageIconButton(
+                          icon: TriageIcons.eye,
+                          tooltip: _passwordVisible
+                              ? 'Ocultar contraseña'
+                              : 'Mostrar contraseña',
+                          variant: TriageIconButtonVariant.plain,
+                          color: _passwordVisible
+                              ? context.triageRole.accent
+                              : TriageColors.textSecondary,
+                          onPressed: () => setState(
+                            () => _passwordVisible = !_passwordVisible,
+                          ),
+                        )
+                      : null,
                   hintStyle: TriageTextStyles.bodyMedium.copyWith(
                     color: TriageColors.textSecondary,
                   ),
@@ -71,23 +96,27 @@ class AuthTextField extends StatelessWidget {
                     vertical: TriageSpacing.md,
                   ),
                   enabledBorder: border(
-                    hasError ? TriageColors.danger : TriageColors.borderMedium,
+                    widget.hasError
+                        ? TriageColors.danger
+                        : TriageColors.borderMedium,
                   ),
                   focusedBorder: border(
-                    hasError ? TriageColors.danger : context.triageRole.accent,
+                    widget.hasError
+                        ? TriageColors.danger
+                        : context.triageRole.accent,
                     TriageSizes.strokeStrong,
                   ),
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
-        if (isPassword && onForgotPassword != null) ...[
+        if (widget.isPassword && widget.onForgotPassword != null) ...[
           const SizedBox(height: TriageSpacing.xs),
           Align(
             alignment: Alignment.centerRight,
             child: TextButton(
-              onPressed: onForgotPassword,
+              onPressed: widget.onForgotPassword,
               style: TextButton.styleFrom(
                 foregroundColor: context.triageRole.accent,
                 textStyle: TriageTextStyles.labelMedium,
