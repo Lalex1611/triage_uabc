@@ -136,6 +136,8 @@ class CreateIncidentController extends ChangeNotifier {
       context,
       lat: lat,
       lng: lng,
+      // Solo si es la del punto actual; si no, el modal la busca
+      placeLabel: locationConfirmed && !refreshingPlace ? placeLabel : null,
     );
     if (result == null) return;
     lat = result.latitude;
