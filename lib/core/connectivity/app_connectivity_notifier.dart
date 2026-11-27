@@ -93,7 +93,9 @@ class AppConnectivityNotifier extends ChangeNotifier {
 
   Future<bool> _probeBackend() async {
     try {
-      final uri = Uri.parse(SupabaseEnv.projectUrl);
+      // La raíz responde 404 sin cabeceras CORS: en la web el navegador
+      // bloquea la respuesta y la app se creería sin conexión
+      final uri = Uri.parse('${SupabaseEnv.projectUrl}/auth/v1/health');
       final response = await http
           .get(uri, headers: {'apikey': SupabaseEnv.anonKey})
           .timeout(const Duration(seconds: 4));
