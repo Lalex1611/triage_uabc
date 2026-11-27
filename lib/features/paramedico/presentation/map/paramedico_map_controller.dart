@@ -75,6 +75,12 @@ class ParamedicoMapController extends ChangeNotifier {
   List<HospitalRow> hospitals = [];
   int unreadNotifications = 0;
 
+  /// Red de seguridad por si Realtime se cae o un aviso no llega por el canal
+  static const Duration _notificationPollInterval = Duration(seconds: 8);
+  Timer? _notificationPollTimer;
+  RealtimeChannel? _notificationRealtimeChannel;
+  bool _refreshingNotifications = false;
+
   // Capas del mapa (panel "Capas del mapa")
   bool showIncidents = true;
   bool showHospitals = true;
@@ -115,6 +121,7 @@ class ParamedicoMapController extends ChangeNotifier {
   void dispose() {
     _disposed = true;
     _stopLive();
+    _stopNotificationSubscription();
     _store.removeListener(_onStoreChanged);
     searchController.dispose();
     mapController.dispose();
@@ -200,11 +207,71 @@ class ParamedicoMapController extends ChangeNotifier {
   }
 
   Future<void> refreshUnreadNotifications() async {
+    if (!SupabaseEnv.isConfigured || _disposed) return;
+    // El polling y Realtime pueden coincidir: basta una consulta a la vez
+    if (_refreshingNotifications) return;
+    _refreshingNotifications = true;
+    try {
+      final count = await ParamedicoNotificationsAction.unreadCount(
+        _notificationsRepo,
+      );
+      if (_disposed || count == unreadNotifications) return;
+      unreadNotifications = count;
+      notifyListeners();
+    } finally {
+      _refreshingNotifications = false;
+    }
+  }
+
+  /// Polling + Realtime sobre `paramedic_notifications` para que la campana
+  /// vea los avisos de traslado aceptado o rechazado sin salir del mapa
+  void _startNotificationSubscription() {
+    _stopNotificationSubscription();
     if (!SupabaseEnv.isConfigured) return;
-    unreadNotifications = await ParamedicoNotificationsAction.unreadCount(
-      _notificationsRepo,
-    );
-    notifyListeners();
+
+    unawaited(refreshUnreadNotifications());
+
+    _notificationPollTimer = Timer.periodic(_notificationPollInterval, (_) {
+      unawaited(refreshUnreadNotifications());
+    });
+
+    final uid = Supabase.instance.client.auth.currentUser?.id;
+    if (uid == null) return;
+
+    try {
+      final channel = Supabase.instance.client.channel(
+        'paramedic_notifications_$uid',
+      );
+      channel.onPostgresChanges(
+        event: PostgresChangeEvent.all,
+        schema: 'public',
+        table: 'paramedic_notifications',
+        filter: PostgresChangeFilter(
+          type: PostgresChangeFilterType.eq,
+          column: 'recipient_id',
+          value: uid,
+        ),
+        callback: (_) {
+          unawaited(refreshUnreadNotifications());
+        },
+      );
+      _notificationRealtimeChannel = channel;
+      channel.subscribe();
+    } catch (_) {
+      // Si Realtime no está habilitado para la tabla, solo queda el polling
+    }
+  }
+
+  void _stopNotificationSubscription() {
+    _notificationPollTimer?.cancel();
+    _notificationPollTimer = null;
+    final ch = _notificationRealtimeChannel;
+    _notificationRealtimeChannel = null;
+    if (ch != null && SupabaseEnv.isConfigured) {
+      try {
+        unawaited(Supabase.instance.client.removeChannel(ch));
+      } catch (_) {}
+    }
   }
 
   Future<void> openNotifications(BuildContext context) {
@@ -284,7 +351,7 @@ class ParamedicoMapController extends ChangeNotifier {
     _store.addListener(_onStoreChanged);
     unawaited(_initUserPosition());
     unawaited(_loadHospitals());
-    unawaited(refreshUnreadNotifications());
+    _startNotificationSubscription();
   }
 
   /// Si el incidente elegido se cerró o borró (aquí o en otro dispositivo),
