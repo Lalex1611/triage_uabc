@@ -74,8 +74,6 @@ class IncidentDetailsController extends ChangeNotifier {
     return IncidentDetailsShellMode.ready;
   }
 
-  String get routeBase => '/paramedico/incident/$incidentId';
-
   List<ImageProvider> get incidentPhotos =>
       IncidentDetailsViewMapper.photoImages(
         paths: incident?.photoPaths ?? const [],

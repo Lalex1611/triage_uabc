@@ -1,5 +1,4 @@
 import 'package:latlong2/latlong.dart';
-import 'package:sistema_triage/core/constants/app_icons.dart';
 import 'package:sistema_triage/features/paramedico/domain/entities/map/map_patient_pin.dart';
 
 /// Radio de cobertura y visibilidad de pacientes en el mapa interactivo
@@ -24,15 +23,15 @@ class MapIncidentCoverageService {
   static const Distance _distance = Distance();
 
   /// Radio en metros hasta el paciente más lejano (+ margen). Sin inflar con mínimos grandes
-  static double radiusMeters(LatLng incidentCenter, List<MapPatientPin> patients) {
+  static double radiusMeters(
+    LatLng incidentCenter,
+    List<MapPatientPin> patients,
+  ) {
     if (patients.isEmpty) return defaultRadiusMeters;
 
     var maxM = 0.0;
     for (final p in patients) {
-      final m = _distance(
-        incidentCenter,
-        LatLng(p.latitude, p.longitude),
-      );
+      final m = _distance(incidentCenter, LatLng(p.latitude, p.longitude));
       if (m > maxPatientDistanceFromIncidentMeters) continue;
       if (m > maxM) maxM = m;
     }
@@ -43,10 +42,7 @@ class MapIncidentCoverageService {
   }
 
   /// Puntos en el borde del círculo de cobertura (para encuadrar el mapa)
-  static List<LatLng> coverageExtentPoints(
-    LatLng center,
-    double radiusMeters,
-  ) {
+  static List<LatLng> coverageExtentPoints(LatLng center, double radiusMeters) {
     if (radiusMeters <= 0) return [center];
     return [
       _distance.offset(center, radiusMeters, 0),
@@ -93,21 +89,5 @@ class MapIncidentCoverageService {
     if (zoom < minZoomForPatients) return false;
     final distM = _distance(cameraCenter, incidentCenter);
     return distM <= radiusMeters;
-  }
-
-  static String triageLocationIcon(String triageColor) {
-    switch (triageColor) {
-      case 'rojo':
-        return AppIcons.unicoPacienteLocationRojo;
-      case 'verde':
-      case 'azul':
-        return AppIcons.unicoPacienteLocationVerde;
-      case 'negro':
-        return AppIcons.unicoPacienteLocationNegro;
-      case 'amarillo':
-      case 'naranja':
-      default:
-        return AppIcons.unicoPacienteLocationAmarillo;
-    }
   }
 }

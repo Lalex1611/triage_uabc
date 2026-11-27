@@ -1,13 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:sistema_triage/core/theme/app_theme.dart';
-import 'package:sistema_triage/shared/widgets/app_header.dart';
+import 'package:sistema_triage/features/medico/presentation/home/widgets/medico_home_header_widget.dart';
 import 'package:sistema_triage/features/medico/presentation/home/widgets/medico_minidash_widget.dart';
 import 'package:sistema_triage/features/medico/presentation/home/widgets/medico_search_bar_widget.dart';
 import 'package:sistema_triage/features/medico/presentation/home/widgets/medico_patient_card_widget.dart';
 import 'package:sistema_triage/features/medico/presentation/navigation/medico_navbar_widget.dart';
 
-import 'package:sistema_triage/core/constants/app_colors.dart';
-import 'package:sistema_triage/core/constants/app_icons.dart';
 import 'package:sistema_triage/features/medico/domain/entities/home/medico_user_stats.dart';
 import 'package:sistema_triage/features/medico/domain/entities/home/medico_patient_card_data.dart';
 import 'package:sistema_triage/features/paramedico/domain/constants/patient_status.dart';
@@ -113,15 +111,12 @@ class _MedicoHomeVisualTestState extends State<MedicoHomeVisualTest> {
         body: Column(
           children: [
             // --- SECCIÓN FIJA (HEADER Y DASHBOARD) ---
-            AppHeader(
-              type: HeaderType.home,
-              color: AppColors.primaryMedico,
-              isConnected: true,
+            MedicoHomeHeader(
+              userName: mockStats.userName,
+              hospitalLabel: 'Cruz Roja - Tijuana',
               hasNotifications: false,
-              subtitle: 'Cruz Roja - Tijuana',
-              logoPath: AppIcons.medicoHeaderLogo,
-              notificationIconPath: AppIcons.medicoHeaderNotification,
-              profileIconPath: AppIcons.medicoHeaderProfile,
+              onNotificationTap: () {},
+              onProfileTap: () {},
             ),
             const MedicoMinidash(userstats: mockStats),
 

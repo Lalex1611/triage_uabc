@@ -3,73 +3,9 @@ import 'package:flutter/material.dart';
 class AppTextStyles {
   static const String fontFamily = 'EncodeSansCondensed_mainTypo';
 
-  /* ─── THIN (w100) ────────────────────────────────────────────────────────── */
-  static const TextStyle ESC_Thin_displayLarge = TextStyle(
-    fontFamily: fontFamily,
-    fontSize: 32,
-    fontWeight: FontWeight.w100,
-  );
-  static const TextStyle ESC_Thin_titleLarge = TextStyle(
-    fontFamily: fontFamily,
-    fontSize: 16,
-    fontWeight: FontWeight.w100,
-  );
-  static const TextStyle ESC_Thin_bodyLarge = TextStyle(
-    fontFamily: fontFamily,
-    fontSize: 16,
-    fontWeight: FontWeight.w100,
-  );
-  static const TextStyle ESC_Thin_bodyMedium = TextStyle(
-    fontFamily: fontFamily,
-    fontSize: 14,
-    fontWeight: FontWeight.w100,
-  );
-
-  /* ─── EXTRA LIGHT (w200) ─────────────────────────────────────────────────── */
-  static const TextStyle ESC_ExtraLight_displayLarge = TextStyle(
-    fontFamily: fontFamily,
-    fontSize: 32,
-    fontWeight: FontWeight.w200,
-  );
-  static const TextStyle ESC_ExtraLight_titleLarge = TextStyle(
-    fontFamily: fontFamily,
-    fontSize: 16,
-    fontWeight: FontWeight.w200,
-  );
-  static const TextStyle ESC_ExtraLight_bodyMedium = TextStyle(
-    fontFamily: fontFamily,
-    fontSize: 14,
-    fontWeight: FontWeight.w200,
-  );
-
   /* ─── LIGHT (w300) ───────────────────────────────────────────────────────── */
-  static const TextStyle ESC_Light_displayLarge = TextStyle(
-    fontFamily: fontFamily,
-    fontSize: 32,
-    fontWeight: FontWeight.w300,
-  );
-  static const TextStyle ESC_Light_titleLarge = TextStyle(
-    fontFamily: fontFamily,
-    fontSize: 16,
-    fontWeight: FontWeight.w300,
-  );
-  static const TextStyle ESC_Light_bodyMedium = TextStyle(
-    fontFamily: fontFamily,
-    fontSize: 14,
-    fontWeight: FontWeight.w300,
-  );
 
   /* ─── REGULAR (w400) ─────────────────────────────────────────────────────── */
-  static const TextStyle ESC_Regular_displayLarge = TextStyle(
-    fontFamily: fontFamily,
-    fontSize: 32,
-    fontWeight: FontWeight.w400,
-  );
-  static const TextStyle ESC_Regular_titleLarge = TextStyle(
-    fontFamily: fontFamily,
-    fontSize: 16,
-    fontWeight: FontWeight.w400,
-  );
   static const TextStyle ESC_Regular_bodyLarge = TextStyle(
     fontFamily: fontFamily,
     fontSize: 16,
@@ -82,16 +18,6 @@ class AppTextStyles {
   );
 
   /* ─── MEDIUM (w500) ──────────────────────────────────────────────────────── */
-  static const TextStyle ESC_Medium_displayLarge = TextStyle(
-    fontFamily: fontFamily,
-    fontSize: 32,
-    fontWeight: FontWeight.w500,
-  );
-  static const TextStyle ESC_Medium_titleLarge = TextStyle(
-    fontFamily: fontFamily,
-    fontSize: 16,
-    fontWeight: FontWeight.w500,
-  );
   static const TextStyle ESC_Medium_titleMedium = TextStyle(
     fontFamily: fontFamily,
     fontSize: 15,
@@ -155,30 +81,6 @@ class AppTextStyles {
     fontFamily: fontFamily,
     fontSize: 12,
     fontWeight: FontWeight.w700,
-  );
-
-  /* ─── EXTRA BOLD (w800) ──────────────────────────────────────────────────── */
-  static const TextStyle ESC_ExtraBold_displayLarge = TextStyle(
-    fontFamily: fontFamily,
-    fontSize: 32,
-    fontWeight: FontWeight.w800,
-  );
-  static const TextStyle ESC_ExtraBold_titleLarge = TextStyle(
-    fontFamily: fontFamily,
-    fontSize: 16,
-    fontWeight: FontWeight.w800,
-  );
-
-  /* ─── BLACK (w900) ───────────────────────────────────────────────────────── */
-  static const TextStyle ESC_Black_displayLarge = TextStyle(
-    fontFamily: fontFamily,
-    fontSize: 32,
-    fontWeight: FontWeight.w900,
-  );
-  static const TextStyle ESC_Black_titleLarge = TextStyle(
-    fontFamily: fontFamily,
-    fontSize: 16,
-    fontWeight: FontWeight.w900,
   );
 }
 

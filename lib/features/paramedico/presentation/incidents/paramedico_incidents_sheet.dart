@@ -1,17 +1,13 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:sistema_triage/core/constants/triage_icons.dart';
 import 'package:sistema_triage/core/router/paramedico_stack_nav.dart';
-import 'package:sistema_triage/core/theme/triage_role_theme.dart';
-import 'package:sistema_triage/core/theme/triage_tokens.dart';
 import 'package:sistema_triage/core/util/time_ago.dart';
 import 'package:sistema_triage/features/paramedico/data/repositories/paramedico_incidents_repository.dart';
 import 'package:sistema_triage/features/paramedico/domain/constants/incident_sorting_options.dart';
 import 'package:sistema_triage/features/paramedico/domain/services/incident_list_query.dart';
 import 'package:sistema_triage/features/paramedico/presentation/create_incident/create_incident_sheet.dart';
 import 'package:sistema_triage/features/paramedico/presentation/incidents/paramedico_incidents_controller.dart';
-import 'package:sistema_triage/shared/domain/triage_level.dart';
 import 'package:sistema_triage/shared/widgets/triage_ui.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
