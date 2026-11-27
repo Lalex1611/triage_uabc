@@ -88,7 +88,23 @@ class AuthGate extends ChangeNotifier {
     await syncFromSession();
   }
 
+  Future<void>? _latestSync;
+
+  /// Consulta el perfil de la sesión actual. Si mientras tanto empieza otra
+  /// consulta (p. ej. la del aviso `signedIn` al iniciar sesión), espera a la
+  /// más reciente: la primera se descarta y quien la pidió leería un rol
+  /// vacío.
   Future<void> syncFromSession() async {
+    var current = _syncProfile();
+    _latestSync = current;
+    await current;
+    while (!identical(_latestSync, current)) {
+      current = _latestSync!;
+      await current;
+    }
+  }
+
+  Future<void> _syncProfile() async {
     final requestSequence = ++_profileRequestSequence;
     lastVerificationSucceeded = false;
     if (!SupabaseEnv.isConfigured) {

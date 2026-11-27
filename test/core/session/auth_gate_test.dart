@@ -117,6 +117,29 @@ void main() {
     expect(gate.fullName, 'Reciente');
   });
 
+  test(
+    'una consulta reemplazada espera el perfil de la más reciente',
+    () async {
+      final oldProfile = Completer<Map<String, Object?>>();
+      final newProfile = Completer<Map<String, Object?>>();
+      profiles.addAll([() => oldProfile.future, () => newProfile.future]);
+      // Como al iniciar sesión: el botón consulta y luego el aviso `signedIn`
+      final login = gate.syncFromSession();
+      final authEvent = gate.syncFromSession();
+      oldProfile.complete(profile('Atrasado'));
+      var loginDone = false;
+      unawaited(login.then((_) => loginDone = true));
+      await Future<void>.delayed(Duration.zero);
+      expect(loginDone, isFalse);
+
+      newProfile.complete(profile('Vigente'));
+      await login;
+      expect(gate.role, AppUserRole.paramedico);
+      expect(gate.fullName, 'Vigente');
+      await authEvent;
+    },
+  );
+
   http.Response rejectedToken() => http.Response(
     jsonEncode({'code': 'PGRST301', 'message': 'Token rechazado'}),
     401,
