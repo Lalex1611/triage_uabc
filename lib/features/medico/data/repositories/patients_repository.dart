@@ -401,31 +401,6 @@ class PatientsRepository {
     );
   }
 
-  Future<List<MedicoPatientCardData>> fetchRejectedTransfers({
-    required String hospitalId,
-  }) async {
-    final rows = await _c
-        .from('medico_rejected_transfers')
-        .select('patient_id, reason, patients($_patientCardSelect)')
-        .eq('hospital_id', hospitalId)
-        .order('created_at', ascending: false);
-
-    final list = rows as List<dynamic>;
-    final out = <MedicoPatientCardData>[];
-    for (final e in list) {
-      final m = e as Map<String, dynamic>;
-      final p = m['patients'];
-      if (p is! Map<String, dynamic>) continue;
-      final reason = (m['reason'] as String?)?.trim() ?? '';
-      final card = _mapRow(p, number: out.length + 1).copyWith(
-        footerNote: reason.isEmpty ? null : 'Motivo rechazo: $reason',
-        isRejectedTransfer: true,
-      );
-      out.add(card);
-    }
-    return out;
-  }
-
   Future<List<MedicoNotificationItem>> fetchMedicoNotifications() async {
     final uid = _c.auth.currentUser?.id;
     if (uid == null) return [];

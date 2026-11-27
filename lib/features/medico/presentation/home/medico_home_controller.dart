@@ -44,7 +44,6 @@ class MedicoHomeController extends ChangeNotifier {
   Map<String, DateTime> dischargedAt = {};
 
   List<MedicoPatientCardData> patients = [];
-  List<MedicoPatientCardData> rejectedPatients = [];
   List<MedicoNotificationItem> medicoNotifications = [];
   bool loading = true;
   String? error;
@@ -301,23 +300,16 @@ class MedicoHomeController extends ChangeNotifier {
   /// "Llegando ahora": pacientes aún no recibidos por el hospital, filtrados
   /// por color de triage y por el buscador
   List<MedicoPatientCardData> incomingPatientsFiltered() {
-    final rejectedIds = _rejectedPatientIds();
     return patients
         .where(
           (p) =>
               (p.status == PatientStatus.trasladando ||
                   p.status == PatientStatus.enEspera) &&
-              !rejectedIds.contains(p.patientRecordId) &&
               _matchesColor(activeFilter, p) &&
               _matchesSearch(p, searchQuery),
         )
         .toList();
   }
-
-  Set<String> _rejectedPatientIds() => rejectedPatients
-      .map((p) => p.patientRecordId)
-      .where((id) => id.isNotEmpty)
-      .toSet();
 
   bool get hasUnreadMedicoNotifications =>
       medicoNotifications.any((n) => n.isUnread);
@@ -485,7 +477,6 @@ class MedicoHomeController extends ChangeNotifier {
       error =
           'Configura SUPABASE_URL y SUPABASE_ANON_KEY con --dart-define para cargar pacientes.';
       patients = [];
-      rejectedPatients = [];
       medicoNotifications = [];
       notifyListeners();
       return;
@@ -539,7 +530,11 @@ class MedicoHomeController extends ChangeNotifier {
   /// Número de la carga de pacientes más reciente; solo esa puede guardar
   int _fetchGeneration = 0;
 
-  /// Pacientes del hospital, traslados rechazados y tiempos de la Sala.
+  /// Pacientes del hospital y tiempos de la Sala.
+  ///
+  /// No se ocultan los traslados que el hospital rechazó antes: el rechazo
+  /// deja al paciente sin hospital, así que si vuelve a esta lista es porque
+  /// el paramédico lo envió de nuevo.
   /// Los datos se reemplazan solo si todo se obtuvo bien y si no empezó
   /// otra carga mientras tanto (`load()` y la recarga silenciosa pueden
   /// cruzarse; una respuesta vieja no debe pisar una más nueva).
@@ -548,26 +543,10 @@ class MedicoHomeController extends ChangeNotifier {
     final generation = ++_fetchGeneration;
     final hid = AuthGate.instance.hospitalId;
     final list = await _repo.fetchForMedico(hospitalIdFromProfile: hid);
-    var rejected = <MedicoPatientCardData>[];
-    if (hid != null && hid.isNotEmpty) {
-      try {
-        rejected = await _repo.fetchRejectedTransfers(hospitalId: hid);
-      } catch (_) {
-        rejected = [];
-      }
-    }
-    final rejectedIds = rejected
-        .map((p) => p.patientRecordId)
-        .where((id) => id.isNotEmpty)
-        .toSet();
-    final visible = rejectedIds.isEmpty
-        ? list
-        : list.where((p) => !rejectedIds.contains(p.patientRecordId)).toList();
-    final timestamps = await _loadSalaTimestamps(visible);
+    final timestamps = await _loadSalaTimestamps(list);
 
     if (generation != _fetchGeneration) return false;
-    rejectedPatients = rejected;
-    patients = visible;
+    patients = list;
     receivedAt = timestamps.receivedAt;
     dischargedAt = timestamps.dischargedAt;
     return true;
