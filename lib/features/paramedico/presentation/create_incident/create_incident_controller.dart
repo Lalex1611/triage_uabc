@@ -17,13 +17,17 @@ class CreateIncidentController extends ChangeNotifier {
     ParamedicoIncidentsRepository? repository,
     TextEditingController? descriptionController,
     ImagePicker? picker,
+    Future<String?> Function(double lat, double lng)? placeLookup,
   }) : _repo = repository ?? ParamedicoIncidentsRepository(),
        descriptionController = descriptionController ?? TextEditingController(),
-       _picker = picker ?? ImagePicker();
+       _picker = picker ?? ImagePicker(),
+       _placeLookup = placeLookup ?? NominatimReverseGeocode.shortPlaceLabel;
 
   final ParamedicoIncidentsRepository _repo;
   final TextEditingController descriptionController;
   final ImagePicker _picker;
+  final Future<String?> Function(double lat, double lng) _placeLookup;
+  int _placeRequest = 0;
 
   late final String draftIdLabel = _buildDraftIdLabel();
 
@@ -53,15 +57,20 @@ class CreateIncidentController extends ChangeNotifier {
 
   @override
   void dispose() {
+    _placeRequest++; // la búsqueda pendiente ya no avisa a nadie
     descriptionController.dispose();
     super.dispose();
   }
 
+  /// Busca la dirección del punto actual. Cada punto elegido lanza su propia
+  /// búsqueda y solo se aplica la del último
   Future<void> refreshPlace() async {
-    if (refreshingPlace) return;
+    final request = ++_placeRequest;
     refreshingPlace = true;
     notifyListeners();
-    placeLabel = await NominatimReverseGeocode.shortPlaceLabel(lat, lng);
+    final label = await _placeLookup(lat, lng);
+    if (request != _placeRequest) return;
+    placeLabel = label;
     refreshingPlace = false;
     notifyListeners();
   }
