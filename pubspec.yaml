@@ -33,9 +33,6 @@ dependencies:
     
       
 
-  # The following adds the Cupertino Icons font to your application.
-  # Use with the CupertinoIcons class for iOS style icons.
-  cupertino_icons: ^1.0.8
   go_router: ^17.0.0
   flutter_svg: ^2.0.0
   image_picker: ^1.1.0
@@ -81,17 +78,8 @@ flutter:
       - assets/supabase_runtime.json
       - assets/icons/auth/
       - assets/icons/auth/consulta/
-      - assets/icons/medico/navigation/header/
-      - assets/icons/medico/navigation/navbar/
-      - assets/icons/medico/register_patient/
       - assets/icons/paramedico/home/
-      - assets/icons/paramedico/incidentes/
-      - assets/icons/paramedico/incidentes/iniciar_start/
-      - assets/icons/paramedico/mapa/
-      - assets/icons/paramedico/navigation/header/
-      - assets/icons/paramedico/navigation/navbar/
       - assets/icons/paramedico/unico_paciente/
-      - assets/icons/partners/
       - assets/icons/triage/
   fonts:
         - family: Inter
@@ -169,8 +157,4 @@ flutter_launcher_icons:
   adaptive_icon_background: "#FFFFFF"
   adaptive_icon_foreground: assets/branding/app_icon_safe.png
   web:
-    generate: true
-  windows:
-    generate: true
-  macos:
     generate: true
