@@ -42,6 +42,7 @@ import 'package:sistema_triage/shared/widgets/triage_ui.dart';
 | Fila de opción en hojas | `TriageOptionRow`, `.check`, `.toggle` |
 | Botón de color | `TriageLevelButton.start`, `.hospital` o con textos propios |
 | Marcadores de mapa | `TriageIncidentMarker`, `TriagePatientMarker`, `TriageHospitalMarker`, `TriageUserMarker` |
+| Pin al elegir un punto (B06) | `TriagePlacePin` (fijo en el centro del mapa) |
 | Fondo de mapa en gris claro | `TriageMapTiles` |
 | Diálogo | `showTriageConfirm`; `showDialog` con `TriageDialog` para más opciones |
 | Mensaje de resultado a pantalla completa | `TriageResultMessage` |

@@ -1,5 +1,6 @@
 // Sandbox visual del botón de color y los marcadores de mapa (TriageLevelButton,
-// TriageIncidentMarker, TriagePatientMarker, TriageHospitalMarker, TriageUserMarker):
+// TriageIncidentMarker, TriagePatientMarker, TriageHospitalMarker, TriageUserMarker,
+// TriagePlacePin):
 // flutter run -t test/shared/widgets/triage_level_button_visual_test.dart
 import 'package:flutter/material.dart';
 import 'package:sistema_triage/shared/widgets/triage_ui.dart';
@@ -102,6 +103,8 @@ class _LevelSandboxState extends State<_LevelSandbox> {
                 spacing: TriageSpacing.md,
                 children: [TriageHospitalMarker(), TriageUserMarker()],
               ),
+              const _Label('Pin al ajustar la ubicación (B06)'),
+              const TriagePlacePin(),
             ],
           ),
         ),
