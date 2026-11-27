@@ -275,7 +275,6 @@ class ParamedicoMapPage extends StatelessWidget {
           // Solo esta capa se rehace al mover la cámara
           Builder(
             builder: (context) => CircleLayer(
-              optimizeRadiusInMeters: true,
               circles: [
                 for (final ring in coverageRingsFor!(MapCamera.of(context)))
                   CircleMarker(
