@@ -113,13 +113,4 @@ class PatientDemographicsMapper {
     }
     return '—';
   }
-
-  static String relativeCreated(DateTime? at) {
-    if (at == null) return '—';
-    final diff = DateTime.now().difference(at.toLocal());
-    if (diff.inMinutes < 1) return 'unos momentos';
-    if (diff.inMinutes < 60) return '${diff.inMinutes} minutos';
-    if (diff.inHours < 24) return '${diff.inHours} horas';
-    return '${diff.inDays} días';
-  }
 }

@@ -789,31 +789,6 @@ class ParamedicoIncidentsRepository {
     return hash % 360;
   }
 
-  HomeDashboardStats dashboardStats({
-    required List<ParamedicoIncidentSummary> openIncidents,
-    required Map<String, IncidentPatientTriageCounts> countsByIncident,
-  }) {
-    var totalPatients = 0;
-    var red = 0;
-    var yellow = 0;
-    var green = 0;
-    for (final inc in openIncidents) {
-      final c = countsByIncident[inc.id];
-      if (c == null) continue;
-      totalPatients += c.total;
-      red += c.red;
-      yellow += c.yellow;
-      green += c.green;
-    }
-    return HomeDashboardStats(
-      totalActiveIncidents: openIncidents.length,
-      totalPatients: totalPatients,
-      redCount: red,
-      yellowCount: yellow,
-      greenCount: green,
-    );
-  }
-
   Future<String> createIncident({
     required String title,
     required String emergencyType,
@@ -952,35 +927,6 @@ class ParamedicoIncidentsRepository {
           'closed_at': DateTime.now().toUtc().toIso8601String(),
         })
         .eq('id', incidentId);
-  }
-
-  /// Crea un paciente vinculado al incidente y un código de consulta de 6 caracteres
-  Future<String> registerPatientWithConsultationCode({
-    required String incidentId,
-    required String triageColor,
-  }) async {
-    final uid = const Uuid().v4();
-
-    final uidAuth = _c.auth.currentUser?.id;
-    if (uidAuth == null) {
-      throw Exception('La sesión no es válida o ha expirado');
-    }
-
-    final inserted = await _c
-        .from('patients')
-        .insert({
-          'sync_client_id': uid,
-          'incident_id': incidentId,
-          'triage_color': triageColor,
-          'status': 'en_espera',
-          'created_by': uidAuth,
-        })
-        .select('id')
-        .single();
-
-    final patientId = inserted['id'] as String;
-
-    return _createConsultationCode(patientId);
   }
 
   /// Registro completo (display_name + demographics + ubicación del paciente + código de consulta)
@@ -1146,19 +1092,6 @@ class ParamedicoIncidentsRepository {
     );
   }
 
-  Future<ParamedicoPatientRow?> getPatient(String patientId) async {
-    final row = await _c
-        .from('patients')
-        .select(
-          'id, display_name, triage_color, status, created_at, regulation_folio, descriptive_notes, demographics, incident_id',
-        )
-        .eq('id', patientId)
-        .eq('is_deleted', false)
-        .maybeSingle();
-    if (row == null) return null;
-    return ParamedicoPatientRow.fromJson(Map<String, dynamic>.from(row));
-  }
-
   Future<ParamedicoPatientDetail?> getPatientDetail(String patientId) async {
     final row = await _c
         .from('patients')
@@ -1295,21 +1228,4 @@ class _TriageAgg {
   int green = 0;
   int black = 0;
   int total = 0;
-}
-
-/// Totales agregados para [Minidash] (home paramédico)
-class HomeDashboardStats {
-  HomeDashboardStats({
-    required this.totalActiveIncidents,
-    required this.totalPatients,
-    required this.redCount,
-    required this.yellowCount,
-    required this.greenCount,
-  });
-
-  final int totalActiveIncidents;
-  final int totalPatients;
-  final int redCount;
-  final int yellowCount;
-  final int greenCount;
 }

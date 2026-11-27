@@ -24,20 +24,6 @@ class AppConnectivityNotifier extends ChangeNotifier {
   bool get isConnected => _isConnected;
   bool get isRefreshing => _refreshInFlight != null;
 
-  String get statusMessage {
-    if (!_isConnected) {
-      return 'Sin conexión. Active Wi‑Fi o datos móviles para usar la aplicación.';
-    }
-    if (!SupabaseEnv.isConfigured) {
-      return 'Conexión de red activa.';
-    }
-    final hasSession = Supabase.instance.client.auth.currentSession != null;
-    if (!hasSession) {
-      return 'Conexión de red activa. Inicie sesión para sincronizar.';
-    }
-    return 'Conexión activa. La aplicación puede sincronizar con el servidor.';
-  }
-
   Future<void> start() async {
     await _updateConnection();
 

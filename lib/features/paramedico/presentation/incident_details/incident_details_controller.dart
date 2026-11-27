@@ -291,25 +291,6 @@ class IncidentDetailsController extends ChangeNotifier {
     );
   }
 
-  Future<void> openIncidentOnMap(BuildContext context) async {
-    final inc = incident;
-    if (inc == null) return;
-    if (!IncidentPresentationFormatters.hasIncidentLocation(inc)) {
-      showAppSnackBar(
-        context,
-        'Este incidente no tiene coordenadas. Use Editar para registrarlas.',
-        isError: true,
-      );
-      return;
-    }
-    await IncidentLocationMapDialog.showPreview(
-      context,
-      lat: inc.latitude!,
-      lng: inc.longitude!,
-      title: 'Ubicación del incidente',
-    );
-  }
-
   Future<void> editIncidentCoords(BuildContext context) async {
     if (!canEditIncident) {
       showAppSnackBar(

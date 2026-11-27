@@ -66,20 +66,12 @@ class MedicoIncomingReview {
     this.contactPhone,
   });
 
-  bool get hasReportedState =>
-      reportedDescription != null ||
-      injuryLabels.isNotEmpty ||
-      startTriageModeLabel != null;
-
   /// "IMSS", "Sí", "No" o null si no se sabe
   String? get insuranceLabel {
     if (hasInsurance == null) return null;
     if (!hasInsurance!) return 'No';
     return insuranceInstitution ?? 'Sí';
   }
-
-  bool get hasAdministrativeData =>
-      hasInsurance != null || bloodTypeLabel != null || contactPhone != null;
 
   /// Arma la revisión desde la fila de `patients` con sus relaciones embebidas
   /// (`incidents`, `ambulancias_unidades`, `profiles`).
